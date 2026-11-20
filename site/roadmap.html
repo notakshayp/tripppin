@@ -293,8 +293,8 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
     <div class="facts">
       <div><svg class="ic"><use href="#i-layers"/></svg><span>base<b>Fedora bootc 45, image-based</b></span></div>
       <div><svg class="ic"><use href="#i-disc"/></svg><span>first iso<b>End of milestone 1</b></span></div>
-      <div><svg class="ic"><use href="#i-term"/></svg><span>first ai iso<b>End of milestone 4</b></span></div>
-      <div><svg class="ic"><use href="#i-laptop"/></svg><span>daily driver<b>End of milestone 6</b></span></div>
+      <div><svg class="ic"><use href="#i-term"/></svg><span>first ai iso<b>End of milestone 3</b></span></div>
+      <div><svg class="ic"><use href="#i-laptop"/></svg><span>desktop<b>End of milestone 5</b></span></div>
     </div>
   </div>
 
@@ -471,72 +471,20 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
   </section>
 
   <section id="milestones">
-    <div class="st"><span>05 / milestones</span><h2>Nine milestones.<br>Three ISOs to try.</h2></div>
+    <div class="st"><span>05 / milestones</span><h2>Ten milestones.<br>AI first.</h2></div>
     <div class="body">
-      <p class="lede">Each milestone ends with something you can run. Green rows produce an ISO for your laptop.</p>
+      <p class="lede">Reordered so the AI comes first: the AI shell works in a plain terminal, so it's proven before the desktop. Green rows produce an ISO.</p>
       <div class="ms">
-        <div class="m rv"><div class="num">M0<small>foundations</small></div><div>
-          <h4>The workshop</h4><p>Everything that makes later work safe and repeatable.</p>
-          <div class="cols"><ul><li>Rust workspace, CI, merge queue, branch rules</li><li>Renovate for base image and actions</li><li>Signing keys, GHCR, R2 bucket for ISOs</li><li>Lima dev VM recipe for the Mac</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-check"/></svg>you can try</b><p>Open a PR and watch every check run.</p></div></div>
-          <div class="exit">done when: CI is green on an empty workspace on both architectures</div>
-        </div></div>
-
-        <div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 1</span><div class="num">M1<small>first boot</small></div><div>
-          <h4>It boots, it's ours</h4><p>A minimal image with Hyprland, our branding and greenboot. No AI yet.</p>
-          <div class="cols"><ul><li>Containerfile on Fedora bootc 45 minimal</li><li>Hyprland stack packaged and pinned</li><li>image.yml and boot-test.yml</li><li>Anaconda ISO from bootc-image-builder</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-laptop"/></svg>on your laptop</b><p>Install from USB, log into a Tripppin-branded Hyprland desktop, update with <code>bootc upgrade</code>.</p></div></div>
-          <div class="exit">done when: it installs with Secure Boot on and the CI boot test passes nightly</div>
-        </div></div>
-
-        <div class="m rv"><div class="num">M2<small>update loop</small></div><div>
-          <h4>It updates itself safely</h4><p>The full nightly loop, channels and rollback.</p>
-          <div class="cols"><ul><li>Nightly builds, rechunked small updates</li><li>Signature enforcement on every machine</li><li>SBOM, provenance, vulnerability scan</li><li>Upgrade and rollback tests, testing/stable channels</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-refresh"/></svg>you can try</b><p>Your laptop updates overnight. Push a broken build and watch it roll back.</p></div></div>
-          <div class="exit">done when: a forced bad update recovers with no human help</div>
-        </div></div>
-
-        <div class="m rv"><div class="num">M3<small>model</small></div><div>
-          <h4>A model lives here</h4><p>The model engine, hardware detection and the eval harness.</p>
-          <div class="cols"><ul><li>llama.cpp for Vulkan, plus the NVIDIA variant</li><li>Hardware tiers and the signed model catalog</li><li>Supervisor: preload, idle unload, priority</li><li>Eval runner with recorded baselines</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-gauge"/></svg>you can try</b><p><code>trip ask "hello"</code> answers locally. Real speed numbers for your hardware.</p></div></div>
-          <div class="exit">done when: measured speeds published per tier; eval runs in CI</div>
-        </div></div>
-
-        <div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 2</span><div class="num">M4<small>ai shell</small></div><div>
-          <h4>The terminal understands you</h4><p>The harness and the first tools. Plain sentences in, actions out.</p>
-          <div class="cols"><ul><li>Router, tool subsets, native grammars, validation</li><li>Tools: system, files, web search (local SearXNG), web fetch</li><li><code>!cmd</code>, <code>/term</code>, streaming, cancel</li><li>Record/replay tests; eval gate on PRs</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-term"/></svg>on your laptop</b><p>Type "what's my IP" or "find big files in Downloads" and see it work.</p></div></div>
-          <div class="exit">done when: tool and argument accuracy meet the target on our suite at the 9B tier</div>
-        </div></div>
-
-        <div class="m rv"><div class="num">M5<small>safety</small></div><div>
-          <h4>Safe to let it act</h4><p>The security boundary in code, then the verifier on top.</p>
-          <div class="cols"><ul><li>Labels on every value, policy engine, rule of two</li><li>Quarantined reader, verifier, approval window</li><li>Sandbox per tool, narrow admin helper, sealed log</li><li><code>trip undo</code>, home snapshots, rescue boot</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-shield"/></svg>you can try</b><p>Point it at a booby-trapped web page. It refuses and tells you why.</p></div></div>
-          <div class="exit">done when: zero successful attacks in our suite; verifier false blocks under target</div>
-        </div></div>
-
-        <div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 3</span><div class="num">M6<small>desktop</small></div><div>
-          <h4>Daily driver alpha</h4><p>The orb, conversations, agents, app installs and the parts list.</p>
-          <div class="cols"><ul><li>Orb overlay with clickable answers</li><li><code>/chat</code>, per-tab memory, agents panel, scheduler</li><li>Flatpak installs through the AI, <code>trip bom</code></li><li>Bring-your-own model: cloud key or server</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-laptop"/></svg>on your laptop</b><p>Use it as your main machine for a week.</p></div></div>
-          <div class="exit">done when: a week of daily use without a reinstall</div>
-        </div></div>
-
-        <div class="m rv"><div class="num">M7<small>installer</small></div><div>
-          <h4>Five-minute install</h4><p>Our own Rust installer replaces Fedora's Anaconda.</p>
-          <div class="cols"><ul><li>One question per screen, hardware shown in plain words</li><li>Encryption and snapshots without partition questions</li><li>Model downloads during install; offline image includes 4B</li><li>First-run tour, accessibility pass</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-disc"/></svg>you can try</b><p>Hand the USB to a friend and watch them install it without help.</p></div></div>
-          <div class="exit">done when: unattended and manual installs pass in CI and on two laptops</div>
-        </div></div>
-
-        <div class="m rv"><div class="num">M8<small>public beta</small></div><div>
-          <h4>Open the doors</h4><p>Downloads on trippp.in, a beta channel and community testing.</p>
-          <div class="cols"><ul><li>Download page, checksums, signatures, torrent</li><li>Beta channel, hardware report template, test weeks</li><li>Docs, privacy page, source archive per release</li><li>Repository made public on GitHub</li></ul>
-          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-users"/></svg>anyone can try</b><p>Download from trippp.in.</p></div></div>
-          <div class="exit">done when: 50 hardware reports with no blocking bugs</div>
-        </div></div>
+<div class="m rv"><div class="num">M0<small>foundations</small></div><div><h4>The workshop</h4><p>Everything that makes later work safe and repeatable.</p><div class="cols"><ul><li>Rust workspace, CI, PR checks on x86 and ARM</li><li>Dependabot for crates, actions and base images</li><li>Signing key, vulnerability and license gates</li><li>Branch protection (needs GitHub Pro or a public repo)</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-check"/></svg>you can try</b><p>Open a PR and watch every check run.</p></div></div><div class="exit">done when: CI is green on both architectures</div></div></div>
+<div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 1</span><div class="num">M1<small>console build</small></div><div><h4>It boots, it's ours</h4><p>The image, the ISO and virtual disks, with Tripppin branding in the terminal.</p><div class="cols"><ul><li>Fedora bootc 45 image, signed, x86 and ARM</li><li>ISO and virtual disks on the nightly release</li><li>Animated terminal logo, login banner, Tripppin name</li><li><code>trip hw</code> picks the model tier</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-laptop"/></svg>on your mac or laptop</b><p>Boot it in UTM or install from USB, log in, watch the logo draw itself.</p></div></div><div class="exit">done when: it boots on the Mac and the laptop</div></div></div>
+<div class="m rv"><div class="num">M2<small>model</small></div><div><h4>A model lives here</h4><p>The model engine, the right model for your hardware, and a first answer.</p><div class="cols"><ul><li>llama.cpp built into the image (Vulkan, CPU fallback)</li><li>Signed model catalog with checksums</li><li><code>trip model pull</code>, a sandboxed model service</li><li><code>trip ask</code> streams an answer</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-gauge"/></svg>you can try</b><p><code>trip ask "hello"</code> answers on your machine, with real speed numbers.</p></div></div><div class="exit">done when: measured speeds published per tier</div></div></div>
+<div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 2</span><div class="num">M3<small>ai shell</small></div><div><h4>The terminal understands you</h4><p>The harness and the first tools, in the console. No desktop needed.</p><div class="cols"><ul><li>Router, tool sets, native grammars, validation</li><li>Tools: system, files, local web search, web fetch</li><li><code>!cmd</code>, <code>/term</code>, streaming, Ctrl-C</li><li>Record/replay tests; eval gate on PRs</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-term"/></svg>on your mac or laptop</b><p>Log in and type "what's my IP" or "find big files in Downloads".</p></div></div><div class="exit">done when: tool accuracy meets the target at the 9B tier</div></div></div>
+<div class="m rv"><div class="num">M4<small>safety</small></div><div><h4>Safe to let it act</h4><p>The security boundary in code, then the verifier on top.</p><div class="cols"><ul><li>Labels on every value, policy engine, rule of two</li><li>Quarantined reader, verifier, approvals</li><li>Sandbox per tool, narrow admin helper, sealed log</li><li><code>trip undo</code>, home snapshots, rescue boot</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-shield"/></svg>you can try</b><p>Point it at a booby-trapped page. It refuses and says why.</p></div></div><div class="exit">done when: zero successful attacks in our suite</div></div></div>
+<div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 3</span><div class="num">M5<small>desktop</small></div><div><h4>A desktop with an orb</h4><p>Hyprland, the boot splash and the floating orb on top of the AI shell.</p><div class="cols"><ul><li>Hyprland stack packaged and pinned</li><li>Login screen, audio, network, Flatpak</li><li>Boot splash with the power spark</li><li>The orb overlay with clickable answers</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-laptop"/></svg>on your laptop</b><p>Log into a Tripppin desktop and ask the orb for things.</p></div></div><div class="exit">done when: a week of daily use without a reinstall</div></div></div>
+<div class="m rv"><div class="num">M6<small>update loop</small></div><div><h4>It updates itself safely</h4><p>Release channels and the full nightly loop with rollback.</p><div class="cols"><ul><li>testing, beta and stable channels</li><li>Signature enforcement on every machine</li><li>Upgrade and rollback tests in CI</li><li>greenboot health checks</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-refresh"/></svg>you can try</b><p>Your laptop updates overnight. A broken build rolls itself back.</p></div></div><div class="exit">done when: a forced bad update recovers with no help</div></div></div>
+<div class="m rv"><div class="num">M7<small>agents</small></div><div><h4>Bigger jobs, your model</h4><p>Background agents and bring-your-own model.</p><div class="cols"><ul><li>Agents with a scheduler and a panel</li><li>Cloud keys: Claude, Gemini, OpenAI, Sarvam</li><li>Your own OpenAI-compatible server</li><li><code>trip bom</code></li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-users"/></svg>you can try</b><p>Ask for a research job and watch the agent work.</p></div></div><div class="exit">done when: agents finish multi-step tasks on our suite</div></div></div>
+<div class="m rv"><div class="num">M8<small>installer</small></div><div><h4>Five-minute install</h4><p>Our own Rust installer replaces Fedora's.</p><div class="cols"><ul><li>One question per screen</li><li>Encryption and snapshots without partition questions</li><li>Model downloads during install</li><li>First-run tour, accessibility pass</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-disc"/></svg>you can try</b><p>Hand someone the USB and watch them install it alone.</p></div></div><div class="exit">done when: installs pass in CI and on two laptops</div></div></div>
+<div class="m rv"><div class="num">M9<small>public beta</small></div><div><h4>Open the doors</h4><p>Downloads on trippp.in, a beta channel and community testing.</p><div class="cols"><ul><li>Download page, checksums, signatures</li><li>Beta channel, hardware reports</li><li>Docs, privacy page, source archive</li><li>Repository made public</li></ul><div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-users"/></svg>anyone can try</b><p>Download from trippp.in.</p></div></div><div class="exit">done when: 50 hardware reports with no blocking bugs</div></div></div>
       </div>
     </div>
   </section>
