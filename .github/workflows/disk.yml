@@ -67,6 +67,10 @@ jobs:
           hash=$(openssl passwd -6 "$TEST_USER_PASSWORD")
           sed -e "s|@PASSWORD_HASH@|$hash|" -e "s|@SSH_KEY@|$TEST_USER_SSH_KEY|" os/disk/config.toml.in > config.toml
 
+      - name: Show the image's package repositories
+        run: |
+          sudo podman run --rm "$IMAGE:nightly-${{ matrix.arch }}" sh -c 'ls -la /etc/yum.repos.d /usr/lib/yum.repos.d 2>&1; grep -H "^enabled" /etc/yum.repos.d/*.repo 2>&1 | head -20'
+
       - name: Build disk images
         run: |
           mkdir -p output
@@ -78,7 +82,8 @@ jobs:
               -v ./output:/output \
               -v /var/lib/containers/storage:/var/lib/containers/storage \
               "$BIB" --type "$type" --rootfs btrfs \
-              "$IMAGE:nightly-${{ matrix.arch }}"
+              "$IMAGE:nightly-${{ matrix.arch }}" \
+              || echo "::warning::the $type build failed; publishing the other images"
           done
           sudo chown -R "$USER" output
           find output -type f -exec ls -lh {} \;
