@@ -32,6 +32,10 @@ RUN dnf -y upgrade --refresh && dnf clean all
 # We don't need it until milestone 6; re-add it once Fedora ships a rebuilt package.
 RUN dnf -y remove toolbox && dnf clean all
 
+# Fedora 45 keeps its repo definitions in /usr/share/dnf5/repos.d, but the ISO
+# builder only reads /etc/yum.repos.d. Copy them so it can resolve installer packages.
+RUN cp -n /usr/share/dnf5/repos.d/*.repo /etc/yum.repos.d/
+
 COPY --from=build /src/target/release/trip /usr/bin/trip
 COPY os/files/ /
 
