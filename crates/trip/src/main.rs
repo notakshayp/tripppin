@@ -3,6 +3,8 @@ use clap::{Parser, Subcommand};
 use hwdetect::{Catalog, Hardware, Tier};
 use serde::Serialize;
 
+mod logo;
+
 #[derive(Parser)]
 #[command(name = "trip", version, about = "Tripppin: tell your computer what you want.")]
 struct Cli {
@@ -18,6 +20,15 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Show the tripppin logo with a short system summary.
+    Logo {
+        /// Draw it once without animating.
+        #[arg(long = "static")]
+        still: bool,
+        /// Only the logo, without the system summary (used for the login banner).
+        #[arg(long)]
+        bare: bool,
+    },
 }
 
 #[derive(Serialize)]
@@ -29,7 +40,36 @@ struct HwReport<'a> {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Hw { json } => hw(json),
+        Command::Logo { still, bare } => {
+            let info = if bare { Vec::new() } else { summary() };
+            Ok(logo::show(&info, !still)?)
+        }
     }
+}
+
+/// The lines printed beside the logo. Each piece is skipped if it can't be read.
+fn summary() -> Vec<String> {
+    let mut lines = vec!["tripppin".to_string(), "a linux with an ai inside".to_string(), String::new()];
+    let os = std::fs::read_to_string("/etc/os-release")
+        .or_else(|_| std::fs::read_to_string("/usr/lib/os-release"))
+        .ok()
+        .and_then(|t| t.lines().find_map(|l| l.strip_prefix("PRETTY_NAME=").map(|v| v.trim_matches('"').to_string())));
+    if let Some(os) = os {
+        lines.push(format!("system   {os}"));
+    }
+    if let Ok(kernel) = std::fs::read_to_string("/proc/sys/kernel/osrelease") {
+        lines.push(format!("kernel   {}", kernel.trim()));
+    }
+    if let Ok(hw) = hwdetect::detect() {
+        lines.push(format!("memory   {:.1} GiB", hw.memory_gib()));
+        if let Ok(catalog) = Catalog::builtin() {
+            lines.push(match catalog.recommend(&hw) {
+                Some(t) => format!("model    {} (not installed yet)", t.model),
+                None => "model    cloud key or your own server".to_string(),
+            });
+        }
+    }
+    lines
 }
 
 fn hw(json: bool) -> Result<()> {
