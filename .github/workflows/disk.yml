@@ -1,9 +1,7 @@
 name: disk
 
-# Turns the published OS image into things you can boot:
-#   x86_64: an installer ISO and a qcow2 virtual disk
-#   arm64:  a qcow2 virtual disk (runs natively in UTM on Apple Silicon)
-# and attaches them to the "nightly" pre-release on GitHub.
+# Turns the published OS image into the x86_64 installer ISO and attaches it to
+# the "nightly" pre-release on GitHub.
 
 on:
   workflow_dispatch:
@@ -32,11 +30,7 @@ jobs:
           - arch: amd64
             name: x86_64
             runner: ubuntu-24.04
-            types: qcow2 anaconda-iso
-          - arch: arm64
-            name: aarch64
-            runner: ubuntu-24.04-arm
-            types: qcow2
+            types: anaconda-iso
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
@@ -83,8 +77,7 @@ jobs:
               -v ./output:/output \
               -v /var/lib/containers/storage:/var/lib/containers/storage \
               "$BIB" --type "$type" --rootfs btrfs \
-              "$IMAGE:nightly-${{ matrix.arch }}" \
-              || echo "::warning::the $type build failed; publishing the other images"
+              "$IMAGE:nightly-${{ matrix.arch }}"
           done
           sudo chown -R "$USER" output
           find output -type f -exec ls -lh {} \;
@@ -94,7 +87,9 @@ jobs:
           sudo apt-get install -y -qq qemu-utils >/dev/null
           day=$(date -u +%Y%m%d)
           mkdir -p dist
-          qemu-img convert -c -O qcow2 output/qcow2/disk.qcow2 "dist/tripppin-$day-${{ matrix.name }}.qcow2"
+          if [ -f output/qcow2/disk.qcow2 ]; then
+            qemu-img convert -c -O qcow2 output/qcow2/disk.qcow2 "dist/tripppin-$day-${{ matrix.name }}.qcow2"
+          fi
           if [ -f output/bootiso/install.iso ]; then
             mv output/bootiso/install.iso "dist/tripppin-$day-${{ matrix.name }}.iso"
           fi
