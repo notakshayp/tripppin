@@ -90,6 +90,18 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [ ] Plymouth boot splash with the power spark, wallpaper, default Hyprland config (floating-first)
 - [ ] The orb overlay
 
+## M8: Installer (later: after the OS is solid)
+
+For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our own flow; parked until the OS itself is in good shape.
+
+- [ ] `trip install`: a full-screen installer in our design (lowercase, DM Mono, forest green, the logo intro as the welcome)
+- [ ] Flow: welcome, language and keyboard, Wi-Fi, disk (one clear warning), account, install with progress, done
+- [ ] Engine: `bootc install to-disk`; our app is only the front end
+- [ ] ISO that boots into our installer instead of Anaconda (image-builder's installer ISO type)
+- [ ] First boot: offer the model download, so `/setup` isn't needed
+- [ ] Later, a graphical version once the desktop exists (M5)
+- [ ] Meanwhile, optionally brand Anaconda (product.img: logo, colours, name)
+
 ## Open questions for the owner
 
 1. **Signing key:** OK to generate a cosign key pair and store the private key as a GitHub secret?
