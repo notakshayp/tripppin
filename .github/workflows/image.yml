@@ -2,10 +2,10 @@ name: image
 
 on:
   pull_request:
-    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .grype.yaml, .syft.yaml, .github/workflows/image.yml]
+    paths: [os/**, "!os/disk/**", crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .grype.yaml, .syft.yaml, .github/workflows/image.yml]
   push:
     branches: [main]
-    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .grype.yaml, .syft.yaml, .github/workflows/image.yml]
+    paths: [os/**, "!os/disk/**", crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .grype.yaml, .syft.yaml, .github/workflows/image.yml]
   schedule:
     - cron: "0 4 * * *" # nightly, picks up Fedora security fixes
   workflow_dispatch:
