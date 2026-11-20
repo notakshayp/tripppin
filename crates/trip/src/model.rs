@@ -29,7 +29,10 @@ About this system:
 - `sudo dnf install` changes don't last; for a command-line tool, use `sudo dnf install --transient -y <package>` \
 and say it lasts until the next reboot.
 - sudo may ask the person for their password in the terminal; that's fine.
-- Use non-interactive flags (-y, --noconfirm) and avoid commands that open an editor or a pager.";
+- Use non-interactive flags (-y, --noconfirm) and avoid commands that open an editor or a pager.
+- There is no graphical desktop yet: Tripppin is text-only for now, so windowed (GUI) apps can't be shown. \
+If asked for a GUI, a desktop or a windowed app, say that plainly instead of trying to install one.
+- If something fails twice the same way, stop and tell the person what's blocking you.";
 
 /// An HTTP client that trusts the operating system's certificate store, so CA updates
 /// arrive with system updates rather than with a new build of trip.
@@ -184,6 +187,9 @@ pub fn server_args(tier: &Tier, model_path: &Path) -> Vec<String> {
         "--ctx-size".into(),
         tier.context.to_string(),
         "--jinja".into(),
+        // One person at a time: the whole context goes to one conversation.
+        "--parallel".into(),
+        "1".into(),
         // Put every layer on the GPU when there is one; llama.cpp falls back to the CPU otherwise.
         "--n-gpu-layers".into(),
         "99".into(),
@@ -308,12 +314,20 @@ pub fn stream(
     }
     let url = format!("http://127.0.0.1:{PORT}/v1/chat/completions");
     let start = Instant::now();
-    let mut resp = match http().post(&url).header("Content-Type", "application/json").send(body.to_string()) {
+    let request = http().post(&url).config().http_status_as_error(false).build();
+    let mut resp = match request.header("Content-Type", "application/json").send(body.to_string()) {
         Ok(r) => r,
         Err(ureq::Error::Io(_)) | Err(ureq::Error::ConnectionFailed) => return Err(unavailable()),
-        Err(ureq::Error::StatusCode(503)) => bail!("the model is still loading. try again in a few seconds."),
-        Err(e) => return Err(e).context("asking the model"),
+        Err(e) => return Err(e).context("couldn't reach the model"),
     };
+    match resp.status().as_u16() {
+        200 => {}
+        503 => bail!("the model is still loading. try again in a few seconds."),
+        status => {
+            let text = resp.body_mut().read_to_string().unwrap_or_default();
+            return Err(server_error(status, &text));
+        }
+    }
     let reader = BufReader::new(resp.body_mut().as_reader());
     let (mut text, mut first, mut pieces, mut cancelled) = (String::new(), None, 0u32, false);
     let mut calls: Vec<ToolCall> = Vec::new();
@@ -328,6 +342,9 @@ pub fn stream(
             break;
         }
         let Ok(chunk) = serde_json::from_str::<serde_json::Value>(data) else { continue };
+        if chunk.get("error").is_some() {
+            return Err(server_error(200, data));
+        }
         if let Some(piece) = delta_text(&chunk) {
             first.get_or_insert_with(|| start.elapsed());
             pieces += 1;
@@ -342,6 +359,44 @@ pub fn stream(
     let tokens_per_sec =
         first.map_or(0.0, |t: Duration| f64::from(pieces) / start.elapsed().saturating_sub(t).as_secs_f64().max(0.001));
     Ok(Reply { text, calls, first_word: first, tokens_per_sec, cancelled })
+}
+
+/// The conversation no longer fits in the model's context; drop old material and try again.
+#[derive(Debug)]
+pub struct ContextFull;
+
+impl std::fmt::Display for ContextFull {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the conversation is too long for the model's memory")
+    }
+}
+
+impl std::error::Error for ContextFull {}
+
+/// Turns an error reply from llama.cpp into something readable, keeping "context full" distinct.
+fn server_error(status: u16, body: &str) -> anyhow::Error {
+    let v: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+    let err = v.get("error").unwrap_or(&v);
+    let message = err.get("message").and_then(|m| m.as_str()).unwrap_or(body).trim().to_string();
+    let kind = err.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    if kind == "exceed_context_size_error" || message.contains("context size") || message.contains("context length") {
+        return ContextFull.into();
+    }
+    let message = if message.is_empty() { "no details".to_string() } else { message };
+    anyhow::anyhow!("the model server said no ({status}): {message}")
+}
+
+/// How many tokens the running model can hold, from llama.cpp's /props. 8192 if it can't say.
+pub fn context_tokens() -> usize {
+    let url = format!("http://127.0.0.1:{PORT}/props");
+    http()
+        .get(&url)
+        .call()
+        .ok()
+        .and_then(|mut r| r.body_mut().read_to_string().ok())
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v.pointer("/default_generation_settings/n_ctx").and_then(|n| n.as_u64()))
+        .map_or(8192, |n| n as usize)
 }
 
 /// Sends one question and prints the streamed answer (`trip ask`, for scripts and testing).
@@ -400,6 +455,15 @@ mod tests {
         let chunk = serde_json::json!({"choices":[{"delta":{"content":"hel"},"index":0}]});
         assert_eq!(delta_text(&chunk).as_deref(), Some("hel"));
         assert_eq!(delta_text(&serde_json::json!({"choices":[{"delta":{"role":"assistant"}}]})), None);
+    }
+
+    #[test]
+    fn recognises_a_full_context() {
+        let body = r#"{"error":{"code":400,"message":"the request exceeds the available context size, try increasing it","type":"exceed_context_size_error"}}"#;
+        assert!(server_error(400, body).downcast_ref::<ContextFull>().is_some());
+        let other = server_error(500, r#"{"error":{"message":"boom"}}"#);
+        assert!(other.downcast_ref::<ContextFull>().is_none());
+        assert_eq!(other.to_string(), "the model server said no (500): boom");
     }
 
     #[test]

@@ -5,10 +5,11 @@
 //! JSON, or missing or mistyped fields isn't run; the model gets the exact problem back and
 //! another try, up to `MAX_RETRIES` times in a row.
 
-use crate::model::{self, Message, ToolCall};
+use crate::model::{self, ContextFull, Message, ToolCall};
 use crate::shell::{ACCENT, DIM, RESET};
 use anyhow::{Result, bail};
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -21,8 +22,15 @@ const MAX_RETRIES: usize = 3;
 const DEFAULT_TIMEOUT_SECS: u64 = 120;
 const MAX_TIMEOUT_SECS: u64 = 1800;
 /// How much of a tool's output goes back to the model. The rest is cut from the middle.
-const MAX_RESULT_CHARS: usize = 6000;
+const MAX_RESULT_CHARS: usize = 4000;
 const MAX_READ_BYTES: u64 = 1 << 20;
+/// The same exec command more often than this in one task is refused, so the model can't loop.
+const MAX_REPEATS: usize = 2;
+/// A rough, deliberately low estimate of characters per token, for budgeting the context.
+const CHARS_PER_TOKEN: usize = 3;
+/// Context kept free for the tool definitions and the model's reply, in tokens.
+const CONTEXT_RESERVE: usize = 3000;
+const TRIMMED: &str = "[earlier output removed to save space; run the command again if you need it]";
 
 /// The tools the model can call, as JSON schemas.
 pub fn tools() -> Value {
@@ -171,13 +179,23 @@ pub struct Done {
 /// The model's text streams to the terminal; each tool call shows as a line, with its output.
 pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
     let tools = tools();
+    let budget = model::context_tokens().saturating_sub(CONTEXT_RESERVE).max(2000) * CHARS_PER_TOKEN;
+    let mut runs: HashMap<String, usize> = HashMap::new();
     let mut retries = 0;
     for step in 0..MAX_STEPS {
-        let mut out = io::stdout();
-        let reply = model::stream(history, Some(&tools), cancel, |piece| {
-            let _ = write!(out, "{piece}");
-            let _ = out.flush();
-        })?;
+        compact(history, budget);
+        let reply = match ask(history, &tools, cancel) {
+            Err(e) if e.downcast_ref::<ContextFull>().is_some() => {
+                // The estimate was off; keep only the newest output and try once more.
+                note("the conversation got too long for the model's memory; trimming old output");
+                compact(history, 0);
+                ask(history, &tools, cancel).map_err(|e| match e.downcast_ref::<ContextFull>() {
+                    Some(_) => anyhow::anyhow!("this task got too long for the model's memory. try a smaller step."),
+                    None => e,
+                })?
+            }
+            other => other?,
+        };
         if !reply.text.is_empty() && !reply.text.ends_with('\n') {
             println!();
         }
@@ -207,6 +225,13 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
         let mut broken = false;
         for call in &calls {
             let result = match verify(call) {
+                Ok(Action::Exec { command, .. }) if bump(&mut runs, &command) > MAX_REPEATS => {
+                    note(&format!("not running `{}` again; it already ran {MAX_REPEATS} times", one_line(&command)));
+                    format!(
+                        "Not run: you've already run this exact command {MAX_REPEATS} times in this task. \
+Don't repeat it. Try a different approach, or tell the person what's blocking you."
+                    )
+                }
                 Ok(action) => perform(&action, cancel),
                 Err(problem) => {
                     broken = true;
@@ -230,6 +255,53 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
         }
     }
     bail!("stopped after {MAX_STEPS} steps without finishing. ask again to keep going.")
+}
+
+/// One model turn, streamed to the terminal.
+fn ask(history: &[Message], tools: &Value, cancel: &AtomicBool) -> Result<model::Reply> {
+    let mut out = io::stdout();
+    model::stream(history, Some(tools), cancel, |piece| {
+        let _ = write!(out, "{piece}");
+        let _ = out.flush();
+    })
+}
+
+fn bump(runs: &mut HashMap<String, usize>, command: &str) -> usize {
+    let n = runs.entry(command.trim().to_string()).or_default();
+    *n += 1;
+    *n
+}
+
+fn one_line(text: &str) -> String {
+    let line = text.lines().next().unwrap_or("");
+    if line.chars().count() > 60 {
+        format!("{}…", line.chars().take(60).collect::<String>())
+    } else {
+        line.to_string()
+    }
+}
+
+/// Keeps the conversation under `budget` characters by replacing the oldest tool outputs with a
+/// short note. The newest tool result always stays, so the model can see what just happened.
+fn compact(history: &mut [Message], budget: usize) {
+    let size = |h: &[Message]| h.iter().map(|m| m.0.to_string().len()).sum::<usize>();
+    let mut total = size(history);
+    if total <= budget {
+        return;
+    }
+    let newest = history.iter().rposition(|m| m.0["role"] == "tool");
+    for (i, msg) in history.iter_mut().enumerate() {
+        if total <= budget {
+            break;
+        }
+        let m = &mut msg.0;
+        if m["role"] != "tool" || Some(i) == newest || m["content"] == TRIMMED {
+            continue;
+        }
+        let before = m.to_string().len();
+        m["content"] = Value::String(TRIMMED.into());
+        total = total - before + m.to_string().len();
+    }
 }
 
 fn note(text: &str) {
@@ -468,6 +540,35 @@ mod tests {
         assert!(err("run_shell", r#"{"command": "ls"}"#).contains("no tool called \"run_shell\""));
         assert!(err("", "{}").contains("no tool name"));
         assert!(err("write_file", r#"{"path": "a"}"#).contains("needs a \"content\" field"));
+    }
+
+    #[test]
+    fn compacts_old_tool_output_first() {
+        let big = "x".repeat(5000);
+        let mut h = vec![
+            Message::system(),
+            Message::user("task"),
+            Message::tool("a", &big),
+            Message::tool("b", &big),
+            Message::tool("c", &big),
+        ];
+        compact(&mut h, 8000);
+        assert_eq!(h[2].0["content"], TRIMMED);
+        assert_eq!(h[3].0["content"], TRIMMED);
+        assert_eq!(h[4].0["content"], big.as_str(), "the newest output stays");
+        assert_eq!(h[1].0["content"], "task", "the request stays");
+        let mut small = vec![Message::user("hi"), Message::tool("a", "ok")];
+        compact(&mut small, 10_000);
+        assert_eq!(small[1].0["content"], "ok");
+    }
+
+    #[test]
+    fn counts_repeated_commands() {
+        let mut runs = HashMap::new();
+        assert_eq!(bump(&mut runs, "ls"), 1);
+        assert_eq!(bump(&mut runs, " ls "), 2);
+        assert_eq!(bump(&mut runs, "ls"), 3);
+        assert_eq!(bump(&mut runs, "pwd"), 1);
     }
 
     #[test]
