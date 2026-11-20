@@ -1,0 +1,562 @@
+<title>Tripppin Build Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the build plan as a field guide. Ruled sections, mono label column, tight bold headings, square panels, line icons. Emphasis is color, never italics. */
+:root{
+  --bg:#f5f2ea; --panel:#ece8db; --line:#ddd6c6; --ink:#182423; --muted:#5d6a65; --accent:#1f6b45; --accent-soft:#d6e6db;
+  --term:#142019; --term-ink:#e6ece6; --term-dim:#8fa097; --term-accent:#7fdcaa; --warn:#a4561c; --stop:#b23b2a;
+  --sheet:#fbfaf6; --dot:rgba(24,36,35,.32);
+  --sans:"Inter", "Helvetica Neue", Arial, sans-serif;
+  --mono:"DM Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1211; --panel:#18201d; --line:#2d3834; --ink:#f2f5ef; --muted:#b9c6bf; --accent:#57d99a; --accent-soft:#1c3328;
+  --term:#070b0a; --term-ink:#e6ece6; --term-dim:#8fa097; --term-accent:#7fdcaa; --warn:#f0a35e; --stop:#ff8a75;
+  --sheet:#131a18; --dot:rgba(242,245,239,.16); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1211; --panel:#18201d; --line:#2d3834; --ink:#f2f5ef; --muted:#b9c6bf; --accent:#57d99a; --accent-soft:#1c3328;
+  --term:#070b0a; --term-ink:#e6ece6; --term-dim:#8fa097; --term-accent:#7fdcaa; --warn:#f0a35e; --stop:#ff8a75;
+  --sheet:#131a18; --dot:rgba(242,245,239,.16); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;letter-spacing:-.011em;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0;
+  -webkit-font-smoothing:antialiased}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.12;background-image:radial-gradient(var(--dot) .55px,transparent .7px);background-size:5px 5px;z-index:0}
+.guide{position:relative;z-index:1;max-width:1180px;margin:0 auto}
+a{color:var(--accent)}
+em{font-style:normal;color:var(--accent)}
+b{font-weight:600}
+code{font-family:var(--mono);font-size:.88em;letter-spacing:0;background:var(--panel);padding:.08em .35em}
+.ic{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ic.lg{width:30px;height:30px;stroke-width:1.4}
+svg text{font-family:var(--mono);font-size:12px;fill:var(--muted);letter-spacing:0}
+svg text.k{fill:var(--ink);font-family:var(--sans);font-weight:700;font-size:13.5px}
+
+.rail{height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.07em}
+.brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.rail nav{display:flex;gap:20px;font:11px var(--mono);color:var(--muted)}
+.rail nav a{color:inherit;text-decoration:none}
+.rail nav a:hover{color:var(--accent)}
+
+.hero{padding-block:88px 56px;border-bottom:1px solid var(--line)}
+.hero h1{font-weight:800;font-size:clamp(50px,8.2vw,110px);line-height:.91;letter-spacing:-.075em;margin:0 0 44px;text-wrap:balance}
+.hero-row{display:flex;justify-content:space-between;align-items:end;gap:32px;flex-wrap:wrap}
+.hero-row p{max-width:520px;font-size:18px;line-height:1.5;letter-spacing:-.02em;margin:0}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line);margin-top:48px}
+.facts div{padding:16px 16px 16px 0;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}
+.facts .ic{color:var(--accent);margin-top:3px}
+.facts span{display:block;font:10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.facts b{display:block;font-size:16px;letter-spacing:-.03em;line-height:1.3}
+
+section{padding-block:88px 24px}
+.st{display:grid;grid-template-columns:100px minmax(0,1fr);gap:25px;margin-bottom:36px}
+.st > span{font:500 11px var(--mono);color:var(--accent);padding-top:10px}
+h2{font-weight:700;font-size:clamp(38px,5vw,64px);letter-spacing:-.07em;line-height:.94;margin:0;text-wrap:balance}
+.body{margin-left:125px}
+.lede{font-size:21px;line-height:1.42;letter-spacing:-.03em;font-weight:500;max-width:720px;margin:0 0 8px}
+h3{font-weight:700;font-size:22px;letter-spacing:-.045em;margin:48px 0 14px}
+p{margin:0 0 16px}
+.muted{color:var(--muted)}
+.cap{font:11px var(--mono);color:var(--muted);margin:10px 0 0;letter-spacing:0}
+
+.cards{display:grid;grid-template-columns:repeat(var(--cols,3),minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);margin:24px 0}
+.card{padding:20px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px;min-width:0;background:var(--bg)}
+.card .ic{color:var(--accent)}
+.card h4{margin:0;font-size:17px;font-weight:700;letter-spacing:-.04em}
+.card p{margin:0;font-size:14px;color:var(--muted);line-height:1.5}
+.card.hi{background:var(--panel)}
+.card.warn .ic{color:var(--warn)}
+.chip{display:inline-flex;align-items:center;gap:6px;font:11px var(--mono);padding:3px 8px;border:1px solid var(--line);color:var(--muted);align-self:flex-start;letter-spacing:0}
+.chip.ok{color:var(--accent);border-color:var(--accent)}
+.chip.wr{color:var(--warn);border-color:var(--warn)}
+
+.fig{border:1px solid var(--line);background:var(--sheet);margin:24px 0;overflow-x:auto}
+.fig svg{display:block;width:100%;height:auto;min-width:640px}
+
+/* image anatomy */
+.anat{display:grid;gap:6px;margin:24px 0}
+.anat > div{display:grid;grid-template-columns:28px 210px minmax(0,1fr) auto;gap:16px;align-items:center;padding:14px 18px;border:1px solid var(--line);background:var(--bg)}
+.anat .ic{color:var(--muted)}
+.anat b{font-size:16px;letter-spacing:-.03em}
+.anat span{font-size:14px;color:var(--muted)}
+.anat .ours{background:var(--panel);border-color:var(--accent)}
+.anat .ours .ic{color:var(--accent)}
+
+/* pipeline svg */
+.pfig .stage{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
+.pfig .stage.gate{stroke:var(--accent);stroke-width:2;fill:var(--panel)}
+.pfig .stage.user{stroke:var(--ink)}
+.pfig .wire{stroke:var(--accent);stroke-width:1.6;fill:none;stroke-dasharray:5 6}
+.pfig .back{stroke:var(--stop);stroke-width:1.4;fill:none;stroke-dasharray:3 5}
+.pfig .ar{fill:var(--accent)}
+.pfig .runner{display:none}
+.pfig text.r{fill:var(--stop)}
+
+/* workflows */
+.wf{border-top:1px solid var(--line);margin:24px 0}
+.wf > div{display:grid;grid-template-columns:160px minmax(0,1fr) 220px;gap:20px;padding:16px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.wf code{font-size:13px;font-weight:500}
+.wf p{margin:0;font-size:14.5px;color:var(--muted)}
+.wf .trig{font:11.5px var(--mono);color:var(--muted)}
+
+/* testing pyramid */
+.pyr{display:grid;gap:6px;margin:28px auto;max-width:860px}
+.pyr > div{margin-inline:auto;width:var(--w);display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 16px;border:1px solid var(--line);background:var(--bg);min-width:0}
+.pyr .ic{color:var(--accent)}
+.pyr b{font-size:15px;letter-spacing:-.03em}
+.pyr small{display:block;font-size:13px;color:var(--muted);line-height:1.4}
+.pyr .when{font:11px var(--mono);color:var(--muted);white-space:nowrap}
+.pyr .hw{background:var(--panel);border-color:var(--accent)}
+
+/* dev loop */
+.loops{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:1px solid var(--line);margin:24px 0}
+.loops > div{padding:22px}
+.loops > div:first-child{border-right:1px solid var(--line)}
+.loops h4{display:flex;gap:10px;align-items:center;margin:0 0 12px;font-size:17px;letter-spacing:-.04em}
+.loops h4 .ic{color:var(--accent)}
+.loops ol{margin:0;padding-left:1.2em;display:grid;gap:8px;font-size:14.5px;color:var(--muted)}
+.loops ol li::marker{color:var(--accent);font-family:var(--mono)}
+.term{background:var(--term);color:var(--term-ink);padding:18px 22px;font-family:var(--mono);font-size:12.5px;line-height:1.75;overflow-x:auto;margin:16px 0 0;border:1px solid var(--line)}
+.term pre{margin:0;font:inherit;white-space:pre}
+.term .d{color:var(--term-dim)}
+.term .p{color:var(--term-accent)}
+
+/* harness svg */
+.hfig .box{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
+.hfig .box.me{stroke:var(--ink)}
+.hfig .box.trust{fill:var(--panel);stroke:var(--accent);stroke-width:2}
+.hfig .box.q{stroke:var(--warn);stroke-dasharray:4 4}
+.hfig .box.hard{fill:var(--accent)}
+.hfig text.w{fill:var(--bg);font-weight:500}
+.hfig .wire{stroke:var(--accent);stroke-width:1.6;fill:none;stroke-dasharray:5 6}
+.hfig .wire.q{stroke:var(--warn)}
+
+/* tables */
+.tbl{overflow-x:auto;margin:24px 0}
+table{border-collapse:collapse;width:100%;font-size:14.5px;line-height:1.5;min-width:600px}
+th,td{text-align:left;padding:12px 14px 12px 0;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{border-top:1px solid var(--line);font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+tbody th{font-weight:600;letter-spacing:-.02em}
+td{color:var(--muted)}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
+
+/* milestones */
+.ms{border-top:1px solid var(--line);margin:28px 0;position:relative}
+.m{display:grid;grid-template-columns:90px minmax(0,1fr);gap:24px;padding:28px 0;border-bottom:1px solid var(--line);position:relative}
+.m .num{font-weight:800;font-size:44px;letter-spacing:-.08em;line-height:.9;color:var(--accent)}
+.m .num small{display:block;font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+.m h4{margin:0 0 6px;font-size:24px;font-weight:700;letter-spacing:-.055em}
+.m > div > p{margin:0 0 14px;color:var(--muted);max-width:720px}
+.m .cols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px}
+.m ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:14px;color:var(--muted)}
+.m ul li{display:flex;gap:8px;align-items:baseline}
+.m ul li::before{content:"+";color:var(--accent);font-family:var(--mono)}
+.m .try{border:1px solid var(--line);background:var(--sheet);padding:14px 16px;font-size:14px}
+.m .try b{display:flex;gap:8px;align-items:center;font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.m .try p{margin:0;color:var(--ink)}
+.m .exit{margin-top:10px;font:11.5px var(--mono);color:var(--muted);letter-spacing:0}
+.m.iso{background:linear-gradient(90deg,var(--panel),transparent 70%)}
+.m.iso .flag{position:absolute;right:0;top:28px;display:inline-flex;gap:6px;align-items:center;font:500 11px var(--mono);color:var(--bg);background:var(--accent);padding:5px 10px}
+.m.iso .flag .ic{width:14px;height:14px;color:var(--bg)}
+
+/* design language */
+.swatches{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--line);margin:24px 0}
+.swatches > div{border-right:1px solid var(--line);min-width:0}
+.swatches > div:last-child{border-right:0}
+.swatches i{display:block;height:72px;border-bottom:1px solid var(--line)}
+.swatches span{display:block;padding:10px 12px;font:11px var(--mono);color:var(--muted)}
+.swatches span b{display:block;font:600 13px var(--sans);color:var(--ink);letter-spacing:-.02em}
+.type{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);border:1px solid var(--line);margin:24px 0}
+.type > div{padding:24px;min-width:0}
+.type > div:first-child{border-right:1px solid var(--line)}
+.type .aa{font-weight:800;font-size:clamp(56px,8vw,96px);letter-spacing:-.075em;line-height:.9}
+.type .mn{font:400 34px var(--mono);letter-spacing:0;line-height:1.1}
+.type p{margin:12px 0 0;font-size:14px;color:var(--muted)}
+
+.contact{margin-top:96px;padding-block:56px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:32px;flex-wrap:wrap;align-items:end}
+.contact h2{font-size:clamp(44px,7vw,92px)}
+.contact p{margin:0;font:11px var(--mono);color:var(--muted);max-width:340px}
+
+@media (prefers-reduced-motion:no-preference){
+  .wire{animation:flow 1.4s linear infinite}
+  .pfig .runner{display:block;offset-path:path("M70 70H170M250 70H350M430 70H530M610 70H700");animation:run 6s linear infinite}
+  @supports (animation-timeline: view()){
+    .rv{animation:rise linear both;animation-timeline:view();animation-range:entry 0% entry 35%}
+  }
+}
+@keyframes flow{to{stroke-dashoffset:-22}}
+@keyframes run{from{offset-distance:0%}to{offset-distance:100%}}
+@keyframes rise{from{opacity:.15;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+@media (max-width:860px){
+  .rail nav a:nth-child(n+4){display:none}
+  .hero{padding-block:56px 40px}
+  .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .st{grid-template-columns:1fr;gap:10px}
+  .st > span{padding-top:0}
+  .body{margin-left:0}
+  .cards{--cols:1 !important}
+  .anat > div{grid-template-columns:24px minmax(0,1fr) auto;gap:4px 12px}
+  .anat span{grid-column:2 / -1;grid-row:2}
+  .wf > div{grid-template-columns:1fr;gap:4px}
+  .pyr > div{width:100% !important}
+  .loops,.type{grid-template-columns:1fr}
+  .loops > div:first-child,.type > div:first-child{border-right:0;border-bottom:1px solid var(--line)}
+  .m{grid-template-columns:1fr;gap:10px}
+  .m .cols{grid-template-columns:1fr}
+  .m.iso .flag{position:static;margin-bottom:10px}
+  .swatches{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .swatches > div:nth-child(3){border-right:0}
+  .swatches > div:nth-child(-n+3){border-bottom:1px solid var(--line)}
+}
+@media (max-width:520px){.facts{grid-template-columns:1fr}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></symbol>
+  <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1"/><path d="M2 19h20"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 9l3 3-3 3M13 15h4"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></symbol>
+  <symbol id="i-git" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 8v8M18 11c0 4-6 3-10 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15 14.5a5 5 0 0 1 6 5.5"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16M20 20v-4h-4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L4 14h8l-1 8 9-12h-8z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+</svg>
+
+<div class="guide">
+  <header class="rail">
+    <div class="brand"><span class="dot" aria-hidden="true"></span>tripppin · build plan</div>
+    <nav aria-label="Sections"><a href="#base">base</a><a href="#pipeline">pipeline</a><a href="#testing">testing</a><a href="#harness">harness</a><a href="#milestones">milestones</a><a href="#design">design</a></nav>
+  </header>
+
+  <div class="hero">
+    <h1>From an empty repo to an ISO <em>on your laptop.</em></h1>
+    <div class="hero-row">
+      <p>The full flow: what we build on, how every change is built, signed and tested, what you can try at each milestone, and what keeps it reliable.</p>
+      <span class="cap">plan v1 · nov 2026</span>
+    </div>
+    <div class="facts">
+      <div><svg class="ic"><use href="#i-layers"/></svg><span>base<b>Fedora bootc 45, image-based</b></span></div>
+      <div><svg class="ic"><use href="#i-disc"/></svg><span>first iso<b>End of milestone 1</b></span></div>
+      <div><svg class="ic"><use href="#i-term"/></svg><span>first ai iso<b>End of milestone 4</b></span></div>
+      <div><svg class="ic"><use href="#i-laptop"/></svg><span>daily driver<b>End of milestone 6</b></span></div>
+    </div>
+  </div>
+
+  <section id="base">
+    <div class="st"><span>01 / base</span><h2>One sealed image.<br>Not a pile of packages.</h2></div>
+    <div class="body">
+      <p class="lede">Tripppin is built as a single signed image, the same on every machine. Updates swap the whole image at reboot, and a bad update rolls itself back.</p>
+      <div class="cards">
+        <div class="card"><svg class="ic lg"><use href="#i-shield"/></svg><h4>Secure by default</h4><p>Read-only system files, SELinux enforcing, Secure Boot, signed images checked before install.</p></div>
+        <div class="card"><svg class="ic lg"><use href="#i-zap"/></svg><h4>Minimal</h4><p>Starts from Fedora's minimal bootc base. Only what Tripppin needs is added.</p></div>
+        <div class="card"><svg class="ic lg"><use href="#i-undo"/></svg><h4>Self-healing updates</h4><p>Health checks after every update. Three failed boots and it returns to the last good image.</p></div>
+      </div>
+      <h3>What's inside the image</h3>
+      <div class="anat">
+        <div class="ours rv"><svg class="ic"><use href="#i-spark"/></svg><b>Tripppin services</b><span>Harness, verifier, shell, orb, installer, <code>trip</code> CLI. Rust, built with cargo-auditable.</span><span class="chip ok">ours</span></div>
+        <div class="ours rv"><svg class="ic"><use href="#i-cpu"/></svg><b>Model engine</b><span>llama.cpp built for Vulkan. A <code>-nvidia</code> image variant adds the NVIDIA driver and CUDA.</span><span class="chip ok">we package</span></div>
+        <div class="ours rv"><svg class="ic"><use href="#i-monitor"/></svg><b>Desktop</b><span>Hyprland and its libraries. Fedora stopped shipping it, so we package and pin it ourselves.</span><span class="chip ok">we package</span></div>
+        <div class="rv"><svg class="ic"><use href="#i-eye"/></svg><b>Branding</b><span>Generic Fedora release and logo packages replaced with ours: name, boot splash, wallpaper.</span><span class="chip">ours</span></div>
+        <div class="rv"><svg class="ic"><use href="#i-layers"/></svg><b>Fedora bootc 45, minimal</b><span>Kernel, systemd, SELinux, drivers, bootc, greenboot. Pinned by digest.</span><span class="chip">upstream</span></div>
+      </div>
+      <p class="muted">Apps install as Flatpaks, which are sandboxed and never touch the system image. Command-line tools go into a container with Toolbx. The AI installs apps the same way.</p>
+      <h3>Why not the others</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Option</th><th>Why not, for now</th></tr></thead>
+        <tbody>
+          <tr><th>openSUSE MicroOS</th><td>Strong, but updates are package-based, so we control less of what each machine gets.</td></tr>
+          <tr><th>Arch</th><td>Current Hyprland, but no SELinux, no signed boot chain and no mature image updates. All of that would be our work.</td></tr>
+          <tr><th>NixOS</th><td>Rollbacks are great, but there's no verified read-only system and it adds a whole configuration language.</td></tr>
+          <tr><th>systemd image tools</th><td>The best boot-chain design, but young: an upstream change broke KDE Linux updates in March 2026.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section id="pipeline">
+    <div class="st"><span>02 / pipeline</span><h2>The update loop.<br>Every night.</h2></div>
+    <div class="body">
+      <p class="lede">Every change, and every upstream fix, goes through the same path before it reaches a machine. Promotion moves the exact tested image. Nothing is rebuilt.</p>
+      <div class="fig rv pfig">
+        <svg viewBox="0 0 760 230" role="img" aria-label="Pipeline: change, build, sign and scan, boot tests, testing channel, 48 hour soak, stable channel, machines update with health checks and automatic rollback">
+          <rect class="stage user" x="10" y="45" width="60" height="50"/><text class="k" x="22" y="75">change</text>
+          <path class="wire" d="M70 70H90"/>
+          <rect class="stage" x="90" y="45" width="80" height="50"/><text class="k" x="104" y="68">build</text><text x="104" y="86">x86 + arm</text>
+          <path class="wire" d="M170 70H190"/>
+          <rect class="stage" x="190" y="45" width="60" height="50"/><text class="k" x="202" y="68">sign</text><text x="202" y="86">sbom</text>
+          <path class="wire" d="M250 70H270"/>
+          <rect class="stage gate" x="270" y="45" width="80" height="50"/><text class="k" x="282" y="68">boot test</text><text x="282" y="86">kvm vm</text>
+          <path class="wire" d="M350 70H370"/>
+          <rect class="stage" x="370" y="45" width="60" height="50"/><text class="k" x="380" y="68">:testing</text><text x="380" y="86">canary</text>
+          <path class="wire" d="M430 70H450"/>
+          <rect class="stage gate" x="450" y="45" width="80" height="50"/><text class="k" x="462" y="68">48 h soak</text><text x="462" y="86">no regress</text>
+          <path class="wire" d="M530 70H550"/>
+          <rect class="stage" x="550" y="45" width="60" height="50"/><text class="k" x="562" y="68">:stable</text><text x="562" y="86">retag</text>
+          <path class="wire" d="M610 70H630"/>
+          <rect class="stage user" x="630" y="45" width="120" height="50"/><text class="k" x="642" y="68">your machine</text><text x="642" y="86">update at reboot</text>
+          <circle class="ar runner" r="5" cx="0" cy="0"/>
+          <path class="back" d="M690 95V150H120V95"/>
+          <text class="r" x="300" y="170">health check fails 3× → previous image boots</text>
+          <path class="back" d="M310 95V125"/>
+          <text class="r" x="230" y="140" text-anchor="end">test fails → change blocked</text>
+          <text x="10" y="215">triggers: every merge · nightly 04:00 · base image digest bump (Renovate) · security fix</text>
+        </svg>
+      </div>
+
+      <h3>GitHub Actions workflows</h3>
+      <div class="wf">
+        <div><code>ci.yml</code><p>Rust: format, lint, tests on x86 and ARM, licenses and advisories, harness replay tests.</p><span class="trig">every PR · merge queue</span></div>
+        <div><code>image.yml</code><p>Build the image for both architectures, shrink update size (rechunk), push to GHCR, sign with our key, attach build provenance and the SBOM, scan for vulnerabilities.</p><span class="trig">merge · nightly · base bump</span></div>
+        <div><code>boot-test.yml</code><p>Boot the image in a KVM virtual machine: services up, desktop starts, a model answers, no SELinux denials, upgrade from the last stable, roll back.</p><span class="trig">after every image</span></div>
+        <div><code>eval.yml</code><p>The AI test suite. Replay tests on every PR. A small model on CPU for AI changes. The full suite nightly on a GPU machine. Any drop blocks the merge.</p><span class="trig">PR · nightly</span></div>
+        <div><code>disk.yml</code><p>Build the ISO and disk images, install the ISO unattended in a VM, sign checksums, upload to R2 storage and the GitHub release.</p><span class="trig">release tags · weekly</span></div>
+        <div><code>release.yml</code><p>Changelog and version from commit messages. Promotes <code>:testing</code> to <code>:beta</code> to <code>:stable</code> by retagging the same image, with a manual approval step.</p><span class="trig">main · manual approval</span></div>
+      </div>
+      <div class="cards">
+        <div class="card"><svg class="ic"><use href="#i-git"/></svg><h4>Protected main</h4><p>Merge queue, required checks, signed commits, no force-push. Actions pinned by hash.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-key"/></svg><h4>Signed and enforced</h4><p>Every machine refuses an image that isn't signed with our key. CI tests that refusal.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-list"/></svg><h4>Parts list per build</h4><p>An SBOM is attached to every image. <code>trip bom</code> reads it on the machine.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="testing">
+    <div class="st"><span>03 / testing</span><h2>Seven layers of tests.<br>One laptop gate.</h2></div>
+    <div class="body">
+      <p class="lede">Fast checks run on every change. Slower ones run nightly. Real hardware decides releases.</p>
+      <div class="pyr">
+        <div class="rv" style="--w:100%"><svg class="ic"><use href="#i-check"/></svg><span><b>Rust unit tests</b><small>Every crate, both architectures</small></span><span class="when">every PR · seconds</span></div>
+        <div class="rv" style="--w:94%"><svg class="ic"><use href="#i-refresh"/></svg><span><b>Harness replay</b><small>Recorded model and tool traffic replayed with no model running</small></span><span class="when">every PR · 1 min</span></div>
+        <div class="rv" style="--w:88%"><svg class="ic"><use href="#i-flask"/></svg><span><b>AI evals</b><small>Right tool, right arguments, job done, speed. Attack suite: success must stay at zero.</small></span><span class="when">PR (CPU) · nightly (GPU)</span></div>
+        <div class="rv" style="--w:82%"><svg class="ic"><use href="#i-box"/></svg><span><b>Image boot test</b><small>KVM VM: services, desktop, model, SELinux</small></span><span class="when">every image · 10 min</span></div>
+        <div class="rv" style="--w:76%"><svg class="ic"><use href="#i-undo"/></svg><span><b>Upgrade and rollback</b><small>Last stable → new → forced failure → back</small></span><span class="when">every image</span></div>
+        <div class="rv" style="--w:70%"><svg class="ic"><use href="#i-disc"/></svg><span><b>Installer test</b><small>ISO installs unattended to a blank virtual disk</small></span><span class="when">weekly · releases</span></div>
+        <div class="rv hw" style="--w:64%"><svg class="ic"><use href="#i-laptop"/></svg><span><b>Your x86 laptop</b><small>The release gate: real install, real hardware</small></span><span class="when">every beta</span></div>
+      </div>
+
+      <h3>Testing on your Mac and your laptop</h3>
+      <p class="muted">Your Mac is an Apple M5. It can't run an x86 operating system at a useful speed, because it would have to emulate the whole processor. So we also build an ARM version of Tripppin. It runs natively and fast on the Mac for everyday development. Anything that depends on x86 hardware is tested in CI and on your laptop.</p>
+      <div class="loops">
+        <div>
+          <h4><svg class="ic"><use href="#i-term"/></svg>On the Mac, every day</h4>
+          <ol>
+            <li>A Lima virtual machine runs Fedora for ARM. It builds images and boots them with <code>bcvk</code>.</li>
+            <li>Change Rust code, build, copy the binary into a running VM, restart the service. Seconds, no image rebuild.</li>
+            <li>Full image: build, boot a throwaway VM, test, exit.</li>
+            <li>UTM 5 shows the real Hyprland desktop on the ARM build, with GPU acceleration.</li>
+          </ol>
+        </div>
+        <div>
+          <h4><svg class="ic"><use href="#i-laptop"/></svg>On the x86 laptop, per release</h4>
+          <ol>
+            <li>Download the ISO from CI and write it to USB with Fedora Media Writer. Avoid Ventoy, which hides Secure Boot issues.</li>
+            <li>Install to a spare disk with Secure Boot on.</li>
+            <li>Run the hardware checklist: Wi-Fi, suspend ×10, GPU and model speed, displays, audio, battery, touchpad.</li>
+            <li>Drill: install a deliberately broken update and confirm it rolls back.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="term"><pre><span class="d"># the fast loop, inside the Lima VM on the Mac</span>
+<span class="p">$</span> podman build -t localhost/tripppin .
+<span class="p">$</span> bcvk ephemeral run-ssh localhost/tripppin     <span class="d"># boots it, gone on exit</span>
+<span class="p">$</span> cargo build -p harness && sudo bootc usr-overlay && rsync … && systemctl restart trip-harness</pre></div>
+
+      <h3>Testing beyond one laptop</h3>
+      <div class="cards">
+        <div class="card"><svg class="ic"><use href="#i-users"/></svg><h4>Beta channel</h4><p>Testers run <code>bootc switch …:beta</code> and switch back anytime.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-list"/></svg><h4>Hardware reports</h4><p>hw-probe uploads an anonymous hardware report. Bug reports link to it. No telemetry.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-monitor"/></svg><h4>Nightly VM matrix</h4><p>Install, upgrade and UI checks driven through accessibility APIs, KDE Linux style.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="harness">
+    <div class="st"><span>04 / harness</span><h2>Security by construction.<br>The verifier is a backup.</h2></div>
+    <div class="body">
+      <p class="lede">Research in 2026 shows every AI-based defense can be broken by a determined attacker. So the hard boundary is code. The AI verifier is an extra layer on top.</p>
+      <div class="fig rv hfig">
+        <svg viewBox="0 0 760 300" role="img" aria-label="Harness: your request goes to the planner. Untrusted content goes only to a quarantined reader with no tools, which returns typed values. The policy engine and sandbox are code. The verifier checks intent.">
+          <rect class="box me" x="10" y="30" width="150" height="44"/><text class="k" x="24" y="57">your request</text>
+          <rect class="box q" x="10" y="200" width="150" height="44"/><text class="k" x="24" y="227">web · file · output</text>
+          <path class="wire" d="M160 52H220"/>
+          <rect class="box trust" x="220" y="20" width="170" height="64"/><text class="k" x="234" y="47">planner</text><text x="234" y="67">9B · sees handles only</text>
+          <path class="wire q" d="M160 222H220"/>
+          <rect class="box" x="220" y="190" width="170" height="64"/><text class="k" x="234" y="217">quarantined reader</text><text x="234" y="237">4B · no tools · typed out</text>
+          <path class="wire q" d="M305 190V84"/><text x="312" y="140">$v3: typed value</text>
+          <path class="wire" d="M390 52H440"/>
+          <rect class="box hard" x="440" y="20" width="150" height="64"/><text class="w" x="454" y="47">policy engine</text><text class="w" x="454" y="67">code · rule of two</text>
+          <path class="wire" d="M515 84V120"/>
+          <rect class="box" x="440" y="120" width="150" height="54"/><text class="k" x="454" y="144">verifier</text><text x="454" y="162">intent check</text>
+          <path class="wire" d="M515 174V210"/>
+          <rect class="box hard" x="440" y="210" width="150" height="64"/><text class="w" x="454" y="237">sandbox</text><text class="w" x="454" y="257">bwrap · landlock</text>
+          <path class="wire" d="M590 242H630"/>
+          <rect class="box me" x="630" y="210" width="120" height="64"/><text class="k" x="644" y="237">tool runs</text><text x="644" y="257">logged</text>
+          <path class="wire" d="M590 52H630"/>
+          <rect class="box me" x="630" y="20" width="120" height="64"/><text class="k" x="644" y="47">ask you</text><text x="644" y="67">all 3 risks</text>
+        </svg>
+      </div>
+      <div class="cards" style="--cols:2">
+        <div class="card"><svg class="ic"><use href="#i-eye"/></svg><h4>Planner never reads untrusted text</h4><p>Web pages and files go to a separate reader with no tools. It returns typed values like a date, a yes/no or a short string. Based on Google DeepMind's CaMeL and Microsoft's FIDES.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-lock"/></svg><h4>Rule of two, in code</h4><p>A session can mix two of: untrusted input, private data, changes or sending out. All three means you're asked. Meta's published rule.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-shield"/></svg><h4>Verifier for intent</h4><p>Checks "did they ask for this?" on actions the policy already allows. It reduces mistakes; it isn't the wall.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-box"/></svg><h4>Fail closed</h4><p>Each tool runs in bubblewrap with Landlock and seccomp, network off by default. No sandbox, no run. The same model as Codex CLI and Claude Code.</p></div>
+      </div>
+      <h3>Expected speed</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Machine</th><th>Model</th><th>Words out per second</th></tr></thead>
+        <tbody>
+          <tr><th>Laptop CPU</th><td>4B</td><td class="n">10–20 tokens/s</td></tr>
+          <tr><th>Integrated GPU (Vulkan)</th><td>4B</td><td class="n">15–30 tokens/s</td></tr>
+          <tr><th>8 GB graphics card</th><td>9B</td><td class="n">40–60 tokens/s</td></tr>
+        </tbody>
+      </table></div>
+      <p class="cap">Estimates from memory bandwidth, to be replaced with measured numbers in milestone 3. Reading the prompt is the slow part on CPU, so the prompt is kept identical between requests and cached.</p>
+    </div>
+  </section>
+
+  <section id="milestones">
+    <div class="st"><span>05 / milestones</span><h2>Nine milestones.<br>Three ISOs to try.</h2></div>
+    <div class="body">
+      <p class="lede">Each milestone ends with something you can run. Green rows produce an ISO for your laptop.</p>
+      <div class="ms">
+        <div class="m rv"><div class="num">M0<small>foundations</small></div><div>
+          <h4>The workshop</h4><p>Everything that makes later work safe and repeatable.</p>
+          <div class="cols"><ul><li>Rust workspace, CI, merge queue, branch rules</li><li>Renovate for base image and actions</li><li>Signing keys, GHCR, R2 bucket for ISOs</li><li>Lima dev VM recipe for the Mac</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-check"/></svg>you can try</b><p>Open a PR and watch every check run.</p></div></div>
+          <div class="exit">done when: CI is green on an empty workspace on both architectures</div>
+        </div></div>
+
+        <div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 1</span><div class="num">M1<small>first boot</small></div><div>
+          <h4>It boots, it's ours</h4><p>A minimal image with Hyprland, our branding and greenboot. No AI yet.</p>
+          <div class="cols"><ul><li>Containerfile on Fedora bootc 45 minimal</li><li>Hyprland stack packaged and pinned</li><li>image.yml and boot-test.yml</li><li>Anaconda ISO from bootc-image-builder</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-laptop"/></svg>on your laptop</b><p>Install from USB, log into a Tripppin-branded Hyprland desktop, update with <code>bootc upgrade</code>.</p></div></div>
+          <div class="exit">done when: it installs with Secure Boot on and the CI boot test passes nightly</div>
+        </div></div>
+
+        <div class="m rv"><div class="num">M2<small>update loop</small></div><div>
+          <h4>It updates itself safely</h4><p>The full nightly loop, channels and rollback.</p>
+          <div class="cols"><ul><li>Nightly builds, rechunked small updates</li><li>Signature enforcement on every machine</li><li>SBOM, provenance, vulnerability scan</li><li>Upgrade and rollback tests, testing/stable channels</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-refresh"/></svg>you can try</b><p>Your laptop updates overnight. Push a broken build and watch it roll back.</p></div></div>
+          <div class="exit">done when: a forced bad update recovers with no human help</div>
+        </div></div>
+
+        <div class="m rv"><div class="num">M3<small>model</small></div><div>
+          <h4>A model lives here</h4><p>The model engine, hardware detection and the eval harness.</p>
+          <div class="cols"><ul><li>llama.cpp for Vulkan, plus the NVIDIA variant</li><li>Hardware tiers and the signed model catalog</li><li>Supervisor: preload, idle unload, priority</li><li>Eval runner with recorded baselines</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-gauge"/></svg>you can try</b><p><code>trip ask "hello"</code> answers locally. Real speed numbers for your hardware.</p></div></div>
+          <div class="exit">done when: measured speeds published per tier; eval runs in CI</div>
+        </div></div>
+
+        <div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 2</span><div class="num">M4<small>ai shell</small></div><div>
+          <h4>The terminal understands you</h4><p>The harness and the first tools. Plain sentences in, actions out.</p>
+          <div class="cols"><ul><li>Router, tool subsets, native grammars, validation</li><li>Tools: system, files, web search (local SearXNG), web fetch</li><li><code>!cmd</code>, <code>/term</code>, streaming, cancel</li><li>Record/replay tests; eval gate on PRs</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-term"/></svg>on your laptop</b><p>Type "what's my IP" or "find big files in Downloads" and see it work.</p></div></div>
+          <div class="exit">done when: tool and argument accuracy meet the target on our suite at the 9B tier</div>
+        </div></div>
+
+        <div class="m rv"><div class="num">M5<small>safety</small></div><div>
+          <h4>Safe to let it act</h4><p>The security boundary in code, then the verifier on top.</p>
+          <div class="cols"><ul><li>Labels on every value, policy engine, rule of two</li><li>Quarantined reader, verifier, approval window</li><li>Sandbox per tool, narrow admin helper, sealed log</li><li><code>trip undo</code>, home snapshots, rescue boot</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-shield"/></svg>you can try</b><p>Point it at a booby-trapped web page. It refuses and tells you why.</p></div></div>
+          <div class="exit">done when: zero successful attacks in our suite; verifier false blocks under target</div>
+        </div></div>
+
+        <div class="m iso rv"><span class="flag"><svg class="ic"><use href="#i-disc"/></svg>ISO 3</span><div class="num">M6<small>desktop</small></div><div>
+          <h4>Daily driver alpha</h4><p>The orb, conversations, agents, app installs and the parts list.</p>
+          <div class="cols"><ul><li>Orb overlay with clickable answers</li><li><code>/chat</code>, per-tab memory, agents panel, scheduler</li><li>Flatpak installs through the AI, <code>trip bom</code></li><li>Bring-your-own model: cloud key or server</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-laptop"/></svg>on your laptop</b><p>Use it as your main machine for a week.</p></div></div>
+          <div class="exit">done when: a week of daily use without a reinstall</div>
+        </div></div>
+
+        <div class="m rv"><div class="num">M7<small>installer</small></div><div>
+          <h4>Five-minute install</h4><p>Our own Rust installer replaces Fedora's Anaconda.</p>
+          <div class="cols"><ul><li>One question per screen, hardware shown in plain words</li><li>Encryption and snapshots without partition questions</li><li>Model downloads during install; offline image includes 4B</li><li>First-run tour, accessibility pass</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-disc"/></svg>you can try</b><p>Hand the USB to a friend and watch them install it without help.</p></div></div>
+          <div class="exit">done when: unattended and manual installs pass in CI and on two laptops</div>
+        </div></div>
+
+        <div class="m rv"><div class="num">M8<small>public beta</small></div><div>
+          <h4>Open the doors</h4><p>Downloads on trippp.in, a beta channel and community testing.</p>
+          <div class="cols"><ul><li>Download page, checksums, signatures, torrent</li><li>Beta channel, hardware report template, test weeks</li><li>Docs, privacy page, source archive per release</li><li>Repository made public on GitHub</li></ul>
+          <div class="try"><b><svg class="ic" style="width:14px;height:14px"><use href="#i-users"/></svg>anyone can try</b><p>Download from trippp.in.</p></div></div>
+          <div class="exit">done when: 50 hardware reports with no blocking bugs</div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="reliable">
+    <div class="st"><span>06 / reliability</span><h2>What keeps it<br>from breaking.</h2></div>
+    <div class="body">
+      <div class="cards">
+        <div class="card"><svg class="ic"><use href="#i-key"/></svg><h4>Pin everything</h4><p>Base image digest, llama.cpp build, model files, Hyprland version, Actions. Upgrades arrive as reviewed PRs.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-refresh"/></svg><h4>Promote, never rebuild</h4><p>Stable is the exact image that passed testing, retagged.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-undo"/></svg><h4>Automatic rollback</h4><p>greenboot checks services, desktop, GPU and network after every update.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-flask"/></svg><h4>Evals gate merges</h4><p>Any drop in AI accuracy, or any successful attack, blocks the change.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-list"/></svg><h4>Everything logged</h4><p>Every model call and tool call is logged, and the logs double as replay tests.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-laptop"/></svg><h4>Hardware decides</h4><p>No beta ships without passing the laptop checklist.</p></div>
+      </div>
+      <h3>Risks we're carrying</h3>
+      <div class="cards">
+        <div class="card warn"><svg class="ic"><use href="#i-alert"/></svg><h4>Hyprland packaging</h4><p>Fedora stopped shipping it and community builds look abandoned. We maintain it. Fallback: Sway, which Fedora ships.</p></div>
+        <div class="card warn"><svg class="ic"><use href="#i-alert"/></svg><h4>Signature enforcement</h4><p>Some projects report problems enforcing signed images. CI tests this on every build.</p></div>
+        <div class="card warn"><svg class="ic"><use href="#i-alert"/></svg><h4>Image size</h4><p>A desktop ISO is over GitHub's 2 GB file limit, so ISOs go to R2 storage.</p></div>
+        <div class="card warn"><svg class="ic"><use href="#i-alert"/></svg><h4>Twice-yearly Fedora rebase</h4><p>Each new Fedora version goes through the same loop and soaks longer on :testing.</p></div>
+        <div class="card warn"><svg class="ic"><use href="#i-alert"/></svg><h4>Verified boot is new</h4><p>Fedora's fully sealed boot chain is still experimental. We ship standard Secure Boot and adopt sealed boot when it's stable.</p></div>
+        <div class="card warn"><svg class="ic"><use href="#i-alert"/></svg><h4>NVIDIA</h4><p>Driver signing needs a one-time key enrollment that some laptops handle badly. Separate image, tested separately.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="design">
+    <div class="st"><span>07 / design</span><h2>One design language.<br>Site to boot screen.</h2></div>
+    <div class="body">
+      <p class="lede">The same look everywhere: the website, installer, boot splash, orb, shell prompt and agents panel. It's adapted from the trippp.in design.</p>
+      <div class="swatches">
+        <div><i style="background:#f5f2ea"></i><span><b>Paper</b>#f5f2ea</span></div>
+        <div><i style="background:#ece8db"></i><span><b>Panel</b>#ece8db</span></div>
+        <div><i style="background:#182423"></i><span><b>Ink</b>#182423</span></div>
+        <div><i style="background:#5d6a65"></i><span><b>Muted</b>#5d6a65</span></div>
+        <div><i style="background:#1f6b45"></i><span><b>Forest</b>#1f6b45</span></div>
+        <div><i style="background:#0d1211"></i><span><b>Night</b>#0d1211</span></div>
+      </div>
+      <div class="type">
+        <div><div class="aa">Aa</div><p><b>Inter</b> for everything people read. Bold, tight letter spacing for headings. Never italic. Emphasis is the forest green.</p></div>
+        <div><div class="mn">tripppin ›</div><p><b>DM Mono</b> for labels, states, the shell and numbers. Small and lowercase.</p></div>
+      </div>
+      <div class="cards">
+        <div class="card"><svg class="ic"><use href="#i-box"/></svg><h4>Square, ruled, quiet</h4><p>Square corners, 1px rules, flat panels. The orb is the only circle.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-spark"/></svg><h4>Thin line icons</h4><p>One stroke weight, round ends, drawn on a 24px grid.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-zap"/></svg><h4>Motion that explains</h4><p>Animate flow and state, not decoration. Everything respects reduced motion.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-term"/></svg><h4>Plain words</h4><p>Short sentences. Say what will happen. No jargon on screen without a glossary.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-monitor"/></svg><h4>Light and dark</h4><p>Paper by day, night by default after sunset. Both designed, not inverted.</p></div>
+        <div class="card"><svg class="ic"><use href="#i-eye"/></svg><h4>Accessible</h4><p>Keyboard-first, high contrast option, screen reader labels on every control.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="contact">
+    <h2>Build it.<br><em>Ship it.</em></h2>
+    <p>tripppin · build plan v1 · trippp.in</p>
+  </footer>
+</div>
