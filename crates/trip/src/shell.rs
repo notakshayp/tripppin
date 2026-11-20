@@ -25,6 +25,7 @@ const HELP: &str = "\
   /chat             start a conversation with memory (/exit to leave it)
   /terminal         open a normal shell (exit to come back)
   !command          run one command exactly as typed
+  /wifi             connect to a wi-fi network
   /setup            download the model for this machine and start it
   /help             show this
   /exit             log out";
@@ -37,6 +38,7 @@ pub enum Input<'a> {
     Raw(&'a str),
     Chat,
     Terminal,
+    Wifi,
     Setup,
     Help,
     Exit,
@@ -54,6 +56,7 @@ pub fn parse(line: &str) -> Input<'_> {
     match line {
         "/chat" => Input::Chat,
         "/terminal" | "/term" => Input::Terminal,
+        "/wifi" => Input::Wifi,
         "/setup" => Input::Setup,
         "/help" | "/?" => Input::Help,
         "/exit" | "/quit" | "/logout" => Input::Exit,
@@ -144,6 +147,7 @@ pub fn run() -> Result<()> {
             }
             Input::Terminal => terminal(),
             Input::Raw(cmd) => raw(cmd),
+            Input::Wifi => wifi(),
             Input::Setup => setup(),
             Input::Unknown(cmd) => println!("{DIM}{cmd} isn't a command here. /help lists them.{RESET}"),
             Input::Ask(text) => {
@@ -210,6 +214,14 @@ fn raw(cmd: &str) {
     }
 }
 
+/// NetworkManager's menu for picking a network and typing its password.
+fn wifi() {
+    match Command::new("nmtui").arg("connect").status() {
+        Ok(_) => println!("{DIM}back in tripppin{RESET}"),
+        Err(e) => println!("{ACCENT}!{RESET} couldn't open the wi-fi menu: {e}"),
+    }
+}
+
 /// Downloads the recommended model and starts the service; both need admin rights.
 fn setup() {
     println!("{DIM}downloading the model for this machine. you may be asked for your password.{RESET}");
@@ -218,7 +230,10 @@ fn setup() {
         match Command::new(step[0]).args(&step[1..]).status() {
             Ok(s) if s.success() => {}
             Ok(_) => {
-                println!("{ACCENT}!{RESET} `{}` didn't finish. you can run /setup again.", step.join(" "));
+                println!(
+                    "{ACCENT}!{RESET} `{}` didn't finish. no internet? try /wifi, then /setup again.",
+                    step.join(" ")
+                );
                 return;
             }
             Err(e) => {
@@ -247,6 +262,7 @@ mod tests {
         assert_eq!(parse("/terminal"), Input::Terminal);
         assert_eq!(parse("/term"), Input::Terminal);
         assert_eq!(parse("/setup"), Input::Setup);
+        assert_eq!(parse("/wifi"), Input::Wifi);
         assert_eq!(parse("/exit"), Input::Exit);
         assert_eq!(parse("/nope"), Input::Unknown("/nope"));
     }
