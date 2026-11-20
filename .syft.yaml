@@ -1,0 +1,5 @@
+# /sysroot/ostree/repo holds the base image's original objects. The live system
+# is /usr and /etc, which are scanned directly; scanning the object store as
+# well reports packages we've already removed or upgraded.
+exclude:
+  - "/sysroot/**"

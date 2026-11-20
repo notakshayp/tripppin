@@ -2,10 +2,10 @@ name: image
 
 on:
   pull_request:
-    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .github/workflows/image.yml]
+    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .grype.yaml, .syft.yaml, .github/workflows/image.yml]
   push:
     branches: [main]
-    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .github/workflows/image.yml]
+    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .grype.yaml, .syft.yaml, .github/workflows/image.yml]
   schedule:
     - cron: "0 4 * * *" # nightly, picks up Fedora security fixes
   workflow_dispatch:
@@ -34,6 +34,8 @@ jobs:
         run: |
           sudo podman run --rm localhost/tripppin:ci trip --version
           sudo podman run --rm localhost/tripppin:ci bootc --version
+          # Packages we removed for security reasons must stay removed.
+          ! sudo podman run --rm localhost/tripppin:ci rpm -q toolbox
 
       - name: Export image for scanning
         run: |
