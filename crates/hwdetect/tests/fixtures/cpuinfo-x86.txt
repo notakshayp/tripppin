@@ -1,0 +1,13 @@
+processor	: 0
+vendor_id	: AuthenticAMD
+cpu family	: 25
+model		: 116
+model name	: AMD Ryzen 7 7840U w/ Radeon 780M Graphics
+flags		: fpu vme de pse tsc msr pae mce cx8 sse sse2 ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand avx2 bmi2 avx512f avx512dq
+
+processor	: 1
+vendor_id	: AuthenticAMD
+cpu family	: 25
+model		: 116
+model name	: AMD Ryzen 7 7840U w/ Radeon 780M Graphics
+flags		: fpu vme de pse tsc msr pae mce cx8 sse sse2 ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand avx2 bmi2 avx512f avx512dq

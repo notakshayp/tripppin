@@ -1,0 +1,45 @@
+name: image
+
+on:
+  pull_request:
+    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, .github/workflows/image.yml]
+  push:
+    branches: [main]
+    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, .github/workflows/image.yml]
+  schedule:
+    - cron: "0 4 * * *" # nightly, picks up Fedora security fixes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/tripppin
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: sudo podman build -f os/Containerfile -t localhost/tripppin:ci .
+
+      - name: Smoke test the image
+        run: |
+          sudo podman run --rm localhost/tripppin:ci trip --version
+          sudo podman run --rm localhost/tripppin:ci bootc --version
+
+      - name: Push to GHCR
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          sha="${GITHUB_SHA::12}"
+          for tag in nightly "$sha"; do
+            sudo podman push localhost/tripppin:ci "$IMAGE:$tag"
+          done

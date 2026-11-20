@@ -1,0 +1,38 @@
+# Model catalog: which model each hardware tier gets.
+#
+# Tiers are checked top to bottom; the first one whose requirements the machine
+# meets wins. Memory is in GiB as the kernel reports it, so a "16 GB" laptop
+# shows about 15.3 GiB; thresholds sit a little under the marketing number.
+#
+# File names, download URLs and checksums are filled in at milestone 3, when the
+# model service lands. The catalog will be signed before it ships.
+
+schema = 1
+
+[[tier]]
+id = "gpu-24"
+model = "Qwen3.5 27B"
+download_gb = 17.0
+license = "Apache-2.0"
+min_vram_gib = 22.0
+
+[[tier]]
+id = "gpu-8"
+model = "Qwen3.5 9B"
+download_gb = 5.8
+license = "Apache-2.0"
+min_vram_gib = 7.5
+
+[[tier]]
+id = "cpu-32"
+model = "Qwen3.5 35B-A3B"
+download_gb = 21.0
+license = "Apache-2.0"
+min_ram_gib = 30.0
+
+[[tier]]
+id = "cpu-16"
+model = "Qwen3.5 4B"
+download_gb = 2.7
+license = "Apache-2.0"
+min_ram_gib = 14.5

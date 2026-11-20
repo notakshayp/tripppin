@@ -1,0 +1,30 @@
+# Tripppin OS image.
+#
+# Build from the repository root:
+#   podman build -f os/Containerfile -t localhost/tripppin .
+#
+# Base images are pinned by digest. Dependabot opens a PR when Fedora publishes
+# a new one, and that PR runs the full image pipeline before it can merge.
+
+# ---- Rust tools -------------------------------------------------------------
+FROM quay.io/fedora/fedora:45@sha256:be6b79cced86b08794d25024513eaea7e621f3d5dc3c4ca2c4371a5889229706 AS build
+RUN dnf -y install --setopt=install_weak_deps=False cargo rust && dnf clean all
+WORKDIR /src
+COPY Cargo.toml Cargo.lock rustfmt.toml ./
+COPY crates crates
+COPY models models
+RUN cargo build --release --locked -p trip
+
+# ---- The OS -----------------------------------------------------------------
+FROM quay.io/fedora/fedora-bootc:45@sha256:990ebc2678ff3dbca3f0143c8d5f1a150a2fb0c418888a3bdf218aea109fc1d2
+
+LABEL org.opencontainers.image.title="tripppin" \
+      org.opencontainers.image.description="A Linux with an AI built in." \
+      org.opencontainers.image.source="https://github.com/notakshayp/tripppin" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      containers.bootc="1"
+
+COPY --from=build /src/target/release/trip /usr/bin/trip
+
+# Fails the build if the image breaks bootc's rules (e.g. content in /var it can't manage).
+RUN bootc container lint
