@@ -5,6 +5,7 @@ use serde::Serialize;
 
 mod logo;
 mod model;
+mod shell;
 
 #[derive(Parser)]
 #[command(name = "trip", version, about = "Tripppin: tell your computer what you want.")]
@@ -21,7 +22,10 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Ask the local model a question and stream the answer.
+    /// The AI shell: type anything to ask. Starts automatically in a terminal.
+    Shell,
+    /// Ask one question and print the answer (for scripts and testing).
+    #[command(hide = true)]
     Ask {
         /// The question, in plain words.
         #[arg(required = true, trailing_var_arg = true)]
@@ -63,6 +67,7 @@ struct HwReport<'a> {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Hw { json } => hw(json),
+        Command::Shell => shell::run(),
         Command::Ask { words } => model::ask(&words.join(" ")),
         Command::Model(ModelCommand::List) => model::list(),
         Command::Model(ModelCommand::Pull { tier }) => model::pull(tier.as_deref()),

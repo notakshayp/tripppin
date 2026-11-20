@@ -78,7 +78,8 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 
 - [ ] Harness daemon: router, per-category tool sets, the model's native tool-call grammar, validation, step limits
 - [ ] First tools: system info, files (read), web search (local SearXNG), web fetch
-- [ ] The AI shell: plain text goes to the model, `!cmd` runs a raw command, `/term` opens a classic shell; streaming and Ctrl-C
+- [x] The AI shell (`trip shell`), default for interactive terminals: plain text goes to the model as a single question, `/chat` keeps a conversation, `/terminal` opens a normal shell, `!cmd` runs one command, `/setup` downloads the model; streaming and Ctrl-C
+- [ ] Tools: let the model act, not just answer
 - [ ] Record/replay tests; eval gate on PRs
 - [ ] ISO 2
 

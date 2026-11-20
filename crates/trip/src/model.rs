@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 pub const PORT: u16 = 8086;
@@ -17,7 +18,8 @@ const MODELS_DIR: &str = "/var/lib/tripppin/models";
 const LLAMA_SERVER: &str = "/usr/bin/llama-server";
 const IDLE_UNLOAD_SECS: u32 = 900;
 const SYSTEM_PROMPT: &str = "You are the assistant built into Tripppin, a Linux operating system. \
-Answer briefly and plainly. You can't run commands yet; if something needs a command, say which one.";
+The person is typing to you in their terminal. Answer briefly and plainly, in a few short lines. \
+You can't run commands yet; if something needs a command, give it and say they can run it with /terminal.";
 
 /// An HTTP client that trusts the operating system's certificate store, so CA updates
 /// arrive with system updates rather than with a new build of trip.
@@ -208,52 +210,100 @@ fn exec(bin: &str, _args: &[String]) -> Result<()> {
     bail!("{bin} can only be started on Linux")
 }
 
-/// Sends one question to the local model and streams the answer.
-pub fn ask(question: &str) -> Result<()> {
+/// One message in a conversation.
+#[derive(Clone, Debug)]
+pub struct Message {
+    pub role: &'static str,
+    pub content: String,
+}
+
+impl Message {
+    pub fn system() -> Self {
+        Message { role: "system", content: SYSTEM_PROMPT.to_string() }
+    }
+    pub fn user(text: &str) -> Self {
+        Message { role: "user", content: text.to_string() }
+    }
+    pub fn assistant(text: &str) -> Self {
+        Message { role: "assistant", content: text.to_string() }
+    }
+}
+
+/// What came back from one streamed reply.
+pub struct Reply {
+    pub text: String,
+    pub first_word: Option<Duration>,
+    pub tokens_per_sec: f64,
+    pub cancelled: bool,
+}
+
+impl Reply {
+    pub fn stats(&self) -> Option<String> {
+        self.first_word.map(|t| format!("first word {:.1} s · {:.0} tokens/s", t.as_secs_f64(), self.tokens_per_sec))
+    }
+}
+
+/// Explains why the model can't be reached, and what to do about it.
+fn unavailable() -> anyhow::Error {
+    let installed = Catalog::builtin().ok().is_some_and(|c| active_tier(&c, &models_dir()).is_some());
+    if installed {
+        anyhow::anyhow!("the model service isn't running yet. type /setup to start it.")
+    } else {
+        anyhow::anyhow!("no model is downloaded yet. type /setup to download the right one for this machine.")
+    }
+}
+
+/// Streams a reply to `messages`, calling `on_text` for each piece. Stops early when `cancel` is set.
+pub fn stream(messages: &[Message], cancel: &AtomicBool, mut on_text: impl FnMut(&str)) -> Result<Reply> {
+    let msgs: Vec<_> = messages.iter().map(|m| serde_json::json!({ "role": m.role, "content": m.content })).collect();
     let body = serde_json::json!({
         "model": "tripppin",
         "stream": true,
-        "messages": [
-            { "role": "system", "content": SYSTEM_PROMPT },
-            { "role": "user", "content": question }
-        ],
-        // Single answers don't need the model's long thinking pass.
+        "messages": msgs,
+        // Plain answers don't need the model's long thinking pass.
         "chat_template_kwargs": { "enable_thinking": false }
     });
     let url = format!("http://127.0.0.1:{PORT}/v1/chat/completions");
     let start = Instant::now();
     let mut resp = match http().post(&url).header("Content-Type", "application/json").send(body.to_string()) {
         Ok(r) => r,
-        Err(ureq::Error::Io(_)) | Err(ureq::Error::ConnectionFailed) => {
-            let dir = models_dir();
-            let catalog = Catalog::builtin()?;
-            if active_tier(&catalog, &dir).is_none() {
-                bail!("no model is installed yet. Download one with: sudo trip model pull");
-            }
-            bail!("the model service isn't running. Start it with: sudo systemctl start tripppin-llm");
-        }
+        Err(ureq::Error::Io(_)) | Err(ureq::Error::ConnectionFailed) => return Err(unavailable()),
+        Err(ureq::Error::StatusCode(503)) => bail!("the model is still loading. try again in a few seconds."),
         Err(e) => return Err(e).context("asking the model"),
     };
     let reader = BufReader::new(resp.body_mut().as_reader());
-    let mut out = io::stdout().lock();
-    let (mut first, mut pieces) = (None, 0u32);
+    let (mut text, mut first, mut pieces, mut cancelled) = (String::new(), None, 0u32, false);
     for line in reader.lines() {
+        if cancel.load(Ordering::Relaxed) {
+            cancelled = true;
+            break;
+        }
         let line = line?;
         let Some(data) = line.strip_prefix("data: ") else { continue };
         if data.trim() == "[DONE]" {
             break;
         }
-        if let Some(text) = delta_text(data) {
+        if let Some(piece) = delta_text(data) {
             first.get_or_insert_with(|| start.elapsed());
             pieces += 1;
-            write!(out, "{text}")?;
-            out.flush()?;
+            on_text(&piece);
+            text.push_str(&piece);
         }
     }
+    let tokens_per_sec =
+        first.map_or(0.0, |t: Duration| f64::from(pieces) / start.elapsed().saturating_sub(t).as_secs_f64().max(0.001));
+    Ok(Reply { text, first_word: first, tokens_per_sec, cancelled })
+}
+
+/// Sends one question and prints the streamed answer (`trip ask`, for scripts and testing).
+pub fn ask(question: &str) -> Result<()> {
+    let mut out = io::stdout().lock();
+    let reply = stream(&[Message::system(), Message::user(question)], &AtomicBool::new(false), |t| {
+        let _ = write!(out, "{t}");
+        let _ = out.flush();
+    })?;
     writeln!(out)?;
-    if let Some(ttft) = first {
-        let generating = start.elapsed().saturating_sub(ttft).as_secs_f64().max(0.001);
-        let note = format!("first word {:.1} s · {:.0} tokens/s", ttft.as_secs_f64(), f64::from(pieces) / generating);
+    if let Some(note) = reply.stats() {
         if io::stderr().is_terminal() {
             eprintln!("\x1b[2m{note}\x1b[0m");
         } else {

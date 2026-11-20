@@ -16,6 +16,8 @@ serde_json.workspace = true
 hwdetect.workspace = true
 ureq.workspace = true
 sha2.workspace = true
+reedline.workspace = true
+ctrlc.workspace = true
 
 [lints]
 workspace = true

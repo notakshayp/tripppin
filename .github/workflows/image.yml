@@ -55,6 +55,7 @@ jobs:
           sudo podman run --rm localhost/tripppin:ci sh -c 'llama-server --help | grep -q -- --sleep-idle-seconds'
           sudo podman run --rm localhost/tripppin:ci systemctl is-enabled tripppin-llm.service
           sudo podman run --rm localhost/tripppin:ci trip model list
+          sudo podman run --rm localhost/tripppin:ci test -f /etc/profile.d/tripppin-shell.sh
 
       - name: Export image for scanning
         run: |
