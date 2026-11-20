@@ -41,7 +41,7 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 - [x] `ci.yml`: fmt, clippy `-D warnings`, tests on x86_64 and arm64, runs `trip hw` on the runner
 - [x] `image.yml`: build the image on PRs; on main and nightly, push to GHCR as `nightly` and `<sha>`
 - [x] Dependabot for cargo, actions and the base image digests
-- [ ] First green CI run and first image in GHCR
+- [x] First green CI run and first image in GHCR (`ghcr.io/notakshayp/tripppin:nightly`)
 - [ ] Branch protection on `main`: required checks, no force-push (needs the owner, or admin rights for `gh`)
 - [ ] Image signing key: cosign key pair, private key in repo secrets, public key in the image (needs the owner's go-ahead)
 - [ ] Lima dev VM recipe for the Mac (`dev/lima.yaml`), with podman and `bcvk`
