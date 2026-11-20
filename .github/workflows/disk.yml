@@ -67,18 +67,19 @@ jobs:
           hash=$(openssl passwd -6 "$TEST_USER_PASSWORD")
           sed -e "s|@PASSWORD_HASH@|$hash|" -e "s|@SSH_KEY@|$TEST_USER_SSH_KEY|" os/disk/config.toml.in > config.toml
 
-      - name: Show the image's package repositories
-        run: |
-          sudo podman run --rm "$IMAGE:nightly-${{ matrix.arch }}" sh -c 'ls -la /etc/yum.repos.d /usr/lib/yum.repos.d 2>&1; grep -H "^enabled" /etc/yum.repos.d/*.repo 2>&1 | head -20'
-
       - name: Build disk images
         run: |
           mkdir -p output
           # The image builder makes either disk images or an ISO in one run, not both.
+          # Virtual disks have no installer, so they get the test account. The ISO
+          # gets no account: the installer asks for the disk, your name and password.
+          echo "# interactive install" > iso.toml
           for type in ${{ matrix.types }}; do
+            config=config.toml
+            [ "$type" = anaconda-iso ] && config=iso.toml
             sudo podman run --rm --privileged --pull=newer \
               --security-opt label=type:unconfined_t \
-              -v ./config.toml:/config.toml:ro \
+              -v "./$config:/config.toml:ro" \
               -v ./output:/output \
               -v /var/lib/containers/storage:/var/lib/containers/storage \
               "$BIB" --type "$type" --rootfs btrfs \
