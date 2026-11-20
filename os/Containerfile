@@ -24,6 +24,10 @@ LABEL org.opencontainers.image.title="tripppin" \
       org.opencontainers.image.licenses="Apache-2.0" \
       containers.bootc="1"
 
+# Apply every Fedora update published since the base image was cut, so the
+# image never ships a fix that already exists upstream.
+RUN dnf -y upgrade --refresh && dnf clean all
+
 COPY --from=build /src/target/release/trip /usr/bin/trip
 
 # Fails the build if the image breaks bootc's rules (e.g. content in /var it can't manage).
