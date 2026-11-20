@@ -24,6 +24,7 @@ RUN git clone --depth 1 --branch "$LLAMA_CPP_TAG" https://github.com/ggml-org/ll
 WORKDIR /src/llama.cpp
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_VULKAN=ON \
       -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON \
+      -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_HTML=OFF \
     && cmake --build build --target llama-server -j"$(nproc)"
 
 # ---- The OS -----------------------------------------------------------------
