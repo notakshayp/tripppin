@@ -4,6 +4,7 @@ use hwdetect::{Catalog, Hardware, Tier};
 use serde::Serialize;
 
 mod logo;
+mod model;
 
 #[derive(Parser)]
 #[command(name = "trip", version, about = "Tripppin: tell your computer what you want.")]
@@ -20,6 +21,15 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Ask the local model a question and stream the answer.
+    Ask {
+        /// The question, in plain words.
+        #[arg(required = true, trailing_var_arg = true)]
+        words: Vec<String>,
+    },
+    /// Manage local models.
+    #[command(subcommand)]
+    Model(ModelCommand),
     /// Show the tripppin logo with a short system summary.
     Logo {
         /// Draw it once without animating.
@@ -31,6 +41,19 @@ enum Command {
     },
 }
 
+#[derive(Subcommand)]
+enum ModelCommand {
+    /// List the catalog and what's installed.
+    List,
+    /// Download a model (the one recommended for this machine unless you name a tier).
+    Pull {
+        /// A tier id from `trip model list`, such as cpu-16.
+        tier: Option<String>,
+    },
+    /// Run the model server (used by tripppin-llm.service).
+    Serve,
+}
+
 #[derive(Serialize)]
 struct HwReport<'a> {
     hardware: &'a Hardware,
@@ -40,6 +63,10 @@ struct HwReport<'a> {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Hw { json } => hw(json),
+        Command::Ask { words } => model::ask(&words.join(" ")),
+        Command::Model(ModelCommand::List) => model::list(),
+        Command::Model(ModelCommand::Pull { tier }) => model::pull(tier.as_deref()),
+        Command::Model(ModelCommand::Serve) => model::serve(),
         Command::Logo { still, bare } => {
             let info = if bare { Vec::new() } else { summary() };
             Ok(logo::show(&info, !still)?)
@@ -64,7 +91,10 @@ fn summary() -> Vec<String> {
         lines.push(format!("memory   {:.1} GiB", hw.memory_gib()));
         if let Ok(catalog) = Catalog::builtin() {
             lines.push(match catalog.recommend(&hw) {
-                Some(t) => format!("model    {} (not installed yet)", t.model),
+                Some(t) if model::active_tier(&catalog, &model::models_dir()).is_some_and(|a| a.id == t.id) => {
+                    format!("model    {} · ready", t.model)
+                }
+                Some(t) => format!("model    {} · not downloaded (sudo trip model pull)", t.model),
                 None => "model    cloud key or your own server".to_string(),
             });
         }
@@ -99,7 +129,7 @@ fn render(hw: &Hardware, tier: Option<&Tier>) -> String {
         out += &format!("gpu      {name} · {vram}\n");
     }
     out += &match tier {
-        Some(t) => format!("model    {} · {:.1} GB download · on this machine\n", t.model, t.download_gb),
+        Some(t) => format!("model    {} · {:.1} GB download · on this machine\n", t.model, t.download_gb()),
         None => "model    needs a cloud key or your own server (under 16 GB)\n".to_string(),
     };
     out

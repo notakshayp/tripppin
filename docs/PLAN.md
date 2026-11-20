@@ -65,11 +65,12 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 
 ## M2: Model service, next
 
-- [ ] llama.cpp: build a pinned release in the image (Vulkan backend, CPU fallback); smoke test `llama-server --version` in CI
-- [ ] Model catalog: real file names, download URLs and SHA-256 checksums for each tier; the catalog is signed
-- [ ] `trip model pull`: download the tier's model with resume and checksum verification into `/var/lib/tripppin/models`
-- [ ] `tripppin-llm.service`: llama-server under systemd, local only, sandboxed (DynamicUser, no network), idle unload
-- [ ] `trip ask "…"`: streams an answer from the local model
+- [x] llama.cpp v1.0.0 built in the image (Vulkan backend, CPU fallback), Mesa Vulkan drivers; CI checks the binary and the flags we pass
+- [x] Model catalog: Qwen3.5 Q4_K_M files (unsloth builds, Apache-2.0) pinned to repository revisions with SHA-256 and context sizes
+- [ ] Sign the catalog; later, quantize the official weights ourselves
+- [x] `trip model pull` / `list`: download with resume and SHA-256 check into `/var/lib/tripppin/models`; TLS trusts the OS certificate store
+- [x] `tripppin-llm.service`: `trip model serve` execs llama-server on 127.0.0.1:8086; DynamicUser, read-only models, localhost-only IP filter, idle unload after 15 min
+- [x] `trip ask "…"`: streams the answer and reports time to first word and tokens/s
 - [ ] Measure speed (tokens per second, time to first word) per hardware tier; publish in the plan
 - [ ] Eval runner skeleton with a first handful of recorded requests
 

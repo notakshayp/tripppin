@@ -8,12 +8,23 @@
 
 # ---- Rust tools -------------------------------------------------------------
 FROM quay.io/fedora/fedora:45@sha256:f236063d5a7a15e76ff034f2be5fa6f7a8922fcb655093ad972a1f196b14a007 AS build
-RUN dnf -y install --setopt=install_weak_deps=False cargo rust && dnf clean all
+RUN dnf -y install --setopt=install_weak_deps=False cargo rust gcc && dnf clean all
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rustfmt.toml ./
 COPY crates crates
 COPY models models
 RUN cargo build --release --locked -p trip
+
+# ---- llama.cpp ------------------------------------------------------------
+# Pinned release, Vulkan backend (falls back to the CPU when there's no GPU).
+FROM quay.io/fedora/fedora:45@sha256:f236063d5a7a15e76ff034f2be5fa6f7a8922fcb655093ad972a1f196b14a007 AS llama
+ARG LLAMA_CPP_TAG=v1.0.0
+RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ vulkan-headers vulkan-loader-devel glslc && dnf clean all
+RUN git clone --depth 1 --branch "$LLAMA_CPP_TAG" https://github.com/ggml-org/llama.cpp /src/llama.cpp
+WORKDIR /src/llama.cpp
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_VULKAN=ON \
+      -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON \
+    && cmake --build build --target llama-server -j"$(nproc)"
 
 # ---- The OS -----------------------------------------------------------------
 FROM quay.io/fedora/fedora-bootc:45@sha256:990ebc2678ff3dbca3f0143c8d5f1a150a2fb0c418888a3bdf218aea109fc1d2
@@ -33,6 +44,11 @@ RUN dnf -y upgrade --refresh && dnf clean all
 RUN dnf -y remove toolbox && dnf clean all
 
 COPY --from=build /src/target/release/trip /usr/bin/trip
+COPY --from=llama /src/llama.cpp/build/bin/llama-server /usr/bin/llama-server
+COPY --from=llama /src/llama.cpp/LICENSE /usr/share/licenses/llama.cpp/LICENSE
+
+# What llama.cpp needs at runtime: the Vulkan loader and Mesa's GPU drivers.
+RUN dnf -y install --setopt=install_weak_deps=False vulkan-loader mesa-vulkan-drivers libgomp && dnf clean all
 COPY os/files/ /
 
 # Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still
@@ -45,6 +61,8 @@ RUN sed -i \
 
 # The login banner: the logo in text, then the system name and terminal.
 RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } > /etc/issue
+
+RUN systemctl enable tripppin-llm.service
 
 # Fails the build if the image breaks bootc's rules (e.g. content in /var it can't manage).
 RUN bootc container lint
