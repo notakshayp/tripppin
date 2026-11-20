@@ -33,6 +33,18 @@ RUN dnf -y upgrade --refresh && dnf clean all
 RUN dnf -y remove toolbox && dnf clean all
 
 COPY --from=build /src/target/release/trip /usr/bin/trip
+COPY os/files/ /
+
+# Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still
+# recognise the base; change only what people see.
+RUN sed -i \
+      -e 's/^NAME=.*/NAME="Tripppin"/' \
+      -e 's/^PRETTY_NAME=.*/PRETTY_NAME="Tripppin 0.1 (Fedora 45 base)"/' \
+      -e 's/^VARIANT=.*/VARIANT="Tripppin"/' \
+      /usr/lib/os-release
+
+# The login banner: the logo in text, then the system name and terminal.
+RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } > /etc/issue
 
 # Fails the build if the image breaks bootc's rules (e.g. content in /var it can't manage).
 RUN bootc container lint

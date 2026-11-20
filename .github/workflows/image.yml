@@ -45,6 +45,11 @@ jobs:
           sudo podman run --rm localhost/tripppin:ci bootc --version
           # Packages we removed for security reasons must stay removed.
           ! sudo podman run --rm localhost/tripppin:ci rpm -q toolbox
+          # Branding: the logo command, the login banner and the system name.
+          sudo podman run --rm localhost/tripppin:ci trip logo --static
+          sudo podman run --rm localhost/tripppin:ci grep -q '█' /etc/issue
+          sudo podman run --rm localhost/tripppin:ci grep -q '^NAME="Tripppin"' /usr/lib/os-release
+          sudo podman run --rm localhost/tripppin:ci grep -q '^ID=fedora' /usr/lib/os-release
 
       - name: Export image for scanning
         run: |

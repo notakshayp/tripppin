@@ -58,7 +58,9 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 - [ ] greenboot health checks: session starts, network, our services
 - [x] Multi-arch image: amd64 and arm64 built natively, joined under one tag, list and per-arch images signed
 - [x] `disk.yml`: bootc-image-builder → x86_64 ISO + qcow2, aarch64 qcow2 (for UTM on the Mac); compressed, split under 2 GiB, checksums signed, attached to the `nightly` pre-release
-- [ ] Test login secrets (`TEST_USER_PASSWORD`, `TEST_USER_SSH_KEY`) set by the owner, then the first disk build
+- [x] Test login secrets (`TEST_USER_PASSWORD`, `TEST_USER_SSH_KEY`)
+- [x] Console branding: os-release name, login banner with the logo, `trip logo` animation on login
+- [ ] First disk build attached to the `nightly` release
 - [ ] `boot-test.yml`: boot the qcow2 under KVM, wait for `multi-user.target`, check `trip hw` and `bootc status`
 
 ## Open questions for the owner
