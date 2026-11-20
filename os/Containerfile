@@ -28,6 +28,10 @@ LABEL org.opencontainers.image.title="tripppin" \
 # image never ships a fix that already exists upstream.
 RUN dnf -y upgrade --refresh && dnf clean all
 
+# toolbox in Fedora 45 is built with a pre-release Go (CVE-2026-78663, critical).
+# We don't need it until milestone 6; re-add it once Fedora ships a rebuilt package.
+RUN dnf -y remove toolbox && dnf clean all
+
 COPY --from=build /src/target/release/trip /usr/bin/trip
 
 # Fails the build if the image breaks bootc's rules (e.g. content in /var it can't manage).

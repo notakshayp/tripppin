@@ -48,6 +48,8 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 - [ ] Lima dev VM recipe for the Mac (`dev/lima.yaml`), with podman and `bcvk`
 - [ ] Pin GitHub Actions by commit hash
 
+- [ ] Re-add toolbox once Fedora ships a build without CVE-2026-78663 (removed from the image for now)
+
 ## M1: First boot, next up
 
 - [ ] Hyprland packaging: decide between building RPMs in our CI (mock + Packit) or a COPR; package hyprland, aquamarine, hyprutils, hyprlang, hyprcursor, hyprgraphics, hyprwayland-scanner, xdg-desktop-portal-hyprland
