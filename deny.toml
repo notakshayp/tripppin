@@ -1,0 +1,20 @@
+# cargo-deny: run in CI on every PR. Fails on known vulnerabilities, yanked
+# crates, licenses we can't ship under Apache-2.0, and crates from unknown sources.
+
+[advisories]
+# Every RustSec advisory fails the build unless listed here with a reason.
+ignore = []
+yanked = "deny"
+
+[licenses]
+allow = ["Apache-2.0", "MIT", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
