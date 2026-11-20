@@ -4,24 +4,24 @@
 //! with memory, `/terminal` opens a normal shell, and `!command` runs one command
 //! exactly as typed.
 
-use crate::model::{self, Message};
+use crate::agent;
+use crate::model::Message;
 use anyhow::Result;
 use reedline::{
     DefaultHinter, FileBackedHistory, Prompt, PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus, Reedline,
     Signal,
 };
 use std::borrow::Cow;
-use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-const ACCENT: &str = "\x1b[38;2;87;217;154m";
-const DIM: &str = "\x1b[2m";
-const RESET: &str = "\x1b[0m";
+pub(crate) const ACCENT: &str = "\x1b[38;2;87;217;154m";
+pub(crate) const DIM: &str = "\x1b[2m";
+pub(crate) const RESET: &str = "\x1b[0m";
 const HELP: &str = "\
-  type anything     ask the model a question
+  type anything     ask, or tell it what to do; it can run commands
   /chat             start a conversation with memory (/exit to leave it)
   /terminal         open a normal shell (exit to come back)
   !command          run one command exactly as typed
@@ -151,45 +151,42 @@ pub fn run() -> Result<()> {
             Input::Setup => setup(),
             Input::Unknown(cmd) => println!("{DIM}{cmd} isn't a command here. /help lists them.{RESET}"),
             Input::Ask(text) => {
-                let messages = match &mut chat {
-                    Some(history) => {
-                        history.push(Message::user(text));
-                        history.clone()
-                    }
-                    None => vec![Message::system(), Message::user(text)],
-                };
                 cancel.store(false, Ordering::Relaxed);
-                let answer = respond(&messages, &cancel);
-                if let (Some(history), Some(answer)) = (&mut chat, answer) {
-                    history.push(Message::assistant(&answer));
+                match &mut chat {
+                    Some(history) => {
+                        // A task that fails part-way leaves half-finished tool turns; drop them.
+                        let before = history.len();
+                        history.push(Message::user(text));
+                        if !respond(history, &cancel) {
+                            history.truncate(before);
+                        }
+                    }
+                    None => {
+                        respond(&mut vec![Message::system(), Message::user(text)], &cancel);
+                    }
                 }
             }
         }
     }
 }
 
-/// Streams one answer to the terminal. Returns the text if it completed.
-fn respond(messages: &[Message], cancel: &AtomicBool) -> Option<String> {
-    let mut out = io::stdout().lock();
-    let result = model::stream(messages, cancel, |piece| {
-        let _ = write!(out, "{piece}");
-        let _ = out.flush();
-    });
-    match result {
-        Ok(reply) => {
-            let _ = writeln!(out);
-            if reply.cancelled {
-                let _ = writeln!(out, "{DIM}stopped{RESET}");
-                return None;
+/// Works on one request with the agent, which streams its answer and shows each step.
+/// Returns whether it finished.
+fn respond(history: &mut Vec<Message>, cancel: &AtomicBool) -> bool {
+    match agent::run(history, cancel) {
+        Ok(done) => {
+            if let Some(stats) = done.stats {
+                println!("{DIM}{stats}{RESET}");
             }
-            if let Some(stats) = reply.stats() {
-                let _ = writeln!(out, "{DIM}{stats}{RESET}");
-            }
-            Some(reply.text)
+            true
+        }
+        Err(e) if e.to_string() == "stopped" => {
+            println!("{DIM}stopped{RESET}");
+            false
         }
         Err(e) => {
-            let _ = writeln!(out, "{ACCENT}!{RESET} {e}");
-            None
+            println!("{ACCENT}!{RESET} {e}");
+            false
         }
     }
 }

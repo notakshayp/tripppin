@@ -60,6 +60,25 @@ RUN dnf -y install --setopt=install_weak_deps=False vulkan-loader mesa-vulkan-dr
 RUN dnf -y install --setopt=install_weak_deps=False NetworkManager-wifi wpa_supplicant \
       iwlwifi-mvm-firmware iwlwifi-dvm-firmware realtek-firmware mt7xxx-firmware atheros-firmware brcmfmac-firmware \
     && dnf clean all
+
+# Apps install as Flatpaks from Flathub, since the system image itself is read-only.
+RUN dnf -y install --setopt=install_weak_deps=False flatpak && dnf clean all \
+    && mkdir -p /usr/share/flatpak/remotes.d \
+    && curl -fsSL -o /usr/share/flatpak/remotes.d/flathub.flatpakrepo https://dl.flathub.org/repo/flathub.flatpakrepo
+
+# The console: kmscon (scrollback, mouse, real fonts) in DM Mono, with DejaVu Sans
+# Mono for the block and line characters DM Mono doesn't have.
+ARG DM_MONO_REV=85f32a0254c400b643d7ce589b91a2ad29bea73b
+ARG DM_MONO_SHA256=55b4c98f123daebb3ed27947ba47b2af00554fc6284d639a540bcef5e6258ad2
+RUN dnf -y install --setopt=install_weak_deps=False kmscon kmscon-pango dejavu-sans-mono-fonts && dnf clean all \
+    && mkdir -p /usr/share/fonts/dm-mono /usr/share/licenses/dm-mono \
+    && curl -fsSL -o /usr/share/fonts/dm-mono/DMMono-Regular.ttf \
+         "https://raw.githubusercontent.com/google/fonts/${DM_MONO_REV}/ofl/dmmono/DMMono-Regular.ttf" \
+    && echo "${DM_MONO_SHA256}  /usr/share/fonts/dm-mono/DMMono-Regular.ttf" | sha256sum -c - \
+    && curl -fsSL -o /usr/share/licenses/dm-mono/OFL.txt \
+         "https://raw.githubusercontent.com/google/fonts/${DM_MONO_REV}/ofl/dmmono/OFL.txt" \
+    && fc-cache -f
+
 COPY os/files/ /
 
 # Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still
@@ -73,7 +92,7 @@ RUN sed -i \
 # The login banner: the logo in text, then the system name and terminal.
 RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } > /etc/issue
 
-RUN systemctl enable tripppin-llm.service
+RUN systemctl enable tripppin-llm.service kmsconvt@tty1.service
 
 # Fails the build if the image breaks bootc's rules (e.g. content in /var it can't manage).
 RUN bootc container lint

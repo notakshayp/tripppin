@@ -17,9 +17,19 @@ pub const PORT: u16 = 8086;
 const MODELS_DIR: &str = "/var/lib/tripppin/models";
 const LLAMA_SERVER: &str = "/usr/bin/llama-server";
 const IDLE_UNLOAD_SECS: u32 = 900;
-const SYSTEM_PROMPT: &str = "You are the assistant built into Tripppin, a Linux operating system. \
-The person is typing to you in their terminal. Answer briefly and plainly, in a few short lines. \
-You can't run commands yet; if something needs a command, give it and say they can run it with /terminal.";
+const SYSTEM_PROMPT: &str = "You are the assistant built into Tripppin, a Linux operating system based on Fedora. \
+The person types to you in their terminal. You have tools: use exec to run shell commands on their machine, \
+and read_file / write_file for files. When they ask you to do something, do it with the tools instead of \
+explaining how, check the result, and keep going until it's done or you're truly stuck. \
+Then answer briefly and plainly, in a few short lines.
+
+About this system:
+- The core system (/usr) is a read-only image; updates replace it whole. /etc, /var and the home folder are writable.
+- Install apps with: sudo flatpak install -y flathub <app id> (find the id with: flatpak search <name>).
+- `sudo dnf install` changes don't last; for a command-line tool, use `sudo dnf install --transient -y <package>` \
+and say it lasts until the next reboot.
+- sudo may ask the person for their password in the terminal; that's fine.
+- Use non-interactive flags (-y, --noconfirm) and avoid commands that open an editor or a pager.";
 
 /// An HTTP client that trusts the operating system's certificate store, so CA updates
 /// arrive with system updates rather than with a new build of trip.
@@ -210,28 +220,52 @@ fn exec(bin: &str, _args: &[String]) -> Result<()> {
     bail!("{bin} can only be started on Linux")
 }
 
-/// One message in a conversation.
+/// One message in a conversation, in the OpenAI chat format llama.cpp speaks.
 #[derive(Clone, Debug)]
-pub struct Message {
-    pub role: &'static str,
-    pub content: String,
-}
+pub struct Message(pub serde_json::Value);
 
 impl Message {
     pub fn system() -> Self {
-        Message { role: "system", content: SYSTEM_PROMPT.to_string() }
+        Message(serde_json::json!({ "role": "system", "content": SYSTEM_PROMPT }))
     }
     pub fn user(text: &str) -> Self {
-        Message { role: "user", content: text.to_string() }
+        Message(serde_json::json!({ "role": "user", "content": text }))
     }
     pub fn assistant(text: &str) -> Self {
-        Message { role: "assistant", content: text.to_string() }
+        Message(serde_json::json!({ "role": "assistant", "content": text }))
     }
+    /// The model's turn when it asked for tools.
+    pub fn assistant_calls(text: &str, calls: &[ToolCall]) -> Self {
+        let calls: Vec<_> = calls
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "id": c.id,
+                    "type": "function",
+                    "function": { "name": c.name, "arguments": c.arguments }
+                })
+            })
+            .collect();
+        Message(serde_json::json!({ "role": "assistant", "content": text, "tool_calls": calls }))
+    }
+    /// The result of one tool call.
+    pub fn tool(id: &str, content: &str) -> Self {
+        Message(serde_json::json!({ "role": "tool", "tool_call_id": id, "content": content }))
+    }
+}
+
+/// A tool call as the model sent it, before it's been checked.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: String,
 }
 
 /// What came back from one streamed reply.
 pub struct Reply {
     pub text: String,
+    pub calls: Vec<ToolCall>,
     pub first_word: Option<Duration>,
     pub tokens_per_sec: f64,
     pub cancelled: bool,
@@ -253,16 +287,25 @@ fn unavailable() -> anyhow::Error {
     }
 }
 
-/// Streams a reply to `messages`, calling `on_text` for each piece. Stops early when `cancel` is set.
-pub fn stream(messages: &[Message], cancel: &AtomicBool, mut on_text: impl FnMut(&str)) -> Result<Reply> {
-    let msgs: Vec<_> = messages.iter().map(|m| serde_json::json!({ "role": m.role, "content": m.content })).collect();
-    let body = serde_json::json!({
+/// Streams a reply to `messages`, calling `on_text` for each piece of text. With `tools`, the model
+/// may answer with tool calls instead, which come back in `Reply::calls`. Stops early when `cancel` is set.
+pub fn stream(
+    messages: &[Message],
+    tools: Option<&serde_json::Value>,
+    cancel: &AtomicBool,
+    mut on_text: impl FnMut(&str),
+) -> Result<Reply> {
+    let msgs: Vec<_> = messages.iter().map(|m| &m.0).collect();
+    let mut body = serde_json::json!({
         "model": "tripppin",
         "stream": true,
         "messages": msgs,
-        // Plain answers don't need the model's long thinking pass.
+        // Answers and tool calls don't need the model's long thinking pass.
         "chat_template_kwargs": { "enable_thinking": false }
     });
+    if let Some(tools) = tools {
+        body["tools"] = tools.clone();
+    }
     let url = format!("http://127.0.0.1:{PORT}/v1/chat/completions");
     let start = Instant::now();
     let mut resp = match http().post(&url).header("Content-Type", "application/json").send(body.to_string()) {
@@ -273,6 +316,7 @@ pub fn stream(messages: &[Message], cancel: &AtomicBool, mut on_text: impl FnMut
     };
     let reader = BufReader::new(resp.body_mut().as_reader());
     let (mut text, mut first, mut pieces, mut cancelled) = (String::new(), None, 0u32, false);
+    let mut calls: Vec<ToolCall> = Vec::new();
     for line in reader.lines() {
         if cancel.load(Ordering::Relaxed) {
             cancelled = true;
@@ -283,22 +327,27 @@ pub fn stream(messages: &[Message], cancel: &AtomicBool, mut on_text: impl FnMut
         if data.trim() == "[DONE]" {
             break;
         }
-        if let Some(piece) = delta_text(data) {
+        let Ok(chunk) = serde_json::from_str::<serde_json::Value>(data) else { continue };
+        if let Some(piece) = delta_text(&chunk) {
             first.get_or_insert_with(|| start.elapsed());
             pieces += 1;
             on_text(&piece);
             text.push_str(&piece);
         }
+        if merge_tool_calls(&chunk, &mut calls) {
+            first.get_or_insert_with(|| start.elapsed());
+            pieces += 1;
+        }
     }
     let tokens_per_sec =
         first.map_or(0.0, |t: Duration| f64::from(pieces) / start.elapsed().saturating_sub(t).as_secs_f64().max(0.001));
-    Ok(Reply { text, first_word: first, tokens_per_sec, cancelled })
+    Ok(Reply { text, calls, first_word: first, tokens_per_sec, cancelled })
 }
 
 /// Sends one question and prints the streamed answer (`trip ask`, for scripts and testing).
 pub fn ask(question: &str) -> Result<()> {
     let mut out = io::stdout().lock();
-    let reply = stream(&[Message::system(), Message::user(question)], &AtomicBool::new(false), |t| {
+    let reply = stream(&[Message::system(), Message::user(question)], None, &AtomicBool::new(false), |t| {
         let _ = write!(out, "{t}");
         let _ = out.flush();
     })?;
@@ -314,10 +363,32 @@ pub fn ask(question: &str) -> Result<()> {
 }
 
 /// The text in one streamed chunk, if any.
-fn delta_text(data: &str) -> Option<String> {
-    let v: serde_json::Value = serde_json::from_str(data).ok()?;
-    let s = v.pointer("/choices/0/delta/content")?.as_str()?;
+fn delta_text(chunk: &serde_json::Value) -> Option<String> {
+    let s = chunk.pointer("/choices/0/delta/content")?.as_str()?;
     (!s.is_empty()).then(|| s.to_string())
+}
+
+/// Adds the tool-call pieces in one streamed chunk to `calls`. Each call arrives in parts keyed by
+/// `index`: the id and name first, then the arguments a few characters at a time.
+fn merge_tool_calls(chunk: &serde_json::Value, calls: &mut Vec<ToolCall>) -> bool {
+    let Some(parts) = chunk.pointer("/choices/0/delta/tool_calls").and_then(|v| v.as_array()) else { return false };
+    for part in parts {
+        let index = part.get("index").and_then(|i| i.as_u64()).map_or(calls.len().saturating_sub(1), |i| i as usize);
+        while calls.len() <= index {
+            calls.push(ToolCall::default());
+        }
+        let call = &mut calls[index];
+        if let Some(id) = part.get("id").and_then(|v| v.as_str()) {
+            call.id.push_str(id);
+        }
+        if let Some(name) = part.pointer("/function/name").and_then(|v| v.as_str()) {
+            call.name.push_str(name);
+        }
+        if let Some(args) = part.pointer("/function/arguments").and_then(|v| v.as_str()) {
+            call.arguments.push_str(args);
+        }
+    }
+    !parts.is_empty()
 }
 
 #[cfg(test)]
@@ -326,10 +397,30 @@ mod tests {
 
     #[test]
     fn reads_streamed_chunks() {
-        let chunk = r#"{"choices":[{"delta":{"content":"hel"},"index":0}]}"#;
-        assert_eq!(delta_text(chunk).as_deref(), Some("hel"));
-        assert_eq!(delta_text(r#"{"choices":[{"delta":{"role":"assistant"}}]}"#), None);
-        assert_eq!(delta_text("not json"), None);
+        let chunk = serde_json::json!({"choices":[{"delta":{"content":"hel"},"index":0}]});
+        assert_eq!(delta_text(&chunk).as_deref(), Some("hel"));
+        assert_eq!(delta_text(&serde_json::json!({"choices":[{"delta":{"role":"assistant"}}]})), None);
+    }
+
+    #[test]
+    fn assembles_tool_calls_from_pieces() {
+        let pieces = [
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"exec","arguments":""}}]}}]}"#,
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"command\":"}}]}}]}"#,
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"ls\"}"}}]}}]}"#,
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":1,"id":"c2","function":{"name":"read_file","arguments":"{}"}}]}}]}"#,
+        ];
+        let mut calls = Vec::new();
+        for p in pieces {
+            assert!(merge_tool_calls(&serde_json::from_str(p).unwrap(), &mut calls));
+        }
+        assert_eq!(calls.len(), 2);
+        assert_eq!(
+            calls[0],
+            ToolCall { id: "c1".into(), name: "exec".into(), arguments: r#"{"command":"ls"}"#.into() }
+        );
+        assert_eq!(calls[1].name, "read_file");
+        assert!(!merge_tool_calls(&serde_json::json!({"choices":[{"delta":{"content":"x"}}]}), &mut calls));
     }
 
     #[test]

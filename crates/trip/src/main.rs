@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use hwdetect::{Catalog, Hardware, Tier};
 use serde::Serialize;
 
+mod agent;
 mod logo;
 mod model;
 mod shell;
@@ -28,6 +29,13 @@ enum Command {
     #[command(hide = true)]
     Ask {
         /// The question, in plain words.
+        #[arg(required = true, trailing_var_arg = true)]
+        words: Vec<String>,
+    },
+    /// Do one task with tools and print the result (for scripts and testing).
+    #[command(hide = true, name = "do")]
+    Do {
+        /// The task, in plain words.
         #[arg(required = true, trailing_var_arg = true)]
         words: Vec<String>,
     },
@@ -69,6 +77,7 @@ fn main() -> Result<()> {
         Command::Hw { json } => hw(json),
         Command::Shell => shell::run(),
         Command::Ask { words } => model::ask(&words.join(" ")),
+        Command::Do { words } => agent::once(&words.join(" ")),
         Command::Model(ModelCommand::List) => model::list(),
         Command::Model(ModelCommand::Pull { tier }) => model::pull(tier.as_deref()),
         Command::Model(ModelCommand::Serve) => model::serve(),
