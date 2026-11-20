@@ -1,38 +1,57 @@
-# Model catalog: which model each hardware tier gets.
+# Model catalog: which model each hardware tier gets, and exactly which file.
 #
 # Tiers are checked top to bottom; the first one whose requirements the machine
 # meets wins. Memory is in GiB as the kernel reports it, so a "16 GB" laptop
 # shows about 15.3 GiB; thresholds sit a little under the marketing number.
 #
-# File names, download URLs and checksums are filled in at milestone 3, when the
-# model service lands. The catalog will be signed before it ships.
+# Files are Q4_K_M GGUF builds of the official Qwen3.5 weights by unsloth
+# (Apache-2.0, same as the base models), pinned to a repository revision and
+# checked by SHA-256 after download. Qwen does not publish GGUF files for 3.5;
+# later we quantize the official weights ourselves and host the result.
+# The catalog will be signed before it ships.
 
 schema = 1
 
 [[tier]]
 id = "gpu-24"
 model = "Qwen3.5 27B"
-download_gb = 17.0
 license = "Apache-2.0"
 min_vram_gib = 22.0
+file = "Qwen3.5-27B-Q4_K_M.gguf"
+url = "https://huggingface.co/unsloth/Qwen3.5-27B-GGUF/resolve/3221f178a6b842d04f1fb42f1c413534adcc0a6a/Qwen3.5-27B-Q4_K_M.gguf"
+size_bytes = 16740812704
+sha256 = "84b5f7f112156d63836a01a69dc3f11a6ba63b10a23b8ca7a7efaf52d5a2d806"
+context = 32768
 
 [[tier]]
 id = "gpu-8"
 model = "Qwen3.5 9B"
-download_gb = 5.8
 license = "Apache-2.0"
 min_vram_gib = 7.5
+file = "Qwen3.5-9B-Q4_K_M.gguf"
+url = "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf"
+size_bytes = 5680522464
+sha256 = "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8"
+context = 16384
 
 [[tier]]
 id = "cpu-32"
 model = "Qwen3.5 35B-A3B"
-download_gb = 21.0
 license = "Apache-2.0"
 min_ram_gib = 30.0
+file = "Qwen3.5-35B-A3B-Q4_K_M.gguf"
+url = "https://huggingface.co/unsloth/Qwen3.5-35B-A3B-GGUF/resolve/bc014a17be43adabd7066b7a86075ff935c6a4e2/Qwen3.5-35B-A3B-Q4_K_M.gguf"
+size_bytes = 22016023168
+sha256 = "3b46d1066bc91cc2d613e3bc22ce691dd77e6f0d33c9060690d24ce6de494375"
+context = 16384
 
 [[tier]]
 id = "cpu-16"
 model = "Qwen3.5 4B"
-download_gb = 2.7
 license = "Apache-2.0"
 min_ram_gib = 14.5
+file = "Qwen3.5-4B-Q4_K_M.gguf"
+url = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf"
+size_bytes = 2740937888
+sha256 = "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4"
+context = 8192

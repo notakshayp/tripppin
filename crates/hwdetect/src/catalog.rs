@@ -15,12 +15,26 @@ pub struct Catalog {
 pub struct Tier {
     pub id: String,
     pub model: String,
-    pub download_gb: f64,
     pub license: String,
     #[serde(default)]
     pub min_vram_gib: Option<f64>,
     #[serde(default)]
     pub min_ram_gib: Option<f64>,
+    /// File name on disk.
+    pub file: String,
+    /// Where to download it, pinned to a repository revision.
+    pub url: String,
+    pub size_bytes: u64,
+    /// Lowercase hex SHA-256 of the whole file.
+    pub sha256: String,
+    /// Context window to run it with, in tokens.
+    pub context: u32,
+}
+
+impl Tier {
+    pub fn download_gb(&self) -> f64 {
+        self.size_bytes as f64 / 1e9
+    }
 }
 
 impl Catalog {
@@ -33,6 +47,17 @@ impl Catalog {
         let catalog: Self = toml::from_str(text).context("parsing model catalog")?;
         if catalog.schema != 1 {
             bail!("unsupported catalog schema {}", catalog.schema);
+        }
+        for t in &catalog.tiers {
+            if t.sha256.len() != 64 || !t.sha256.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+                bail!("tier {}: sha256 must be 64 lowercase hex characters", t.id);
+            }
+            if !t.url.starts_with("https://") || !t.url.ends_with(&t.file) {
+                bail!("tier {}: url must be https and end with the file name", t.id);
+            }
+            if t.file.contains('/') {
+                bail!("tier {}: file must be a plain file name", t.id);
+            }
         }
         Ok(catalog)
     }
@@ -87,6 +112,24 @@ mod tests {
     #[test]
     fn small_machines_get_no_local_model() {
         assert_eq!(pick(7.6, None), None);
+    }
+
+    #[test]
+    fn every_tier_is_pinned_and_checksummed() {
+        for t in Catalog::builtin().unwrap().tiers {
+            assert!(
+                t.url.contains("/resolve/") && !t.url.contains("/resolve/main/"),
+                "{} is not pinned to a revision",
+                t.id
+            );
+            assert!(t.size_bytes > 1_000_000_000);
+        }
+    }
+
+    #[test]
+    fn rejects_bad_checksums() {
+        let bad = include_str!("../../../models/catalog.toml").replacen("sha256 = \"8", "sha256 = \"X", 1);
+        assert!(Catalog::parse(&bad).is_err());
     }
 
     #[test]
