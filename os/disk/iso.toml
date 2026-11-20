@@ -1,0 +1,19 @@
+# Installer ISO settings. A custom kickstart stops the image builder's
+# defaults (wipe every disk, no user, reboot), so Anaconda asks for the disk,
+# language, time zone, network and your account like a normal install.
+
+[customizations.installer.kickstart]
+contents = """
+%post --erroronfail
+bootc switch --mutate-in-place --transport registry ghcr.io/notakshayp/tripppin:nightly-amd64
+%end
+"""
+
+[customizations.installer.modules]
+enable = [
+  "org.fedoraproject.Anaconda.Modules.Localization",
+  "org.fedoraproject.Anaconda.Modules.Network",
+  "org.fedoraproject.Anaconda.Modules.Storage",
+  "org.fedoraproject.Anaconda.Modules.Timezone",
+  "org.fedoraproject.Anaconda.Modules.Users",
+]

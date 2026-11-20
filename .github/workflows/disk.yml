@@ -66,8 +66,8 @@ jobs:
           mkdir -p output
           # The image builder makes either disk images or an ISO in one run, not both.
           # Virtual disks have no installer, so they get the test account. The ISO
-          # gets no account: the installer asks for the disk, your name and password.
-          echo "# interactive install" > iso.toml
+          # gets os/disk/iso.toml: the installer asks for the disk and your account.
+          cp os/disk/iso.toml iso.toml
           for type in ${{ matrix.types }}; do
             config=config.toml
             [ "$type" = anaconda-iso ] && config=iso.toml
@@ -80,6 +80,16 @@ jobs:
               "$IMAGE:nightly-${{ matrix.arch }}"
           done
           sudo chown -R "$USER" output
+          # Fail if the ISO would install unattended (wipe disks, no account).
+          if [ -d output/bootiso ]; then
+            sudo apt-get install -y -qq libarchive-tools >/dev/null
+            bsdtar -xOf output/bootiso/install.iso osbuild.ks > ks.txt
+            bsdtar -xOf output/bootiso/install.iso osbuild-base.ks >> ks.txt 2>/dev/null || true
+            cat ks.txt
+            if grep -qE "^(clearpart|autopart|rootpw|reboot)" ks.txt; then
+              echo "::error::the ISO kickstart is unattended"; exit 1
+            fi
+          fi
           find output -type f -exec ls -lh {} \;
 
       - name: Compress and package
