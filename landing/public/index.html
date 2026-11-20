@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tripppin — tell your computer what you want</title>
-<meta name="description" content="Tripppin is a Linux operating system with an AI model built in. Say what you want; it plans, checks itself and gets it done.">
+<meta name="description" content="Tripppin is a Linux with an AI built in. Tell your computer what you want. It does it.">
 <meta property="og:title" content="Tripppin">
-<meta property="og:description" content="A Linux operating system with an AI model built in. Tell your computer what you want. Watch it work.">
+<meta property="og:description" content="A Linux with an AI built in. Tell your computer what you want. It does it.">
 <meta property="og:url" content="https://trippp.in">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#f5f2ea" media="(prefers-color-scheme: light)">
@@ -16,457 +16,271 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: launch page. Big tight type, ruled sections, square panels, line icons. Emphasis is color, never italics. */
+/* Layout: a sparse launch page. Giant wordmark, one idea per section, two-line headings, mono labels. Emphasis is color, never italics. */
 :root{
-  --bg:#f5f2ea; --panel:#ece8db; --line:#ddd6c6; --ink:#182423; --muted:#5d6a65; --accent:#1f6b45; --accent-soft:#d6e6db;
-  --term:#142019; --term-ink:#e6ece6; --term-dim:#8fa097; --term-accent:#7fdcaa; --warn:#a4561c; --stop:#b23b2a;
-  --sheet:#fbfaf6; --dot:rgba(24,36,35,.32);
+  --bg:#f5f2ea; --panel:#ece8db; --line:#ddd6c6; --ink:#182423; --muted:#5d6a65; --accent:#1f6b45;
+  --term:#142019; --term-ink:#e6ece6; --term-dim:#8fa097; --term-accent:#7fdcaa; --stop:#ff9d8a;
+  --dot:rgba(24,36,35,.32);
   --sans:"Inter", "Helvetica Neue", Arial, sans-serif;
   --mono:"DM Mono", ui-monospace, Menlo, monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#0d1211; --panel:#18201d; --line:#2d3834; --ink:#f2f5ef; --muted:#b9c6bf; --accent:#57d99a; --accent-soft:#1c3328;
-  --term:#070b0a; --warn:#f0a35e; --stop:#ff8a75; --sheet:#131a18; --dot:rgba(242,245,239,.16); color-scheme:dark}}
+  --bg:#0d1211; --panel:#18201d; --line:#2d3834; --ink:#f2f5ef; --muted:#b9c6bf; --accent:#57d99a;
+  --term:#070b0a; --dot:rgba(242,245,239,.16); color-scheme:dark}}
 
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;letter-spacing:-.011em;
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;letter-spacing:-.015em;
   padding-left:max(20px, env(safe-area-inset-left, 0px));padding-right:max(20px, env(safe-area-inset-right, 0px));
   -webkit-font-smoothing:antialiased}
 body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.12;background-image:radial-gradient(var(--dot) .55px,transparent .7px);background-size:5px 5px;z-index:0}
-.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto}
-a{color:var(--accent)}
+.wrap{position:relative;z-index:1;max-width:1240px;margin:0 auto}
+a{color:inherit}
 em{font-style:normal;color:var(--accent)}
-b{font-weight:600}
-code{font-family:var(--mono);font-size:.88em;background:var(--panel);padding:.08em .35em}
-button{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.ic{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.ic.lg{width:32px;height:32px;stroke-width:1.4}
-svg text{font-family:var(--mono);font-size:12px;fill:var(--muted)}
-svg text.k{fill:var(--ink);font-family:var(--sans);font-weight:700;font-size:14px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.mark{fill:currentColor;overflow:visible;display:block;width:auto}
+.label{font:500 11px var(--mono);letter-spacing:.04em;color:var(--accent);text-transform:lowercase}
 
 /* nav */
-nav.top{height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:-.07em;color:var(--ink);text-decoration:none}
-.brand svg{width:24px;height:24px;fill:currentColor;overflow:visible}
-.brand .pupil{transition:transform .5s cubic-bezier(.3,0,.2,1)}
-.brand:hover .pupil,.brand:focus-visible .pupil{transform:translate(-7px,-4px)}
-nav.top div{display:flex;gap:24px;font:12px var(--mono);text-transform:lowercase}
-nav.top div a{color:var(--muted);text-decoration:none}
-nav.top div a:hover{color:var(--accent)}
+nav.top{height:84px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:24px;letter-spacing:-.07em;text-decoration:none}
+.brand .mark{height:42px}
+.pupil{transition:transform .6s cubic-bezier(.3,0,.2,1)}
+.brand:hover .pupil{transform:translate(-7px,-4px)}
+nav.top .links{display:flex;gap:26px;font:12px var(--mono);text-transform:lowercase}
+nav.top .links a{color:var(--muted);text-decoration:none}
+nav.top .links a:hover{color:var(--accent)}
 
 /* hero */
-.hero{padding-block:96px 48px}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;font:12px var(--mono);color:var(--accent);border:1px solid var(--accent);padding:4px 10px;margin-bottom:28px}
-.eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--accent)}
-.hero h1{font-weight:800;font-size:clamp(54px,9.4vw,128px);line-height:.9;letter-spacing:-.075em;margin:0 0 44px;text-wrap:balance}
-.hero-row{display:flex;justify-content:space-between;align-items:end;gap:32px;flex-wrap:wrap}
-.hero-row p{max-width:520px;font-size:19px;line-height:1.5;letter-spacing:-.02em;margin:0}
-.pills{display:flex;flex-wrap:wrap;gap:8px}
-.pill{display:inline-flex;align-items:center;gap:6px;font:12px var(--mono);border:1px solid var(--line);padding:6px 10px;color:var(--muted);background:var(--bg)}
-.pill .ic{width:15px;height:15px;color:var(--accent)}
+.hero{padding-block:72px 64px;border-bottom:1px solid var(--line);display:grid;gap:40px}
+.wordmark{display:flex;align-items:center;gap:clamp(10px,2vw,28px)}
+.wordmark .mark{height:clamp(58px,15vw,200px);flex:none;margin-bottom:.02em}
+.wordmark h1{margin:0;font-weight:800;font-size:clamp(50px,15vw,216px);line-height:.8;letter-spacing:-.055em;padding-bottom:.08em}
+.hero-row{display:flex;justify-content:space-between;align-items:end;gap:24px;flex-wrap:wrap}
+.hero-row p{margin:0;font-size:clamp(24px,3vw,38px);line-height:1.08;letter-spacing:-.05em;font-weight:600;max-width:640px}
+.hero-row span{font:12px var(--mono);color:var(--muted)}
+.hero-row span i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:8px;vertical-align:1px}
 
-/* demo */
-.demo{border:1px solid var(--line);background:var(--sheet);margin:16px 0 0}
-.demo-tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line)}
-.demo-tabs button{background:none;border:0;border-right:1px solid var(--line);padding:14px 18px;font:12px var(--mono);color:var(--muted);cursor:pointer;text-align:left}
-.demo-tabs button[aria-selected="true"]{color:var(--ink);background:var(--panel)}
-.demo-tabs button[aria-selected="true"]::before{content:"● ";color:var(--accent)}
-.demo-tabs .pp{margin-left:auto;border-right:0;border-left:1px solid var(--line)}
-.demo-body{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}
-.screen{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:12.5px;line-height:1.7;min-height:400px;display:flex;flex-direction:column;border-right:1px solid var(--line)}
-.screen .bar{display:flex;justify-content:space-between;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(143,160,151,.25);color:var(--term-dim);font-size:11px}
-.log{flex:1;padding:16px 16px 8px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;min-width:0}
-.log div{white-space:pre-wrap;overflow-wrap:anywhere}
-.log .d{color:var(--term-dim)} .log .t{color:var(--term-accent)} .log .x{color:#ff9d8a} .log .q{font-weight:500}
-.ask{display:flex;align-items:center;gap:12px;margin:8px 16px 16px;padding:10px 12px;border:1px solid rgba(143,160,151,.35);min-height:42px}
-.ask .p{color:var(--term-accent)}
-.ask #typed{flex:1;min-width:0;overflow-wrap:anywhere}
-.caret{width:7px;height:15px;background:var(--term-accent)}
-.orb{width:26px;height:26px;border-radius:50%;flex:none;background:radial-gradient(circle at 35% 30%,#bff0d4,var(--term-accent) 70%);box-shadow:0 0 0 5px rgba(127,220,170,.15)}
-.nodes{list-style:none;margin:0;padding:0}
-.nodes li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:2px 12px;padding:12px 18px;border-bottom:1px solid var(--line);align-items:center}
-.nodes li:last-child{border-bottom:0}
-.nodes li .ic{grid-row:span 2;color:var(--muted)}
-.nodes b{font-size:15px;letter-spacing:-.03em}
-.nodes span{font:11.5px var(--mono);color:var(--muted);min-height:1.4em}
-.nodes li.on{background:var(--panel)}
-.nodes li.on .ic,.nodes li.ok .ic,.nodes li.ok span{color:var(--accent)}
-.nodes li.no span,.nodes li.no .ic{color:var(--stop)}
-.nodes li.dim{opacity:.45}
-.demo-cap{padding:12px 18px;border-top:1px solid var(--line);font:11px var(--mono);color:var(--muted)}
-
-/* band */
-.band{background:var(--panel);margin:88px calc(-1 * max(20px, env(safe-area-inset-left, 0px))) 0;padding:64px max(20px, 6%);border-block:1px solid var(--line)}
-.band p{max-width:1000px;margin:0 auto;font-size:clamp(26px,3.4vw,44px);line-height:1.12;letter-spacing:-.055em;font-weight:600}
+/* manifesto */
+.band{background:var(--panel);margin-inline:calc(-1 * max(20px, env(safe-area-inset-left, 0px)));padding:64px max(20px, 6%);border-bottom:1px solid var(--line)}
+.band p{max-width:1100px;margin:0 auto;font-size:clamp(30px,4.4vw,60px);line-height:1.02;letter-spacing:-.06em;font-weight:600}
 .band p span{color:var(--muted)}
 
 /* sections */
-section{padding-block:96px 0}
-.st{display:grid;grid-template-columns:110px minmax(0,1fr);gap:24px;margin-bottom:36px}
-.st > span{font:500 11px var(--mono);color:var(--accent);padding-top:12px}
-h2{font-weight:700;font-size:clamp(40px,5.4vw,70px);letter-spacing:-.07em;line-height:.93;margin:0;text-wrap:balance}
+section{padding-block:110px 0}
+.head{display:grid;grid-template-columns:110px minmax(0,1fr);gap:24px;margin-bottom:44px}
+.head .label{padding-top:12px}
+h2{margin:0;font-weight:700;font-size:clamp(44px,6.4vw,84px);line-height:.92;letter-spacing:-.07em;text-wrap:balance}
 .body{margin-left:134px}
-.lede{font-size:21px;line-height:1.42;letter-spacing:-.03em;font-weight:500;max-width:680px;margin:0 0 8px}
-.cap{font:11px var(--mono);color:var(--muted);margin:10px 0 0}
 
-.cards{display:grid;grid-template-columns:repeat(var(--cols,3),minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);margin:28px 0 0}
-.card{padding:24px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px;background:var(--bg);min-width:0}
-.card .ic{color:var(--accent)}
-.card h3{margin:0;font-size:20px;font-weight:700;letter-spacing:-.05em;line-height:1.15}
-.card p{margin:0;font-size:14.5px;color:var(--muted);line-height:1.5}
-.card.hi{background:var(--panel)}
+/* demo */
+.demo{border:1px solid var(--line);background:var(--term);color:var(--term-ink);font-family:var(--sans)}
+.demo-tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid rgba(143,160,151,.25)}
+.demo-tabs button{background:none;border:0;border-right:1px solid rgba(143,160,151,.25);padding:14px 18px;font:500 13px var(--sans);letter-spacing:-.01em;color:var(--term-dim);cursor:pointer}
+.demo-tabs button[aria-selected="true"]{color:var(--term-ink)}
+.demo-tabs button[aria-selected="true"]::before{content:"● ";color:var(--term-accent)}
+.screen{min-height:320px;display:flex;flex-direction:column;padding:8px 0}
+.log{flex:1;padding:16px 22px 8px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;font-size:16px;line-height:1.5;min-width:0}
+.log div{white-space:pre-wrap;overflow-wrap:anywhere}
+.log .q{font-weight:600}
+.log .q::before{content:"› ";color:var(--term-accent)}
+.log .t{color:var(--term-accent);font-size:14px}
+.log .d{color:var(--term-dim);font-size:14px}
+.log .x{color:var(--stop)}
+.ask{display:flex;align-items:center;gap:12px;margin:12px 22px 18px;padding:12px 14px;border:1px solid rgba(143,160,151,.35);min-height:48px;font-size:16px}
+.ask .p{color:var(--term-accent)}
+.ask #typed{flex:1;min-width:0}
+.caret{width:2px;height:20px;background:var(--term-accent)}
 
-.fig{border:1px solid var(--line);background:var(--sheet);margin:28px 0 0;overflow-x:auto}
-.fig svg{display:block;width:100%;height:auto;min-width:540px}
-.vfig .box{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
-.vfig .box.me{stroke:var(--ink)}
-.vfig .box.v{fill:var(--panel);stroke:var(--accent);stroke-width:2}
-.vfig .box.bad{stroke:var(--stop);stroke-dasharray:4 4}
-.vfig .wire{stroke:var(--accent);stroke-width:1.6;fill:none;stroke-dasharray:5 6}
-.vfig .wire.cut{stroke:var(--stop)}
-.vfig .x{stroke:var(--stop);stroke-width:2.4}
-.vfig .ok{fill:var(--accent)} .vfig .ask{fill:var(--warn)} .vfig .no{fill:var(--stop)}
-.vfig text.w{fill:var(--bg);font-weight:500}
+/* three words */
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line)}
+.trio div{padding:28px 24px 28px 0;border-bottom:1px solid var(--line)}
+.trio b{display:block;font-size:clamp(40px,5vw,64px);font-weight:700;letter-spacing:-.07em;line-height:1}
+.trio span{display:block;margin-top:12px;color:var(--muted);max-width:260px}
 
-.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);margin:28px 0 0}
-.modes > div{padding:24px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
-.modes > div:last-child{border-right:0}
-.modes > div.def{background:var(--panel)}
-.modes .ic{color:var(--accent)}
-.modes h3{margin:0;font-size:24px;font-weight:700;letter-spacing:-.06em}
-.modes h3 small{font:500 10.5px var(--mono);color:var(--accent);margin-left:6px;letter-spacing:0}
-.modes p{margin:0;font-size:14.5px;color:var(--muted)}
-.meter{display:flex;gap:3px}
-.meter i{height:5px;flex:1;background:var(--line)}
-.meter i.on{background:var(--accent)}
+/* safety */
+.verdicts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border:1px solid var(--line)}
+.verdicts div{padding:28px;border-right:1px solid var(--line)}
+.verdicts div:last-child{border-right:0}
+.verdicts b{display:flex;align-items:center;gap:10px;font-size:28px;letter-spacing:-.06em}
+.verdicts b i{width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.verdicts div:nth-child(2) b i{background:#c58a3c}
+.verdicts div:nth-child(3) b i{background:#c4513f}
+.verdicts span{display:block;margin-top:8px;color:var(--muted)}
+.note{margin-top:20px;font:12px var(--mono);color:var(--muted)}
 
-/* desktop illustration */
-.desk{position:relative;background:var(--panel);border:1px solid var(--line);height:380px;overflow:hidden;margin:28px 0 0}
-.desk .w1,.desk .w2{position:absolute;background:var(--bg);border:1px solid var(--line)}
-.desk .w1{left:5%;top:9%;width:42%;height:58%}
-.desk .w2{left:20%;top:30%;width:38%;height:52%}
-.desk .tb{height:22px;border-bottom:1px solid var(--line);display:flex;gap:5px;align-items:center;padding-left:8px}
-.desk .tb i{width:7px;height:7px;border-radius:50%;background:var(--line)}
-.desk .ln{height:6px;background:var(--panel);margin:10px 12px 0}
-.desk .ln.s{width:50%}
-.pop{position:absolute;right:calc(4% + 56px);bottom:8%;width:min(300px,52%);background:var(--sheet);border:1px solid var(--ink);padding:14px;display:grid;gap:8px;font-size:13px}
-.pop .q{font:12px var(--mono);color:var(--muted)}
-.pop .opt{display:flex;justify-content:space-between;gap:8px;border:1px solid var(--line);padding:7px 10px;background:var(--bg)}
-.pop .opt.sel{border-color:var(--accent);color:var(--accent)}
-.pop .opt span{font:11px var(--mono);color:var(--muted)}
-.big-orb{position:absolute;right:4%;bottom:8%;width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--accent-soft),var(--accent) 70%)}
-.agents{position:absolute;right:4%;top:9%;width:min(260px,40%);background:var(--sheet);border:1px solid var(--line);font-size:12.5px}
-.agents h4{margin:0;padding:9px 12px;border-bottom:1px solid var(--line);font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.agent{padding:9px 12px;border-bottom:1px solid var(--line);display:grid;gap:5px}
-.agent:last-child{border-bottom:0}
-.agent div{display:flex;justify-content:space-between;gap:8px}
-.agent span{font:11px var(--mono);color:var(--muted)}
-.prog{height:4px;background:var(--panel);position:relative;overflow:hidden}
-.prog i{position:absolute;inset:0 auto 0 0;background:var(--accent);width:var(--p)}
+/* choices */
+.choices{border-top:1px solid var(--line)}
+.choices div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;padding:26px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.choices b{font-size:clamp(26px,3vw,38px);letter-spacing:-.06em;font-weight:700}
+.choices span{color:var(--muted)}
 
-.choose{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);margin:28px 0 0}
-.choose > div{padding:24px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
-.choose > div:last-child{border-right:0}
-.choose .big{font-weight:800;font-size:36px;letter-spacing:-.07em;line-height:1}
-.choose .ic{color:var(--accent)}
-.choose h3{margin:0;font-size:18px;letter-spacing:-.04em}
-.choose p{margin:0;font-size:14.5px;color:var(--muted)}
-
-.cta{margin-top:120px;padding-block:72px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:end;gap:32px;flex-wrap:wrap}
-.cta h2{font-size:clamp(48px,8vw,108px)}
-.cta .side{display:grid;gap:12px;max-width:340px}
-.cta .side p{margin:0;color:var(--muted)}
-footer{border-top:1px solid var(--line);padding-block:24px 40px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font:11px var(--mono);color:var(--muted)}
+/* closer */
+.closer{margin-top:140px;padding-block:80px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:end;gap:40px;flex-wrap:wrap}
+.closer h2{font-size:clamp(56px,9vw,128px)}
+.closer .side{display:grid;gap:10px;font:12px var(--mono);color:var(--muted);text-transform:lowercase}
+footer{border-top:1px solid var(--line);padding-block:26px 44px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;font:12px var(--mono);color:var(--muted)}
+footer .brand{font-size:18px;color:var(--ink)}
+footer .brand .mark{height:30px}
 
 @media (prefers-reduced-motion:no-preference){
   .caret{animation:blink 1s step-end infinite}
-  .orb,.big-orb{animation:breathe 3s ease-in-out infinite}
-  .wire{animation:flow 1.4s linear infinite}
-  .prog i{animation:prog var(--t,6s) ease-in-out infinite}
-  .pop{animation:float 6s ease-in-out infinite}
-  .eyebrow i{animation:pulse 2s ease-in-out infinite}
   @supports (animation-timeline: view()){
     .rv{animation:rise linear both;animation-timeline:view();animation-range:entry 0% entry 35%}
   }
 }
 @keyframes blink{50%{opacity:0}}
-@keyframes breathe{50%{box-shadow:0 0 0 10px rgba(127,220,170,.14)}}
-@keyframes flow{to{stroke-dashoffset:-22}}
-@keyframes prog{0%,100%{width:calc(var(--p) - 20%)}50%{width:var(--p)}}
-@keyframes float{50%{transform:translateY(-4px)}}
-@keyframes pulse{50%{opacity:.3}}
-@keyframes rise{from{opacity:.15;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:.15;transform:translateY(20px)}to{opacity:1;transform:none}}
 
 @media (max-width:860px){
-  nav.top div a:not(:last-child){display:none}
-  .hero{padding-block:56px 32px}
-  .demo-body{grid-template-columns:1fr}
-  .screen{border-right:0;border-bottom:1px solid var(--line);min-height:340px}
-  .demo-tabs button{flex:1 1 50%;border-bottom:1px solid var(--line)}
-  .demo-tabs .pp{margin-left:0;border-left:0}
-  .st{grid-template-columns:1fr;gap:10px}
-  .st > span{padding-top:0}
+  nav.top{height:70px}
+  nav.top .links a:not(:last-child){display:none}
+  .brand .mark{height:36px}
+  .hero{padding-block:48px 44px}
+  .head{grid-template-columns:1fr;gap:12px}
+  .head .label{padding-top:0}
   .body{margin-left:0}
-  .cards{--cols:1 !important}
-  .modes,.choose{grid-template-columns:1fr}
-  .modes > div,.choose > div{border-right:0;border-bottom:1px solid var(--line)}
-  .modes > div:last-child,.choose > div:last-child{border-bottom:0}
-  .desk{height:430px}
-  .desk .w1{width:60%} .desk .w2{width:55%;left:10%}
-  .agents{width:62%;top:auto;bottom:calc(8% + 160px)}
-  .pop{width:70%;right:calc(4% + 50px)}
+  .trio,.verdicts{grid-template-columns:1fr}
+  .verdicts div{border-right:0;border-bottom:1px solid var(--line)}
+  .verdicts div:last-child{border-bottom:0}
+  .choices div{grid-template-columns:1fr;gap:4px}
+  .demo-tabs button{flex:1 1 33%}
 }
 </style>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
-  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="12" cy="19" r="2"/><path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7M12 12v5"/></symbol>
-  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17v4M17 19h4"/></symbol>
-  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
-  <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
-  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8"/></symbol>
-  <symbol id="i-term" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 9l3 3-3 3M13 15h4"/></symbol>
-  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
-  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a5 5 0 0 1-.6-10A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/></symbol>
-  <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
-  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
-  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L4 14h8l-1 8 9-12h-8z"/></symbol>
-  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
-  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
-  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16M20 20v-4h-4"/></symbol>
-  <symbol id="i-git" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 8v8M18 11c0 4-6 3-10 6"/></symbol>
+  <symbol id="glance" viewBox="44 29 96 135"><g transform="rotate(28 100 100)"><path fill-rule="evenodd" d="M100.00 22.00L140.38 95.96A46 46 0 1 1 59.62 95.96ZM70.00 130.00a30 30 0 1 0 60.00 0a30 30 0 1 0 -60.00 0Z"/><circle cx="100" cy="138" r="13"/></g></symbol>
 </svg>
 
 <div class="wrap">
   <nav class="top" aria-label="Main">
-    <a class="brand" href="/"><svg viewBox="0 0 200 200" aria-hidden="true"><g transform="rotate(28 100 100)"><path fill-rule="evenodd" d="M100.00 22.00L140.38 95.96A46 46 0 1 1 59.62 95.96ZM70.00 130.00a30 30 0 1 0 60.00 0a30 30 0 1 0 -60.00 0Z"/><circle class="pupil" cx="100" cy="138" r="13"/></g></svg>tripppin</a>
-    <div><a href="#how">how it works</a><a href="#safety">safety</a><a href="#models">your ai</a><a href="#status">status</a></div>
+    <a class="brand" href="/" aria-label="Tripppin home">
+      <svg class="mark" viewBox="44 29 96 135" aria-hidden="true"><g transform="rotate(28 100 100)"><path fill-rule="evenodd" d="M100.00 22.00L140.38 95.96A46 46 0 1 1 59.62 95.96ZM70.00 130.00a30 30 0 1 0 60.00 0a30 30 0 1 0 -60.00 0Z"/><circle class="pupil" cx="100" cy="138" r="13"/></g></svg>
+      tripppin
+    </a>
+    <div class="links"><a href="#ask">ask</a><a href="#safe">safe</a><a href="#yours">yours</a><a href="#soon">soon</a></div>
   </nav>
 
   <header class="hero">
-    <span class="eyebrow"><i></i>in development</span>
-    <h1>Tell your computer what you want. <em>Watch it work.</em></h1>
+    <div class="wordmark">
+      <svg class="mark" viewBox="44 29 96 135" aria-hidden="true"><g transform="rotate(28 100 100)"><path fill-rule="evenodd" d="M100.00 22.00L140.38 95.96A46 46 0 1 1 59.62 95.96ZM70.00 130.00a30 30 0 1 0 60.00 0a30 30 0 1 0 -60.00 0Z"/><circle id="hero-pupil" cx="100" cy="138" r="13"/></g></svg>
+      <h1>tripppin</h1>
+    </div>
     <div class="hero-row">
-      <p>Tripppin is a Linux operating system with an AI model built in. Say what you want in plain words. It plans the steps, checks itself, and gets it done.</p>
-      <div class="pills">
-        <span class="pill"><svg class="ic"><use href="#i-cpu"/></svg>runs on your machine</span>
-        <span class="pill"><svg class="ic"><use href="#i-shield"/></svg>checks before it acts</span>
-        <span class="pill"><svg class="ic"><use href="#i-git"/></svg>open source</span>
-      </div>
+      <p>Tell your computer what you want. <em>It does it.</em></p>
+      <span><i></i>a linux with an ai inside · in development</span>
     </div>
   </header>
 
-  <div class="demo" id="how" aria-label="How a request flows through Tripppin">
-    <div class="demo-tabs" role="tablist" aria-label="Example requests">
-      <button role="tab" aria-selected="true">what's my ip</button>
-      <button role="tab" aria-selected="false">install an editor</button>
-      <button role="tab" aria-selected="false">a sneaky web page</button>
-      <button class="pp" id="pp" aria-pressed="false">pause</button>
-    </div>
-    <div class="demo-body">
-      <div class="screen">
-        <div class="bar"><span id="mode">tripppin · auto mode · local</span><span>on-device model</span></div>
-        <div class="log" id="log" aria-live="polite">
-          <div class="q">› what's my ip</div>
-          <div class="d">  route → system</div>
-          <div class="t">  ⚙ network.info</div>
-          <div class="d">  read-only · no check needed</div>
-          <div>  Local 192.168.1.42 on Wi-Fi "home".</div>
-          <div>  Public 49.36.12.8.</div>
-        </div>
-        <div class="ask"><span class="p">›</span><span id="typed"></span><span class="caret" aria-hidden="true"></span><span class="orb" aria-hidden="true"></span></div>
-      </div>
-      <ol class="nodes" id="nodes">
-        <li class="ok"><svg class="ic"><use href="#i-user"/></svg><b>You</b><span>typed a sentence</span></li>
-        <li class="ok"><svg class="ic"><use href="#i-route"/></svg><b>Route</b><span>system</span></li>
-        <li class="ok"><svg class="ic"><use href="#i-spark"/></svg><b>Model</b><span>picks network.info</span></li>
-        <li class="dim"><svg class="ic"><use href="#i-shield"/></svg><b>Verifier</b><span>skipped · read-only</span></li>
-        <li class="ok"><svg class="ic"><use href="#i-box"/></svg><b>Tool</b><span>ran in its sandbox</span></li>
-        <li class="ok"><svg class="ic"><use href="#i-msg"/></svg><b>Answer</b><span>1.1 s</span></li>
-      </ol>
-    </div>
-    <div class="demo-cap">Illustration of the request loop. Every request takes this path.</div>
-  </div>
-
   <div class="band">
-    <p>Today, AI lives in an app or a browser tab. You ask, it answers, you do the work. <span>Tripppin puts the model inside the computer, so the model does the work.</span></p>
+    <p>No commands to remember. No settings to dig through. <span>Just say it.</span></p>
   </div>
 
-  <section>
-    <div class="st"><span>01 / what it does</span><h2>Say it once.<br>It handles the rest.</h2></div>
+  <section id="ask">
+    <div class="head"><span class="label">01 / ask</span><h2>Ask.<br>It handles it.</h2></div>
     <div class="body">
-      <div class="cards">
-        <div class="card rv"><svg class="ic lg"><use href="#i-msg"/></svg><h3>Every line is a request</h3><p>The terminal and a floating orb take plain sentences. "Free up some space." "Share this folder." "Install a photo editor."</p></div>
-        <div class="card rv"><svg class="ic lg"><use href="#i-box"/></svg><h3>The OS is the toolbox</h3><p>Files, apps, network, settings and the web are skills the AI can use, each one sandboxed and typed.</p></div>
-        <div class="card rv"><svg class="ic lg"><use href="#i-term"/></svg><h3>The classic shell stays</h3><p>Start a line with <code>!</code> to run a command exactly as typed, or switch the tab to a normal terminal with <code>/term</code>.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="safety">
-    <div class="st"><span>02 / safety</span><h2>A second opinion.<br>Before anything risky.</h2></div>
-    <div class="body">
-      <p class="lede">You shouldn't have to approve everything. A separate AI check, the verifier, compares each risky action with what you actually asked for.</p>
-      <div class="fig rv vfig">
-        <svg viewBox="0 0 720 280" role="img" aria-label="The verifier reads your words, the proposed action and its source. Page and file text is cut off from it. It outputs allow, ask you, or block.">
-          <rect class="box me" x="10" y="20" width="190" height="44"/><text class="k" x="26" y="47">your words</text>
-          <rect class="box" x="10" y="98" width="190" height="44"/><text class="k" x="26" y="125">proposed action</text>
-          <rect class="box" x="10" y="176" width="190" height="44"/><text class="k" x="26" y="203">where it came from</text>
-          <path class="wire" d="M200 42C250 42 250 110 285 120"/>
-          <path class="wire" d="M200 120H285"/>
-          <path class="wire" d="M200 198C250 198 250 130 285 125"/>
-          <rect class="box v" x="285" y="80" width="150" height="86"/>
-          <text class="k" x="310" y="118">verifier</text><text x="310" y="140">allow · ask · block</text>
-          <rect class="box bad" x="285" y="226" width="150" height="40"/><text x="300" y="250">page or file text</text>
-          <path class="wire cut" d="M360 226V170"/>
-          <path class="x" d="M352 190l16 16M368 190l-16 16"/>
-          <path class="wire" d="M435 105C480 105 480 42 520 42"/>
-          <path class="wire" d="M435 123H520"/>
-          <path class="wire" d="M435 141C480 141 480 204 520 204"/>
-          <rect class="ok" x="520" y="24" width="180" height="36"/><text class="w" x="536" y="47">allow · it runs</text>
-          <rect class="ask" x="520" y="105" width="180" height="36"/><text class="w" x="536" y="128">not sure · asks you</text>
-          <rect class="no" x="520" y="186" width="180" height="36"/><text class="w" x="536" y="209">block · you're told why</text>
-        </svg>
-      </div>
-      <p class="cap">The verifier never reads page or file text, so hidden instructions there can't talk it into anything.</p>
-      <div class="modes">
-        <div><svg class="ic lg"><use href="#i-user"/></svg><h3>Ask</h3><div class="meter"><i class="on"></i><i></i><i></i></div><p>You approve every change yourself.</p></div>
-        <div class="def"><svg class="ic lg"><use href="#i-shield"/></svg><h3>Auto<small>default</small></h3><div class="meter"><i class="on"></i><i class="on"></i><i></i></div><p>The verifier approves routine changes. When it isn't sure, you decide.</p></div>
-        <div><svg class="ic lg"><use href="#i-zap"/></svg><h3>YOLO</h3><div class="meter"><i class="on"></i><i class="on"></i><i class="on"></i></div><p>Never asks. Raw commands and anything prompted by outside content still get verified.</p></div>
-      </div>
-      <div class="cards">
-        <div class="card rv"><svg class="ic lg"><use href="#i-undo"/></svg><h3>Undo is built in</h3><p>Installs, settings and file changes are snapshotted first. One command rolls them back.</p></div>
-        <div class="card rv"><svg class="ic lg"><use href="#i-lock"/></svg><h3>Secrets stay secret</h3><p>Keys and private folders are off limits to every tool, in every mode.</p></div>
-        <div class="card rv"><svg class="ic lg"><use href="#i-list"/></svg><h3>Every part, listed</h3><p><code>trip bom</code> shows every package, its version, its license and any security issue.</p></div>
+      <div class="demo rv" aria-label="Example conversation">
+        <div class="demo-tabs" role="tablist" aria-label="Examples">
+          <button role="tab" aria-selected="true">what's my ip</button>
+          <button role="tab" aria-selected="false">get me an editor</button>
+          <button role="tab" aria-selected="false">a sneaky page</button>
+        </div>
+        <div class="screen">
+          <div class="log" id="log" aria-live="polite">
+            <div class="q">what's my ip</div>
+            <div class="t">checking network</div>
+            <div>You're on Wi-Fi "home". Public IP 49.36.12.8.</div>
+          </div>
+          <div class="ask"><span class="p">›</span><span id="typed"></span><span class="caret" aria-hidden="true"></span></div>
+        </div>
       </div>
     </div>
   </section>
 
   <section>
-    <div class="st"><span>03 / desktop</span><h2>An orb on the screen.<br>Agents in a panel.</h2></div>
+    <div class="head"><span class="label">02 / why</span><h2>Three promises.</h2></div>
     <div class="body">
-      <p class="lede">Click the orb or press Super + Space from anywhere. Bigger jobs run as agents you can watch and talk to.</p>
-      <div class="desk rv" role="img" aria-label="Desktop with two windows, an agents panel showing three running jobs, and the orb with a popover offering three photo editors">
-        <div class="w1"><div class="tb"><i></i><i></i><i></i></div><div class="ln"></div><div class="ln s"></div><div class="ln"></div></div>
-        <div class="w2"><div class="tb"><i></i><i></i><i></i></div><div class="ln s"></div><div class="ln"></div><div class="ln s"></div></div>
-        <div class="agents">
-          <h4>agents · 3 running</h4>
-          <div class="agent"><div><b>Solar inverter research</b><span>step 7</span></div><div class="prog"><i style="--p:62%;--t:7s"></i></div></div>
-          <div class="agent"><div><b>Tidy Downloads</b><span>step 3</span></div><div class="prog"><i style="--p:40%;--t:5s"></i></div></div>
-          <div class="agent"><div><b>Weekly backup</b><span>verifying</span></div><div class="prog"><i style="--p:85%;--t:9s"></i></div></div>
-        </div>
-        <div class="pop">
-          <div class="q">› I need a photo editor</div>
-          <div class="opt sel">GIMP <span>full featured</span></div>
-          <div class="opt">Pinta <span>simple</span></div>
-          <div class="opt">Darktable <span>for raw photos</span></div>
-        </div>
-        <div class="big-orb" aria-hidden="true"></div>
+      <div class="trio">
+        <div class="rv"><b>Local.</b><span>The AI runs on your machine. Nothing leaves unless you say so.</span></div>
+        <div class="rv"><b>Checked.</b><span>A second AI reviews anything risky before it happens.</span></div>
+        <div class="rv"><b>Undoable.</b><span>Changed your mind? One command puts it back.</span></div>
       </div>
     </div>
   </section>
 
-  <section id="models">
-    <div class="st"><span>04 / your ai</span><h2>Your machine.<br>Your model.</h2></div>
+  <section id="safe">
+    <div class="head"><span class="label">03 / safe</span><h2>It asks<br>before it acts.</h2></div>
     <div class="body">
-      <p class="lede">The installer checks your hardware and picks the best open model it can run. Or bring your own.</p>
-      <div class="choose">
-        <div class="rv"><svg class="ic lg"><use href="#i-cpu"/></svg><div class="big">16 GB+</div><h3>On this computer</h3><p>Private and offline. Sized to your memory and graphics card.</p></div>
-        <div class="rv"><svg class="ic lg"><use href="#i-cloud"/></svg><div class="big">Any key</div><h3>A cloud provider</h3><p>Use your own API key for the strongest models.</p></div>
-        <div class="rv"><svg class="ic lg"><use href="#i-server"/></svg><div class="big">Any URL</div><h3>Your own server</h3><p>A GPU box at home or a company cluster.</p></div>
+      <div class="verdicts rv">
+        <div><b><i></i>allow</b><span>Routine and expected. It just happens.</span></div>
+        <div><b><i></i>ask</b><span>Not sure. You decide.</span></div>
+        <div><b><i></i>block</b><span>Not what you asked for. It stops and tells you.</span></div>
       </div>
-      <div class="cards">
-        <div class="card rv"><svg class="ic lg"><use href="#i-refresh"/></svg><h3>Always up to date</h3><p>Updates are built, tested and signed before they reach your machine.</p></div>
-        <div class="card rv"><svg class="ic lg"><use href="#i-zap"/></svg><h3>Light by design</h3><p>A minimal base with nothing you didn't ask for. Written in Rust.</p></div>
-        <div class="card rv"><svg class="ic lg"><use href="#i-git"/></svg><h3>Open source</h3><p>Free to use, read and share. Built in the open.</p></div>
+      <p class="note">hidden instructions in web pages and files can't talk it into anything.</p>
+    </div>
+  </section>
+
+  <section id="yours">
+    <div class="head"><span class="label">04 / yours</span><h2>Your machine.<br>Your model.</h2></div>
+    <div class="body">
+      <div class="choices">
+        <div class="rv"><b>On this computer</b><span>Private and offline. Picked to fit your hardware.</span></div>
+        <div class="rv"><b>Your cloud key</b><span>Claude, Gemini, OpenAI and more.</span></div>
+        <div class="rv"><b>Your own server</b><span>A GPU at home or at work.</span></div>
       </div>
     </div>
   </section>
 
-  <div class="cta" id="status">
-    <h2>Tell it.<br><em>Watch it work.</em></h2>
+  <div class="closer" id="soon">
+    <h2>Coming<br><em>soon.</em></h2>
     <div class="side">
-      <span class="eyebrow"><i></i>in development</span>
-      <p>Tripppin is being built now. The first release will be open source and free to download.</p>
+      <span>open source</span>
+      <span>free to download</span>
+      <span>trippp.in</span>
     </div>
   </div>
 
   <footer>
-    <span>tripppin · trippp.in</span>
-    <span>a linux with an ai inside</span>
+    <a class="brand" href="/"><svg class="mark" viewBox="44 29 96 135" aria-hidden="true"><use href="#glance"/></svg>tripppin</a>
+    <span>© 2026 tripppin</span>
   </footer>
 </div>
 
 <script>
 (function(){
   var S = [
-    { q:"what's my ip", mode:"auto", steps:[
-      ["typed a sentence","ok",[["q","› what's my ip"]]],
-      ["system","ok",[["d","  route → system"]]],
-      ["picks network.info","ok",[["t","  ⚙ network.info"]]],
-      ["skipped · read-only","dim",[["d","  read-only · no check needed"]]],
-      ["ran in its sandbox","ok",[]],
-      ["1.1 s","ok",[["","  Local 192.168.1.42 on Wi-Fi \"home\"."],["","  Public 49.36.12.8."]]]
-    ]},
-    { q:"install a markdown editor", mode:"auto", steps:[
-      ["typed a sentence","ok",[["q","› install a markdown editor"]]],
-      ["packages + web","ok",[["d","  route → packages, web"]]],
-      ["web.search, then packages.install","ok",[["t","  ⚙ web.search \"markdown editor linux\""],["t","  ⚙ packages.install apostrophe"]]],
-      ["allow · matches your request","ok",[["d","  verifier: you asked for an editor · official repo · allow"]]],
-      ["snapshot, then install","ok",[["d","  snapshot saved"]]],
-      ["6.4 s","ok",[["","  Installed Apostrophe. It's in your launcher."],["d","  undo anytime: trip undo"]]]
-    ]},
-    { q:"summarize this page: tips.example/fast-linux", mode:"yolo", steps:[
-      ["typed a sentence","ok",[["q","› summarize this page: tips.example/fast-linux"]]],
-      ["web","ok",[["d","  route → web"]]],
-      ["web.fetch, then share.send ~/.ssh","ok",[["t","  ⚙ web.fetch tips.example/fast-linux"],["d","  outside content in conversation · tracked"],["x","  ⚙ share.send ~/.ssh   (the page told it to)"]]],
-      ["block · you asked for a summary","no",[["x","  verifier: you asked for a summary, not a file send · block"]]],
-      ["never ran","no",[["x","  hard rule: ~/.ssh is off limits"]]],
-      ["summary + warning","ok",[["","  Summary: 5 tips on speeding up boot time."],["x","  Heads up: the page hid instructions to upload"],["x","  your SSH keys. I ignored them."]]]
-    ]}
+    { q:"what's my ip", lines:[["t","checking network"],["","You're on Wi-Fi \"home\". Public IP 49.36.12.8."]] },
+    { q:"get me a markdown editor", lines:[["t","searching apps"],["","Apostrophe looks right: simple and distraction-free."],["d","checked · matches what you asked · installing"],["","Done. It's in your apps. Undo anytime."]] },
+    { q:"summarize tips.example/fast-linux", lines:[["t","reading the page"],["x","The page hid an instruction to upload your SSH keys."],["d","blocked · not what you asked"],["","Here's the summary: 5 ways to boot faster."]] }
   ];
-  var nodes = [].slice.call(document.querySelectorAll('#nodes li'));
   var log = document.getElementById('log'), typed = document.getElementById('typed');
   var tabs = [].slice.call(document.querySelectorAll('.demo-tabs [role=tab]'));
-  var pp = document.getElementById('pp'), modeEl = document.getElementById('mode');
+  var pupil = document.getElementById('hero-pupil');
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var timers = [], cur = 0, paused = reduce;
+  var timers = [], cur = 0;
   function clear(){ timers.forEach(clearTimeout); timers = []; }
   function later(fn, ms){ timers.push(setTimeout(fn, ms)); }
   function line(cls, text){ var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; log.appendChild(d); }
-  function setNode(i, state, text, on){ var li = nodes[i]; li.className = (state || '') + (on ? ' on' : ''); li.querySelector('span').textContent = text || ''; }
-  function select(i){ cur = i; tabs.forEach(function(t, k){ t.setAttribute('aria-selected', k === i ? 'true' : 'false'); }); modeEl.textContent = 'tripppin · ' + S[i].mode + ' mode · local'; }
-  function renderFull(i){ clear(); select(i); log.innerHTML = ''; typed.textContent = '';
-    S[i].steps.forEach(function(st, k){ setNode(k, st[1], st[0], false); st[2].forEach(function(l){ line(l[0], l[1]); }); }); }
+  function select(i){ cur = i; tabs.forEach(function(t, k){ t.setAttribute('aria-selected', k === i ? 'true' : 'false'); }); }
+  function full(i){ clear(); select(i); log.innerHTML = ''; typed.textContent = ''; line('q', S[i].q); S[i].lines.forEach(function(l){ line(l[0], l[1]); }); }
   function play(i){
     clear(); select(i); log.innerHTML = ''; typed.textContent = '';
-    nodes.forEach(function(_, k){ setNode(k, 'dim', '', false); });
     var q = S[i].q, t = 0;
-    for (var c = 1; c <= q.length; c++) (function(c){ later(function(){ typed.textContent = q.slice(0, c); }, t += 45); })(c);
-    t += 400;
-    S[i].steps.forEach(function(st, k){
-      later(function(){
-        if (k === 0) typed.textContent = '';
-        if (k > 0) setNode(k - 1, S[i].steps[k - 1][1], S[i].steps[k - 1][0], false);
-        setNode(k, st[1], st[0], true);
-        st[2].forEach(function(l){ line(l[0], l[1]); });
-      }, t);
-      t += 1100;
-    });
-    later(function(){ var l = S[i].steps.length - 1; setNode(l, S[i].steps[l][1], S[i].steps[l][0], false); }, t);
-    later(function(){ if (!paused) play((i + 1) % S.length); }, t + 3200);
+    for (var c = 1; c <= q.length; c++) (function(c){ later(function(){ typed.textContent = q.slice(0, c); }, t += 50); })(c);
+    later(function(){ typed.textContent = ''; line('q', q); }, t += 450);
+    S[i].lines.forEach(function(l){ later(function(){ line(l[0], l[1]); }, t += 1000); });
+    later(function(){ play((i + 1) % S.length); }, t + 3600);
   }
-  tabs.forEach(function(t, k){ t.addEventListener('click', function(){ if (paused) renderFull(k); else play(k); }); });
-  pp.addEventListener('click', function(){
-    paused = !paused; pp.textContent = paused ? 'play' : 'pause'; pp.setAttribute('aria-pressed', paused ? 'true' : 'false');
-    if (paused) renderFull(cur); else play(cur);
-  });
-  if (reduce){ pp.textContent = 'play'; pp.setAttribute('aria-pressed', 'true'); }
-  else later(function(){ play(0); }, 2500);
+  tabs.forEach(function(t, k){ t.addEventListener('click', function(){ reduce ? full(k) : play(k); }); });
+  if (!reduce){
+    later(function(){ play(0); }, 2200);
+    // the hero eye glances around now and then
+    var gaze = [[0,0],[-7,-4],[-7,-4],[6,-2],[6,-2],[0,0],[0,0],[0,0]], g = 0;
+    pupil.style.transition = 'transform .7s cubic-bezier(.3,0,.2,1)';
+    setInterval(function(){ g = (g + 1) % gaze.length; pupil.style.transform = 'translate(' + gaze[g][0] + 'px,' + gaze[g][1] + 'px)'; }, 1100);
+  }
 })();
 </script>
 </body>
