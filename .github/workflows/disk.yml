@@ -1,0 +1,120 @@
+name: disk
+
+# Turns the published OS image into things you can boot:
+#   x86_64: an installer ISO and a qcow2 virtual disk
+#   arm64:  a qcow2 virtual disk (runs natively in UTM on Apple Silicon)
+# and attaches them to the "nightly" pre-release on GitHub.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * 1" # weekly, after a nightly image exists
+
+permissions:
+  contents: write
+  packages: read
+
+concurrency:
+  group: disk
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/tripppin
+  BIB: quay.io/centos-bootc/bootc-image-builder:latest
+
+jobs:
+  disk:
+    name: disk (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            name: x86_64
+            runner: ubuntu-24.04
+            types: --type qcow2 --type anaconda-iso
+          - arch: arm64
+            name: aarch64
+            runner: ubuntu-24.04-arm
+            types: --type qcow2
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Pull and verify the signed image
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cosign verify --key cosign.pub "$IMAGE:nightly-${{ matrix.arch }}" > /dev/null
+          sudo podman pull "$IMAGE:nightly-${{ matrix.arch }}"
+
+      - name: Write the test login
+        env:
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          TEST_USER_SSH_KEY: ${{ secrets.TEST_USER_SSH_KEY }}
+        run: |
+          if [ -z "$TEST_USER_PASSWORD" ] || [ -z "$TEST_USER_SSH_KEY" ]; then
+            echo "::error::Set the TEST_USER_PASSWORD and TEST_USER_SSH_KEY repository secrets first."
+            exit 1
+          fi
+          hash=$(openssl passwd -6 "$TEST_USER_PASSWORD")
+          sed -e "s|@PASSWORD_HASH@|$hash|" -e "s|@SSH_KEY@|$TEST_USER_SSH_KEY|" os/disk/config.toml.in > config.toml
+
+      - name: Build disk images
+        run: |
+          mkdir -p output
+          sudo podman run --rm --privileged --pull=newer \
+            --security-opt label=type:unconfined_t \
+            -v ./config.toml:/config.toml:ro \
+            -v ./output:/output \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            "$BIB" ${{ matrix.types }} --rootfs btrfs \
+            "$IMAGE:nightly-${{ matrix.arch }}"
+          sudo chown -R "$USER" output
+          find output -type f -exec ls -lh {} \;
+
+      - name: Compress and package
+        run: |
+          sudo apt-get install -y -qq qemu-utils >/dev/null
+          day=$(date -u +%Y%m%d)
+          mkdir -p dist
+          qemu-img convert -c -O qcow2 output/qcow2/disk.qcow2 "dist/tripppin-$day-${{ matrix.name }}.qcow2"
+          if [ -f output/bootiso/install.iso ]; then
+            mv output/bootiso/install.iso "dist/tripppin-$day-${{ matrix.name }}.iso"
+          fi
+          # GitHub release files are capped at 2 GiB; split anything larger.
+          cd dist
+          for f in *; do
+            if [ "$(stat -c %s "$f")" -gt 2000000000 ]; then
+              split -b 1900M -d "$f" "$f.part" && rm "$f"
+            fi
+          done
+          sha256sum * > "SHA256SUMS-${{ matrix.name }}"
+          ls -lh
+
+      - name: Sign checksums
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          cd dist
+          cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY --bundle "SHA256SUMS-${{ matrix.name }}.bundle" "SHA256SUMS-${{ matrix.name }}"
+
+      - name: Attach to the nightly pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view nightly >/dev/null 2>&1 || gh release create nightly --prerelease --title "nightly" \
+            --notes "Test builds for trying Tripppin. Files are replaced by every disk build."
+          # Remove this architecture's previous files, then upload the new ones.
+          for old in $(gh release view nightly --json assets --jq ".assets[].name | select(contains(\"${{ matrix.name }}\"))"); do
+            gh release delete-asset nightly "$old" --yes
+          done
+          gh release upload nightly dist/* --clobber
