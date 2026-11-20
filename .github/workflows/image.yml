@@ -63,6 +63,7 @@ jobs:
           sudo podman run --rm localhost/tripppin:ci systemctl is-enabled tripppin-llm.service
           sudo podman run --rm localhost/tripppin:ci trip model list
           sudo podman run --rm localhost/tripppin:ci test -f /etc/profile.d/tripppin-shell.sh
+          sudo podman run --rm localhost/tripppin:ci rpm -q NetworkManager-wifi wpa_supplicant iwlwifi-mvm-firmware
 
       - name: Export image for scanning
         run: |

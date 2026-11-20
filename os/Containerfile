@@ -54,6 +54,12 @@ COPY --from=llama /src/llama.cpp/LICENSE /usr/share/licenses/llama.cpp/LICENSE
 
 # What llama.cpp needs at runtime: the Vulkan loader and Mesa's GPU drivers.
 RUN dnf -y install --setopt=install_weak_deps=False vulkan-loader mesa-vulkan-drivers libgomp && dnf clean all
+
+# Wi-Fi: NetworkManager's Wi-Fi plugin and wpa_supplicant, plus firmware for the
+# common laptop chips (Intel, Realtek, MediaTek, Atheros, Broadcom).
+RUN dnf -y install --setopt=install_weak_deps=False NetworkManager-wifi wpa_supplicant \
+      iwlwifi-mvm-firmware iwlwifi-dvm-firmware realtek-firmware mt7xxx-firmware atheros-firmware brcmfmac-firmware \
+    && dnf clean all
 COPY os/files/ /
 
 # Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still
