@@ -23,7 +23,16 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    name: build (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
 
@@ -47,7 +56,7 @@ jobs:
         with:
           image: docker-archive:image.tar
           format: spdx-json
-          output-file: tripppin.spdx.json
+          output-file: tripppin-${{ matrix.arch }}.spdx.json
           upload-artifact: true
 
       - name: Vulnerability scan
@@ -65,21 +74,40 @@ jobs:
         run: |
           rm -f image.tar
           echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          sudo podman push localhost/tripppin:ci "$IMAGE:${GITHUB_SHA::12}-${{ matrix.arch }}"
+
+  publish:
+    name: publish and sign
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Join both architectures under one tag
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
           sha="${GITHUB_SHA::12}"
-          sudo podman push --digestfile digest localhost/tripppin:ci "$IMAGE:$sha"
-          sudo podman push localhost/tripppin:ci "$IMAGE:nightly"
+          sudo podman manifest create tripppin-list
+          for arch in amd64 arm64; do
+            sudo podman manifest add tripppin-list "docker://$IMAGE:$sha-$arch"
+          done
+          sudo podman manifest push --all --digestfile digest tripppin-list "docker://$IMAGE:$sha"
+          for arch in amd64 arm64; do
+            sudo skopeo copy --all "docker://$IMAGE:$sha-$arch" "docker://$IMAGE:nightly-$arch"
+          done
+          sudo skopeo copy --all "docker://$IMAGE:$sha" "docker://$IMAGE:nightly"
           echo "DIGEST=$(cat digest)" >> "$GITHUB_ENV"
 
       - uses: sigstore/cosign-installer@v3
-        if: github.event_name != 'pull_request'
 
       - name: Sign the image
-        if: github.event_name != 'pull_request'
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
-          cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$IMAGE@$DIGEST"
+          # Signing the list with --recursive also signs each architecture's image.
+          cosign sign --yes --recursive --key env://COSIGN_PRIVATE_KEY "$IMAGE@$DIGEST"
           cosign verify --key cosign.pub "$IMAGE@$DIGEST" > /dev/null
           echo "signed and verified $IMAGE@$DIGEST"

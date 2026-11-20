@@ -22,7 +22,7 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 | # | Milestone | You can try | Status |
 |---|---|---|---|
 | M0 | Foundations | CI on every PR | **in progress** |
-| M1 | First boot (ISO 1) | Install, log into a Tripppin Hyprland desktop | next |
+| M1 | First boot (ISO 1) | Install, log into a Tripppin Hyprland desktop | **in progress** |
 | M2 | Update loop | Laptop updates overnight, bad build rolls back | |
 | M3 | Model service | `trip ask "hello"` answers locally | |
 | M4 | AI shell (ISO 2) | Sentences in the terminal do things | |
@@ -56,9 +56,10 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 - [ ] Desktop session: greetd + a minimal greeter, PipeWire, NetworkManager, fonts (Inter), Flatpak with Flathub
 - [ ] Branding: our os-release name and pretty name (keep `ID=fedora` so bootc-image-builder still works), Plymouth splash with the Glance mark, wallpaper, default Hyprland config (floating-first)
 - [ ] greenboot health checks: session starts, network, our services
-- [ ] `disk.yml`: bootc-image-builder → `anaconda-iso` and `qcow2`; upload ISOs to R2 (over GitHub's 2 GB limit)
+- [x] Multi-arch image: amd64 and arm64 built natively, joined under one tag, list and per-arch images signed
+- [x] `disk.yml`: bootc-image-builder → x86_64 ISO + qcow2, aarch64 qcow2 (for UTM on the Mac); compressed, split under 2 GiB, checksums signed, attached to the `nightly` pre-release
+- [ ] Test login secrets (`TEST_USER_PASSWORD`, `TEST_USER_SSH_KEY`) set by the owner, then the first disk build
 - [ ] `boot-test.yml`: boot the qcow2 under KVM, wait for `multi-user.target`, check `trip hw` and `bootc status`
-- [ ] aarch64 image for fast testing on the M-series Mac
 
 ## Open questions for the owner
 
