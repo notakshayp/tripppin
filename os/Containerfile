@@ -60,6 +60,12 @@ RUN dnf -y install --setopt=install_weak_deps=False vulkan-loader mesa-vulkan-dr
 RUN dnf -y install --setopt=install_weak_deps=False NetworkManager-wifi wpa_supplicant \
       iwlwifi-mvm-firmware iwlwifi-dvm-firmware realtek-firmware mt7xxx-firmware atheros-firmware brcmfmac-firmware \
     && dnf clean all
+
+# Apps install as Flatpaks from Flathub, since the system image itself is read-only.
+RUN dnf -y install --setopt=install_weak_deps=False flatpak && dnf clean all \
+    && mkdir -p /usr/share/flatpak/remotes.d \
+    && curl -fsSL -o /usr/share/flatpak/remotes.d/flathub.flatpakrepo https://dl.flathub.org/repo/flathub.flatpakrepo
+
 COPY os/files/ /
 
 # Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still

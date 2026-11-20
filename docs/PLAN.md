@@ -79,7 +79,11 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [ ] Harness daemon: router, per-category tool sets, the model's native tool-call grammar, validation, step limits
 - [ ] First tools: system info, files (read), web search (local SearXNG), web fetch
 - [x] The AI shell (`trip shell`), default for interactive terminals: plain text goes to the model as a single question, `/chat` keeps a conversation, `/terminal` opens a normal shell, `!cmd` runs one command, `/setup` downloads the model; streaming and Ctrl-C
-- [ ] Tools: let the model act, not just answer
+- [x] Agent loop in `trip`: the model calls tools until it answers in plain text (25-step cap, Ctrl-C stops it)
+- [x] Tools: `exec` (bash, live output, timeout, sudo prompts work), `read_file`, `write_file`
+- [x] Tool-call verifier: unknown tools, bad JSON, missing or mistyped fields and calls written as text go back to the model with the exact problem; 3 retries before giving up
+- [x] Flatpak with Flathub in the image, so the agent can install apps
+- [ ] Safety: permission modes, a second check on risky steps, undo (M4)
 - [ ] Record/replay tests; eval gate on PRs
 - [ ] ISO 2
 
