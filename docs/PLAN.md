@@ -19,17 +19,20 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 
 ## Milestones
 
+Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a plain terminal, so it can be proven on the console build before any desktop work.
+
 | # | Milestone | You can try | Status |
 |---|---|---|---|
-| M0 | Foundations | CI on every PR | **in progress** |
-| M1 | First boot (ISO 1) | Install, log into a Tripppin Hyprland desktop | **in progress** |
-| M2 | Update loop | Laptop updates overnight, bad build rolls back | |
-| M3 | Model service | `trip ask "hello"` answers locally | |
-| M4 | AI shell (ISO 2) | Sentences in the terminal do things | |
-| M5 | Safety | Booby-trapped pages get refused | |
-| M6 | Desktop (ISO 3) | Daily driver for a week | |
-| M7 | Installer | Five-minute install, our own UI | |
-| M8 | Public beta | Download from trippp.in | |
+| M0 | Foundations | CI on every PR | mostly done |
+| M1 | Console build (ISO 1) | Boot, log in, see the animated logo | **in progress** |
+| M2 | Model service | `trip ask "hello"` answers locally | **next** |
+| M3 | AI shell + harness (ISO 2) | Sentences in the terminal do things | |
+| M4 | Safety | Booby-trapped pages get refused | |
+| M5 | Desktop + orb (ISO 3) | Branded Hyprland desktop with the orb | |
+| M6 | Update loop + channels | Overnight updates, bad build rolls back | |
+| M7 | Agents + bring your own model | Background jobs, cloud keys, own server | |
+| M8 | Installer | Five-minute install, our own UI | |
+| M9 | Public beta | Download from trippp.in | |
 
 ## M0: Foundations
 
@@ -50,18 +53,40 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 
 - [ ] Re-add toolbox once Fedora ships a build without CVE-2026-78663 (removed from the image for now)
 
-## M1: First boot, next up
+## M1: Console build
 
-- [ ] Hyprland packaging: decide between building RPMs in our CI (mock + Packit) or a COPR; package hyprland, aquamarine, hyprutils, hyprlang, hyprcursor, hyprgraphics, hyprwayland-scanner, xdg-desktop-portal-hyprland
-- [ ] Desktop session: greetd + a minimal greeter, PipeWire, NetworkManager, fonts (Inter), Flatpak with Flathub
-- [ ] Branding: our os-release name and pretty name (keep `ID=fedora` so bootc-image-builder still works), Plymouth splash with the Glance mark, wallpaper, default Hyprland config (floating-first)
-- [ ] greenboot health checks: session starts, network, our services
+- [ ] greenboot health checks: network, our services
 - [x] Multi-arch image: amd64 and arm64 built natively, joined under one tag, list and per-arch images signed
 - [x] `disk.yml`: bootc-image-builder → x86_64 ISO + qcow2, aarch64 qcow2 (for UTM on the Mac); compressed, split under 2 GiB, checksums signed, attached to the `nightly` pre-release
 - [x] Test login secrets (`TEST_USER_PASSWORD`, `TEST_USER_SSH_KEY`)
 - [x] Console branding: os-release name, login banner with the logo, `trip logo` animation on login
 - [ ] First disk build attached to the `nightly` release
 - [ ] `boot-test.yml`: boot the qcow2 under KVM, wait for `multi-user.target`, check `trip hw` and `bootc status`
+
+## M2: Model service, next
+
+- [ ] llama.cpp: build a pinned release in the image (Vulkan backend, CPU fallback); smoke test `llama-server --version` in CI
+- [ ] Model catalog: real file names, download URLs and SHA-256 checksums for each tier; the catalog is signed
+- [ ] `trip model pull`: download the tier's model with resume and checksum verification into `/var/lib/tripppin/models`
+- [ ] `tripppin-llm.service`: llama-server under systemd, local only, sandboxed (DynamicUser, no network), idle unload
+- [ ] `trip ask "…"`: streams an answer from the local model
+- [ ] Measure speed (tokens per second, time to first word) per hardware tier; publish in the plan
+- [ ] Eval runner skeleton with a first handful of recorded requests
+
+## M3: AI shell + harness
+
+- [ ] Harness daemon: router, per-category tool sets, the model's native tool-call grammar, validation, step limits
+- [ ] First tools: system info, files (read), web search (local SearXNG), web fetch
+- [ ] The AI shell: plain text goes to the model, `!cmd` runs a raw command, `/term` opens a classic shell; streaming and Ctrl-C
+- [ ] Record/replay tests; eval gate on PRs
+- [ ] ISO 2
+
+## M5: Desktop + orb
+
+- [ ] Hyprland packaging: build RPMs in our CI (mock) or a COPR; hyprland, aquamarine, hyprutils, hyprlang, hyprcursor, hyprgraphics, hyprwayland-scanner, xdg-desktop-portal-hyprland
+- [ ] Desktop session: greetd + a minimal greeter, PipeWire, NetworkManager, fonts (Inter), Flatpak with Flathub
+- [ ] Plymouth boot splash with the power spark, wallpaper, default Hyprland config (floating-first)
+- [ ] The orb overlay
 
 ## Open questions for the owner
 
