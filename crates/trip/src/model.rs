@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 pub const PORT: u16 = 8086;
+const MAX_REPLY_TOKENS: u32 = 2048;
 const MODELS_DIR: &str = "/var/lib/tripppin/models";
 const LLAMA_SERVER: &str = "/usr/bin/llama-server";
 const IDLE_UNLOAD_SECS: u32 = 900;
@@ -32,6 +33,8 @@ and say it lasts until the next reboot.
 - Use non-interactive flags (-y, --noconfirm) and avoid commands that open an editor or a pager.
 - There is no graphical desktop yet: Tripppin is text-only for now, so windowed (GUI) apps can't be shown. \
 If asked for a GUI, a desktop or a windowed app, say that plainly instead of trying to install one.
+- Long commands (big installs, downloads) keep running as background jobs; use job_wait to wait for them \
+instead of starting them again.
 - If something fails twice the same way, stop and tell the person what's blocking you.";
 
 /// An HTTP client that trusts the operating system's certificate store, so CA updates
@@ -271,6 +274,8 @@ pub struct ToolCall {
 /// What came back from one streamed reply.
 pub struct Reply {
     pub text: String,
+    /// The reply hit the length cap before the model finished.
+    pub cut_off: bool,
     pub calls: Vec<ToolCall>,
     pub first_word: Option<Duration>,
     pub tokens_per_sec: f64,
@@ -307,7 +312,16 @@ pub fn stream(
         "stream": true,
         "messages": msgs,
         // Answers and tool calls don't need the model's long thinking pass.
-        "chat_template_kwargs": { "enable_thinking": false }
+        "chat_template_kwargs": { "enable_thinking": false },
+        // Qwen's recommended sampling without thinking; the presence penalty keeps small models
+        // from repeating themselves.
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 1.5,
+        // A reply is a few lines or a tool call; anything longer has gone wrong.
+        "max_tokens": MAX_REPLY_TOKENS
     });
     if let Some(tools) = tools {
         body["tools"] = tools.clone();
@@ -331,6 +345,7 @@ pub fn stream(
     let reader = BufReader::new(resp.body_mut().as_reader());
     let (mut text, mut first, mut pieces, mut cancelled) = (String::new(), None, 0u32, false);
     let mut calls: Vec<ToolCall> = Vec::new();
+    let mut cut_off = false;
     for line in reader.lines() {
         if cancel.load(Ordering::Relaxed) {
             cancelled = true;
@@ -345,6 +360,9 @@ pub fn stream(
         if chunk.get("error").is_some() {
             return Err(server_error(200, data));
         }
+        if chunk.pointer("/choices/0/finish_reason").and_then(|r| r.as_str()) == Some("length") {
+            cut_off = true;
+        }
         if let Some(piece) = delta_text(&chunk) {
             first.get_or_insert_with(|| start.elapsed());
             pieces += 1;
@@ -358,7 +376,7 @@ pub fn stream(
     }
     let tokens_per_sec =
         first.map_or(0.0, |t: Duration| f64::from(pieces) / start.elapsed().saturating_sub(t).as_secs_f64().max(0.001));
-    Ok(Reply { text, calls, first_word: first, tokens_per_sec, cancelled })
+    Ok(Reply { text, cut_off, calls, first_word: first, tokens_per_sec, cancelled })
 }
 
 /// The conversation no longer fits in the model's context; drop old material and try again.
