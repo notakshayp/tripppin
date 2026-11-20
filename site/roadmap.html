@@ -183,10 +183,10 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
 .contact p{margin:0;font:11px var(--mono);color:var(--muted);max-width:340px}
 
 /* brand */
-.lg{display:block;width:100%;height:auto;overflow:visible;fill:var(--mk,var(--ink))}
+.lg{display:block;width:100%;height:auto;overflow:visible;fill:var(--mk,var(--ink));color:var(--mk,var(--ink))}
 .mk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);margin:24px 0}
 .mk{border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:grid;grid-template-rows:auto 1fr;min-width:0;background:var(--bg)}
-.mk .stage{display:grid;place-items:center;padding:32px 28px;border-bottom:1px solid var(--line);background:var(--sheet)}
+.mk .stage{display:grid;place-items:center;padding:32px 28px;border-bottom:1px solid var(--line);background:var(--sheet);--mk-bg:var(--sheet)}
 .mk .stage .lg{max-width:150px}
 .mk.rec{background:var(--panel)}
 .mk.rec .stage{background:var(--bg)}
@@ -197,11 +197,11 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
 .mk .why{color:var(--ink)}
 .minis{display:flex;gap:8px;align-items:center;margin-top:auto;padding-top:10px;flex-wrap:wrap}
 .mini{display:grid;place-items:center;border:1px solid var(--line);background:var(--bg)}
-.mini.dark{background:#0d1211;border-color:#0d1211;--mk:#f2f5ef}
+.mini.dark{background:#0d1211;border-color:#0d1211;--mk:#f2f5ef;--mk-bg:#0d1211}
 .lockup{display:flex;align-items:center;gap:14px;padding:28px;border:1px solid var(--line);background:var(--sheet);margin:24px 0;flex-wrap:wrap}
 .lockup .lg{width:60px}
 .lockup b{font-weight:800;font-size:56px;letter-spacing:-.075em;line-height:1}
-.lockup.night{background:#0d1211;border-color:#0d1211;--mk:#f2f5ef}
+.lockup.night{background:#0d1211;border-color:#0d1211;--mk:#f2f5ef;--mk-bg:#0d1211}
 .lockup.night b{color:#f2f5ef}
 .lockups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
 .lockups .lockup{margin:0}
@@ -592,51 +592,24 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
   </section>
 
   <section id="brand">
-    <div class="st"><span>08 / brand</span><h2>One color.<br>One glance.</h2></div>
+    <div class="st"><span>08 / brand</span><h2>The peacock.<br>Three feathers, one neck.</h2></div>
     <div class="body wide">
-      <p class="lede">The peacock feather's eye, reduced to geometry: a teardrop, a circle and a point, in one color. Each mark stands on its own as a logo. The feather is the story behind it, not the picture.</p>
+      <p class="lede">A minimal peacock: one curved neck and three feathers fanning out. One color, solid, readable as an app icon.</p>
       <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-<symbol id="mk-glance" viewBox="0 0 200 200"><g transform="rotate(28 100 100)"><path fill-rule="evenodd" d="M100.00 22.00L140.38 95.96A46 46 0 1 1 59.62 95.96ZM70.00 130.00a30 30 0 1 0 60.00 0a30 30 0 1 0 -60.00 0Z"/><circle cx="100" cy="138" r="13"/></g></symbol>
-<symbol id="mk-tail" viewBox="0 0 200 200"><path fill-rule="evenodd" d="M93.31 168.57L31.55 140.96A30 30 0 1 1 72.31 104.26ZM27.78 109.12a12 12 0 1 0 24.00 0a12 12 0 1 0 -24.00 0Z"/><path fill-rule="evenodd" d="M100.00 166.00L72.58 104.16A30 30 0 1 1 127.42 104.16ZM88.00 86.00a12 12 0 1 0 24.00 0a12 12 0 1 0 -24.00 0Z"/><path fill-rule="evenodd" d="M106.69 168.57L127.69 104.26A30 30 0 1 1 168.45 140.96ZM148.22 109.12a12 12 0 1 0 24.00 0a12 12 0 1 0 -24.00 0Z"/></symbol>
-<symbol id="mk-drop" viewBox="0 0 200 200"><path fill-rule="evenodd" d="M100.00 4.00L149.29 95.42A56 56 0 1 1 50.71 95.42ZM64.00 136.00a36 36 0 1 0 72.00 0a36 36 0 1 0 -72.00 0Z"/><circle cx="100" cy="146" r="16"/></symbol>
-<symbol id="mk-halo" viewBox="0 0 200 200"><path fill-rule="evenodd" d="M22.00 100.00a78 78 0 1 1 156.00 0a78 78 0 1 1 -156.00 0ZM46.00 122.00a54 54 0 1 0 108.00 0a54 54 0 1 0 -108.00 0Z"/><circle cx="100" cy="142" r="30"/></symbol>
-<symbol id="mk-barbs" viewBox="0 0 200 200"><mask id="mk-barbs-m" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200"><rect width="200" height="200" fill="#fff"/><path d="M100 70 L162 34" stroke="#000" stroke-width="7"/><path d="M100 92 L162 56" stroke="#000" stroke-width="7"/><path d="M100 114 L162 78" stroke="#000" stroke-width="7"/></mask><path mask="url(#mk-barbs-m)" fill-rule="evenodd" d="M100.00 4.00L149.29 95.42A56 56 0 1 1 50.71 95.42ZM78.00 142.00a22 22 0 1 0 44.00 0a22 22 0 1 0 -44.00 0Z"/><circle cx="100" cy="146" r="9"/></symbol>
-<symbol id="mk-seal" viewBox="0 0 200 200"><path fill-rule="evenodd" d="M18.00 100.00a82 82 0 1 1 164.00 0a82 82 0 1 1 -164.00 0ZM100.00 42.00L130.20 100.38A34 34 0 1 1 69.80 100.38Z"/><circle cx="100" cy="124" r="14"/></symbol>
+<symbol id="pc-fan" viewBox="0 0 200 200"><g transform="translate(100 104) scale(0.78) translate(-100 -100)"><path fill-rule="evenodd" d="M84.2 168.7L17.1 142.5A30 30 0 1 1 55.6 102.6ZM8.9 107.6a12 12 0 1 0 24.0 0a12 12 0 1 0 -24.0 0Z"/><path fill-rule="evenodd" d="M100.0 162.0L72.3 95.5A30 30 0 1 1 127.7 95.5ZM88.0 74.0a12 12 0 1 0 24.0 0a12 12 0 1 0 -24.0 0Z"/><path fill-rule="evenodd" d="M115.8 168.7L144.4 102.6A30 30 0 1 1 182.9 142.5ZM167.1 107.6a12 12 0 1 0 24.0 0a12 12 0 1 0 -24.0 0Z"/><path d="M96 200 C 96 168, 118 160, 114 134 C 112 120, 100 118, 100 106" fill="none" style="stroke:var(--mk-bg,var(--bg))" stroke-width="22" stroke-linecap="round"/><path d="M94.0 100.0a11 11 0 1 1 22.0 0a11 11 0 1 1 -22.0 0ZM114 96 L130 103 L114 108 Z" style="fill:var(--mk-bg,var(--bg));stroke:var(--mk-bg,var(--bg))" stroke-width="10" stroke-linejoin="round"/><path d="M96 200 C 96 168, 118 160, 114 134 C 112 120, 100 118, 100 106" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"/><path fill-rule="evenodd" d="M94.0 100.0a11 11 0 1 1 22.0 0a11 11 0 1 1 -22.0 0ZM114 96 L130 103 L114 108 ZM104.0 98.0a3 3 0 1 0 6.0 0a3 3 0 1 0 -6.0 0Z"/></g></symbol>
+<symbol id="pc-crest" viewBox="0 0 200 200"><g transform="translate(100 108) scale(0.86) translate(-100 -100)"><path d="M70 196 C 68 156, 124 146, 120 108 C 118 86, 102 82, 102 68" fill="none" stroke="currentColor" stroke-width="22" stroke-linecap="round"/><path fill-rule="evenodd" d="M92.0 60.0a17 17 0 1 1 34.0 0a17 17 0 1 1 -34.0 0ZM123 54 L146 63 L123 69 ZM108.0 57.0a4 4 0 1 0 8.0 0a4 4 0 1 0 -8.0 0Z"/><path d="M106 44 L94.2 27.8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path fill-rule="evenodd" d="M69.6 -6.2L88.6 3.4A11 11 0 1 1 72.8 14.9ZM78.5 11.6a4 4 0 1 0 8.0 0a4 4 0 1 0 -8.0 0Z"/><path d="M106 44 L106.0 24.0" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path fill-rule="evenodd" d="M106.0 -18.0L115.8 1.0A11 11 0 1 1 96.2 1.0ZM102.0 4.0a4 4 0 1 0 8.0 0a4 4 0 1 0 -8.0 0Z"/><path d="M106 44 L117.8 27.8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path fill-rule="evenodd" d="M142.4 -6.2L139.2 14.9A11 11 0 1 1 123.4 3.4ZM125.5 11.6a4 4 0 1 0 8.0 0a4 4 0 1 0 -8.0 0Z"/></g></symbol>
+<symbol id="pc-light" viewBox="0 0 200 200"><g transform="translate(100 106) scale(0.9) translate(-100 -100)"><path d="M66 194 C 64 150, 124 140, 120 100 C 118 78, 100 74, 100 60" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round"/><path fill-rule="evenodd" d="M92.0 54.0a16 16 0 1 1 32.0 0a16 16 0 1 1 -32.0 0ZM121 48 L144 57 L121 63 ZM107.0 51.0a4 4 0 1 0 8.0 0a4 4 0 1 0 -8.0 0Z"/><path d="M106 40 L98.0 26.1" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path fill-rule="evenodd" d="M85.5 4.5L96.7 11.6A7 7 0 1 1 86.0 17.7Z"/><path d="M106 40 L106.0 24.0" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path fill-rule="evenodd" d="M106.0 -1.0L112.2 10.7A7 7 0 1 1 99.8 10.7Z"/><path d="M106 40 L114.0 26.1" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><path fill-rule="evenodd" d="M126.5 4.5L126.0 17.7A7 7 0 1 1 115.3 11.6Z"/></g></symbol>
       </defs></svg>
       <div class="mk-grid">
-        <div class="mk rec"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="1 · Glance mark"><g transform="rotate(28 100 100)"><path fill-rule="evenodd" d="M100.00 22.00L140.38 95.96A46 46 0 1 1 59.62 95.96ZM70.00 130.00a30 30 0 1 0 60.00 0a30 30 0 1 0 -60.00 0Z"/><circle cx="100" cy="138" r="13"><animateTransform attributeName="transform" type="translate" values="0 0;0 0;-7 -4;-7 -4;6 -2;6 -2;0 0" keyTimes="0;.35;.45;.6;.7;.85;1" dur="6s" repeatCount="indefinite"/></circle></g></svg></div><div class="info"><div class="top"><h4>1 · Glance</h4><span class="chip ok">chosen</span></div><p>The eye tipped sideways, its pupil resting low. Watch it: it looks around.</p><p class="why">Unexpected, alive and still clean at 16 pixels. The feather's tilt gives it movement.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-glance"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-glance"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:25px" aria-hidden="true"><use href="#mk-glance"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:16px" aria-hidden="true"><use href="#mk-glance"/></svg></span></div></div></div>
-        <div class="mk"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="2 · Tail mark"><path fill-rule="evenodd" d="M100.00 166.00L72.58 104.16A30 30 0 1 1 127.42 104.16ZM88.00 86.00a12 12 0 1 0 24.00 0a12 12 0 1 0 -24.00 0Z"><animateTransform attributeName="transform" type="rotate" values="0 100 176;42 100 176;42 100 176;0 100 176" calcMode="spline" keySplines=".3 0 .2 1;0 0 1 1;.6 0 .8 1" keyTimes="0;.25;.8;1" dur="5s" repeatCount="indefinite"/></path><path fill-rule="evenodd" d="M100.00 166.00L72.58 104.16A30 30 0 1 1 127.42 104.16ZM88.00 86.00a12 12 0 1 0 24.00 0a12 12 0 1 0 -24.00 0Z"><animateTransform attributeName="transform" type="rotate" values="0 100 176;-42 100 176;-42 100 176;0 100 176" calcMode="spline" keySplines=".3 0 .2 1;0 0 1 1;.6 0 .8 1" keyTimes="0;.25;.8;1" dur="5s" repeatCount="indefinite"/></path><path fill-rule="evenodd" d="M100.00 166.00L72.58 104.16A30 30 0 1 1 127.42 104.16ZM88.00 86.00a12 12 0 1 0 24.00 0a12 12 0 1 0 -24.00 0Z"/></svg></div><div class="info"><div class="top"><h4>2 · Tail</h4></div><p>Three eyes fanning out from one point: a peacock's tail opening.</p><p class="why">The most memorable and the most clearly peacock. Slightly busy when tiny.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-tail"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-tail"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:25px" aria-hidden="true"><use href="#mk-tail"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:16px" aria-hidden="true"><use href="#mk-tail"/></svg></span></div></div></div>
-        <div class="mk"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="3 · Drop mark"><use href="#mk-drop"/></svg></div><div class="info"><div class="top"><h4>3 · Drop</h4></div><p>The eye upright: teardrop, window, pupil.</p><p class="why">Classic and calm. Closest to a generic drop shape.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-drop"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-drop"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:25px" aria-hidden="true"><use href="#mk-drop"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:16px" aria-hidden="true"><use href="#mk-drop"/></svg></span></div></div></div>
-        <div class="mk"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="4 · Halo mark"><use href="#mk-halo"/></svg></div><div class="info"><div class="top"><h4>4 · Halo</h4></div><p>No tip at all: three circles touching at the bottom, the way a peacock eye's rings crowd one side.</p><p class="why">The most abstract. Reads as an eye or a planet, which may be what you want.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-halo"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-halo"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:25px" aria-hidden="true"><use href="#mk-halo"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:16px" aria-hidden="true"><use href="#mk-halo"/></svg></span></div></div></div>
-        <div class="mk"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="5 · Barbs mark"><use href="#mk-barbs"/></svg></div><div class="info"><div class="top"><h4>5 · Barbs</h4></div><p>The eye with three cuts along one side: the feather's barbs.</p><p class="why">Says feather most directly. The cuts disappear at small sizes.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-barbs"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-barbs"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:25px" aria-hidden="true"><use href="#mk-barbs"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:16px" aria-hidden="true"><use href="#mk-barbs"/></svg></span></div></div></div>
-        <div class="mk"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="6 · Seal mark"><use href="#mk-seal"/></svg></div><div class="info"><div class="top"><h4>6 · Seal</h4></div><p>A solid disc with the eye cut out of it.</p><p class="why">Strongest as an app icon or stamp. Less distinctive as a shape on its own.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-seal"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:44px" aria-hidden="true"><use href="#mk-seal"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:25px" aria-hidden="true"><use href="#mk-seal"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:16px" aria-hidden="true"><use href="#mk-seal"/></svg></span></div></div></div>
+        <div class="mk rec"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="1 · Fan peacock mark"><use href="#pc-fan"/></svg></div><div class="info"><div class="top"><h4>1 · Fan</h4><span class="chip ok">recommended</span></div><p>The neck rises in front of three fanned feather eyes, the way a peacock stands before its open tail.</p><p class="why">Closest to the idea: three feathers and the neck. Busiest at 16 pixels.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:48px" aria-hidden="true"><use href="#pc-fan"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:48px" aria-hidden="true"><use href="#pc-fan"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:27px" aria-hidden="true"><use href="#pc-fan"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:17px" aria-hidden="true"><use href="#pc-fan"/></svg></span></div></div></div>
+        <div class="mk"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="2 · Crest peacock mark"><use href="#pc-crest"/></svg></div><div class="info"><div class="top"><h4>2 · Crest</h4></div><p>The neck and head in profile, with the three feathers as its crest.</p><p class="why">The cleanest peacock silhouette, and clear when small. The feathers are smaller.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:48px" aria-hidden="true"><use href="#pc-crest"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:48px" aria-hidden="true"><use href="#pc-crest"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:27px" aria-hidden="true"><use href="#pc-crest"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:17px" aria-hidden="true"><use href="#pc-crest"/></svg></span></div></div></div>
+        <div class="mk"><div class="stage"><svg class="lg" viewBox="0 0 200 200" role="img" aria-label="3 · Crest, light peacock mark"><use href="#pc-light"/></svg></div><div class="info"><div class="top"><h4>3 · Crest, light</h4></div><p>The same profile with three small leaf-like crest feathers.</p><p class="why">The quietest version. The crest reads more like a crown.</p><div class="minis"><span class="mini" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:48px" aria-hidden="true"><use href="#pc-light"/></svg></span><span class="mini dark" style="width:56px;height:56px"><svg class="lg" viewBox="0 0 200 200" style="width:48px" aria-hidden="true"><use href="#pc-light"/></svg></span><span class="mini" style="width:32px;height:32px"><svg class="lg" viewBox="0 0 200 200" style="width:27px" aria-hidden="true"><use href="#pc-light"/></svg></span><span class="mini" style="width:20px;height:20px"><svg class="lg" viewBox="0 0 200 200" style="width:17px" aria-hidden="true"><use href="#pc-light"/></svg></span></div></div></div>
       </div>
-
       <div class="lockups">
-        <div class="lockup"><svg class="lg" viewBox="0 0 200 200" aria-hidden="true"><use href="#mk-glance"/></svg><b>tripppin</b></div>
-        <div class="lockup night"><svg class="lg" viewBox="0 0 200 200" aria-hidden="true"><use href="#mk-glance"/></svg><b>tripppin</b></div>
+        <div class="lockup"><svg class="lg" viewBox="0 0 200 200" aria-hidden="true"><use href="#pc-fan"/></svg><b>tripppin</b></div>
+        <div class="lockup night"><svg class="lg" viewBox="0 0 200 200" aria-hidden="true"><use href="#pc-crest"/></svg><b>tripppin</b></div>
       </div>
-
-      <h3>In the terminal</h3>
-      <p class="narrow muted">When a shell opens, the eye appears in text characters beside the system summary, set in Inter. It glances left, then right, then settles on you.</p>
-      <div class="bootscreen">
-        <canvas id="ascii" aria-label="The glance mark drawn in text characters, its pupil looking around"></canvas>
-        <div class="bootinfo">
-          <div class="nm">tripppin</div>
-          <div><i>system</i><span>tripppin 0.1 · nightly</span></div>
-          <div><i>model</i><span>qwen3.5 9b · on this machine</span></div>
-          <div><i>mode</i><span>auto · verifier on</span></div>
-          <div><i>memory</i><span>32 GB · 21 GB free</span></div>
-          <div><i>updated</i><span>today, 04:12 · healthy</span></div>
-          <span class="ask">what would you like to do?</span>
-        </div>
-      </div>
-      <div class="cards">
-        <div class="card"><svg class="ic"><use href="#i-eye"/></svg><h4>The orb is the eye</h4><p>The pupil follows what the AI is working on: toward the window it's reading, toward the tool it's running.</p></div>
-        <div class="card"><svg class="ic"><use href="#i-disc"/></svg><h4>Boot splash</h4><p>The eye opens from a closed line, then glances once.</p></div>
-        <div class="card"><svg class="ic"><use href="#i-shield"/></svg><h4>One color, always</h4><p>Ink on paper or paper on night. No gradients, outlines or effects.</p></div>
-      </div>
-      <p class="cap">Chosen: Glance. Files: brand/logo.svg and landing/public/favicon.svg. Tail is kept as brand/logo-tail.svg.</p>
+      <p class="cap">Pick one and it replaces Glance everywhere: the site, the favicon, the orb and the terminal animation.</p>
     </div>
   </section>
 
@@ -646,77 +619,3 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
   </footer>
 </div>
 
-<script>
-(function(){
-  var cv = document.getElementById('ascii'); if (!cv || !cv.getContext) return;
-  var ctx = cv.getContext('2d');
-  var COLS = 36, ROWS = 18, SUB = 3, RAMP = ' .:-=+*#%@';
-  // Glance geometry in the logo's 200×200 space, before its 28° tilt.
-  var DROP = { cx: 100, cy: 118, r: 46, d: 96 }, HOLE = { cx: 100, cy: 130, r: 30 }, PUPIL = { cx: 100, cy: 138, r: 13 };
-  var TILT = 28 * Math.PI / 180, HALF = Math.asin(DROP.r / DROP.d);
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var cw, ch, W, H, ink = '#e6ece6', running = false, start = 0, visible = true;
-
-  function size(){
-    var w = cv.clientWidth || 320, dpr = window.devicePixelRatio || 1;
-    cw = w / COLS; ch = cw * 2; W = w; H = ch * ROWS;
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ink = getComputedStyle(document.documentElement).getPropertyValue('--term-ink').trim() || ink;
-  }
-  function inDrop(x, y){
-    var dx = x - DROP.cx, dy = y - DROP.cy;
-    if (dx * dx + dy * dy <= DROP.r * DROP.r) return true;
-    var ty = DROP.cy - DROP.d, vy = y - ty;
-    return vy > 0 && y <= DROP.cy - DROP.r * Math.sin(HALF) && Math.abs(Math.atan2(x - DROP.cx, vy)) < HALF;
-  }
-  function solid(x, y, px, py){
-    var hx = x - HOLE.cx, hy = y - HOLE.cy, ux = x - PUPIL.cx - px, uy = y - PUPIL.cy - py;
-    if (ux * ux + uy * uy <= PUPIL.r * PUPIL.r) return true;
-    return inDrop(x, y) && hx * hx + hy * hy > HOLE.r * HOLE.r;
-  }
-  // Where the pupil looks over time: rest, left, right, back to centre.
-  function gaze(t){
-    if (reduce) return [0, 0];
-    var p = (t / 1000) % 6, ease = function(a){ return a * a * (3 - 2 * a); };
-    var keys = [[0, 0, 0], [2.1, 0, 0], [2.7, -7, -4], [3.6, -7, -4], [4.2, 6, -2], [5.1, 6, -2], [6, 0, 0]];
-    for (var i = 1; i < keys.length; i++) if (p <= keys[i][0]){
-      var a = keys[i - 1], b = keys[i], k = ease((p - a[0]) / (b[0] - a[0] || 1));
-      return [a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
-    }
-    return [0, 0];
-  }
-  function draw(t){
-    var g = gaze(t), sc = 200 / Math.min(W, H) * 0.98, cs = Math.cos(-TILT), sn = Math.sin(-TILT);
-    ctx.clearRect(0, 0, W, H);
-    ctx.font = '600 ' + (cw * 1.2).toFixed(1) + 'px Inter, "Helvetica Neue", Arial, sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = ink;
-    for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++){
-      var hit = 0;
-      for (var sy = 0; sy < SUB; sy++) for (var sx = 0; sx < SUB; sx++){
-        var px = ((c + (sx + 0.5) / SUB) * cw - W / 2) * sc, py = ((r + (sy + 0.5) / SUB) * ch - H / 2) * sc;
-        // undo the 28° tilt around the logo's centre
-        var x = 100 + px * cs - py * sn, y = 100 + px * sn + py * cs;
-        if (solid(x, y, g[0], g[1])) hit++;
-      }
-      if (hit) ctx.fillText(RAMP[Math.round(hit / (SUB * SUB) * (RAMP.length - 1))], (c + 0.5) * cw, (r + 0.5) * ch);
-    }
-  }
-  function loop(now){
-    if (!running) return;
-    if (!start) start = now;
-    if (visible) draw(now - start);
-    setTimeout(function(){ requestAnimationFrame(loop); }, 50);
-  }
-  function init(){
-    size(); draw(0);
-    if (!reduce){ running = true; requestAnimationFrame(loop); }
-    else document.querySelectorAll('svg.lg').forEach(function(s){ if (s.pauseAnimations) s.pauseAnimations(); });
-  }
-  if ('IntersectionObserver' in window){
-    new IntersectionObserver(function(es){ visible = es[0].isIntersecting; }).observe(cv);
-  }
-  window.addEventListener('resize', function(){ size(); draw(0); });
-  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(init);
-})();
-</script>
