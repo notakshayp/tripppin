@@ -42,10 +42,13 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 - [x] `image.yml`: build the image on PRs; on main and nightly, push to GHCR as `nightly` and `<sha>`
 - [x] Dependabot for cargo, actions and the base image digests
 - [x] First green CI run and first image in GHCR (`ghcr.io/notakshayp/tripppin:nightly`)
-- [ ] Branch protection on `main`: required checks, no force-push (needs the owner, or admin rights for `gh`)
-- [ ] Image signing key: cosign key pair, private key in repo secrets, public key in the image (needs the owner's go-ahead)
+- [ ] Branch protection on `main`: not available for private repos on the free plan. Until then every change goes through a PR with green checks
+- [x] Image signing: cosign key pair; private key and password in repo secrets; `cosign.pub` in the repo; every pushed image signed and verified
+- [x] Vulnerability gates: cargo-deny on every PR and weekly; image SBOM (SPDX) and grype scan, failing on critical issues that have a fix
 - [ ] Lima dev VM recipe for the Mac (`dev/lima.yaml`), with podman and `bcvk`
 - [ ] Pin GitHub Actions by commit hash
+
+- [ ] Re-add toolbox once Fedora ships a build without CVE-2026-78663 (removed from the image for now)
 
 ## M1: First boot, next up
 

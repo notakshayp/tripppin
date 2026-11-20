@@ -8,6 +8,7 @@ edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
 repository = "https://github.com/notakshayp/tripppin"
+publish = false
 
 [workspace.dependencies]
 anyhow = "1"

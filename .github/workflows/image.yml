@@ -2,10 +2,10 @@ name: image
 
 on:
   pull_request:
-    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, .github/workflows/image.yml]
+    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .grype.yaml, .syft.yaml, .github/workflows/image.yml]
   push:
     branches: [main]
-    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, .github/workflows/image.yml]
+    paths: [os/**, crates/**, models/**, Cargo.toml, Cargo.lock, cosign.pub, .grype.yaml, .syft.yaml, .github/workflows/image.yml]
   schedule:
     - cron: "0 4 * * *" # nightly, picks up Fedora security fixes
   workflow_dispatch:
@@ -34,12 +34,52 @@ jobs:
         run: |
           sudo podman run --rm localhost/tripppin:ci trip --version
           sudo podman run --rm localhost/tripppin:ci bootc --version
+          # Packages we removed for security reasons must stay removed.
+          ! sudo podman run --rm localhost/tripppin:ci rpm -q toolbox
+
+      - name: Export image for scanning
+        run: |
+          sudo podman save --format docker-archive -o image.tar localhost/tripppin:ci
+          sudo chmod 644 image.tar
+
+      - name: Bill of materials (SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          image: docker-archive:image.tar
+          format: spdx-json
+          output-file: tripppin.spdx.json
+          upload-artifact: true
+
+      - name: Vulnerability scan
+        uses: anchore/scan-action@v6
+        with:
+          image: docker-archive:image.tar
+          # Fail on critical issues that already have a fix: those mean we're shipping something stale.
+          severity-cutoff: critical
+          only-fixed: true
+          fail-build: true
+          output-format: table
 
       - name: Push to GHCR
         if: github.event_name != 'pull_request'
         run: |
+          rm -f image.tar
           echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
           sha="${GITHUB_SHA::12}"
-          for tag in nightly "$sha"; do
-            sudo podman push localhost/tripppin:ci "$IMAGE:$tag"
-          done
+          sudo podman push --digestfile digest localhost/tripppin:ci "$IMAGE:$sha"
+          sudo podman push localhost/tripppin:ci "$IMAGE:nightly"
+          echo "DIGEST=$(cat digest)" >> "$GITHUB_ENV"
+
+      - uses: sigstore/cosign-installer@v3
+        if: github.event_name != 'pull_request'
+
+      - name: Sign the image
+        if: github.event_name != 'pull_request'
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$IMAGE@$DIGEST"
+          cosign verify --key cosign.pub "$IMAGE@$DIGEST" > /dev/null
+          echo "signed and verified $IMAGE@$DIGEST"

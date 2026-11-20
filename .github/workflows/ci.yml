@@ -5,6 +5,8 @@ on:
   push:
     branches: [main]
   merge_group:
+  schedule:
+    - cron: "0 5 * * 1" # weekly: catch newly published advisories
 
 permissions:
   contents: read
@@ -35,3 +37,12 @@ jobs:
         run: cargo test --workspace --locked
       - name: Run trip hw on the runner
         run: cargo run --locked -q -p trip -- hw
+
+  deny:
+    name: vulnerabilities and licenses
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources

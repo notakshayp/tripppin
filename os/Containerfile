@@ -7,7 +7,7 @@
 # a new one, and that PR runs the full image pipeline before it can merge.
 
 # ---- Rust tools -------------------------------------------------------------
-FROM quay.io/fedora/fedora:45@sha256:be6b79cced86b08794d25024513eaea7e621f3d5dc3c4ca2c4371a5889229706 AS build
+FROM quay.io/fedora/fedora:45@sha256:f236063d5a7a15e76ff034f2be5fa6f7a8922fcb655093ad972a1f196b14a007 AS build
 RUN dnf -y install --setopt=install_weak_deps=False cargo rust && dnf clean all
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rustfmt.toml ./
@@ -23,6 +23,14 @@ LABEL org.opencontainers.image.title="tripppin" \
       org.opencontainers.image.source="https://github.com/notakshayp/tripppin" \
       org.opencontainers.image.licenses="Apache-2.0" \
       containers.bootc="1"
+
+# Apply every Fedora update published since the base image was cut, so the
+# image never ships a fix that already exists upstream.
+RUN dnf -y upgrade --refresh && dnf clean all
+
+# toolbox in Fedora 45 is built with a pre-release Go (CVE-2026-78663, critical).
+# We don't need it until milestone 6; re-add it once Fedora ships a rebuilt package.
+RUN dnf -y remove toolbox && dnf clean all
 
 COPY --from=build /src/target/release/trip /usr/bin/trip
 
