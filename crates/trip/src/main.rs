@@ -4,6 +4,7 @@ use hwdetect::{Catalog, Hardware, Tier};
 use serde::Serialize;
 
 mod agent;
+mod jobs;
 mod logo;
 mod model;
 mod shell;

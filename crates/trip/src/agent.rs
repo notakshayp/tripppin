@@ -5,45 +5,94 @@
 //! JSON, or missing or mistyped fields isn't run; the model gets the exact problem back and
 //! another try, up to `MAX_RETRIES` times in a row.
 
-use crate::model::{self, Message, ToolCall};
+use crate::jobs;
+use crate::model::{self, ContextFull, Message, ToolCall};
 use crate::shell::{ACCENT, DIM, RESET};
 use anyhow::{Result, bail};
 use serde_json::{Value, json};
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::collections::HashMap;
+use std::io::{self, Write};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-const MAX_STEPS: usize = 25;
+const MAX_STEPS: usize = 40;
 const MAX_RETRIES: usize = 3;
-const DEFAULT_TIMEOUT_SECS: u64 = 120;
-const MAX_TIMEOUT_SECS: u64 = 1800;
-/// How much of a tool's output goes back to the model. The rest is cut from the middle.
-const MAX_RESULT_CHARS: usize = 6000;
+/// How long exec waits before a command carries on in the background.
+const DEFAULT_WAIT_SECS: u64 = 60;
+/// How long job_wait waits by default.
+const DEFAULT_JOB_WAIT_SECS: u64 = 120;
+const MAX_WAIT_SECS: u64 = 1800;
+/// How much of a file goes back to the model. The rest is cut from the middle.
+const MAX_RESULT_CHARS: usize = 4000;
 const MAX_READ_BYTES: u64 = 1 << 20;
+/// The same exec command more often than this in one task is refused, so the model can't loop.
+const MAX_REPEATS: usize = 2;
+/// A rough, deliberately low estimate of characters per token, for budgeting the context.
+const CHARS_PER_TOKEN: usize = 3;
+/// Context kept free for the tool definitions and the model's reply, in tokens.
+const CONTEXT_RESERVE: usize = 3000;
+const TRIMMED: &str = "[earlier output removed to save space; run the command again if you need it]";
 
 /// The tools the model can call, as JSON schemas.
 pub fn tools() -> Value {
+    let job_id = json!({ "type": "integer", "description": "The job number exec gave you." });
     json!([
         {
             "type": "function",
             "function": {
                 "name": "exec",
-                "description": "Run a bash command on this computer and get its output and exit code. \
-    Use it for anything: installing apps, checking the system, downloading, managing files.",
+                "description": "Run a bash command on this computer. Waits up to wait_secs (default 60) for it to \
+    finish and returns the exit code and the newest output. If it's still running then, it carries on as a background \
+    job and you get its job number; use job_wait, job_output or job_stop with it. Long output is cut to the newest \
+    lines; the full log's path is given so you can grep it.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "command": { "type": "string", "description": "The bash command to run." },
-                        "timeout_secs": {
+                        "wait_secs": {
                             "type": "integer",
-                            "description": "Stop the command after this many seconds. Default 120; use more for big installs or downloads."
+                            "description": "How long to wait before letting it run in the background. Default 60."
+                        },
+                        "background": {
+                            "type": "boolean",
+                            "description": "Start it in the background right away and return its job number, for things \
+    that run a long time or forever (servers, big downloads). It gets no keyboard input."
                         }
                     },
                     "required": ["command"]
                 }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "job_wait",
+                "description": "Wait for a background job to finish (up to wait_secs, default 120) and get its new output.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "job": job_id,
+                        "wait_secs": { "type": "integer", "description": "The most to wait. Default 120." }
+                    },
+                    "required": ["job"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "job_output",
+                "description": "Check on a background job without waiting: whether it's running and its new output.",
+                "parameters": { "type": "object", "properties": { "job": job_id }, "required": ["job"] }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "job_stop",
+                "description": "Stop a background job.",
+                "parameters": { "type": "object", "properties": { "job": job_id }, "required": ["job"] }
             }
         },
         {
@@ -76,10 +125,15 @@ pub fn tools() -> Value {
     ])
 }
 
+const TOOL_NAMES: &str = "exec, job_wait, job_output, job_stop, read_file and write_file";
+
 /// A tool call that passed the checks.
 #[derive(Debug, PartialEq)]
 pub enum Action {
-    Exec { command: String, timeout_secs: u64 },
+    Exec { command: String, wait_secs: u64, background: bool },
+    JobWait { job: usize, wait_secs: u64 },
+    JobOutput { job: usize },
+    JobStop { job: usize },
     ReadFile { path: String },
     WriteFile { path: String, content: String },
 }
@@ -110,27 +164,60 @@ pub fn verify(call: &ToolCall) -> Result<Action, String> {
             Some(other) => Err(format!("\"{key}\" for {name} must be a string, but you sent {}.", kind(other))),
         }
     };
+    let seconds = |key: &str, default: u64| -> Result<u64, String> {
+        let bad = || format!("\"{key}\" must be a whole number of seconds, 1 or more.");
+        match args.get(key) {
+            None | Some(Value::Null) => Ok(default),
+            Some(Value::Number(n)) => match n.as_f64() {
+                Some(t) if t >= 1.0 => Ok((t as u64).min(MAX_WAIT_SECS)),
+                _ => Err(bad()),
+            },
+            Some(Value::String(s)) => match s.trim().parse::<u64>() {
+                Ok(t) if t >= 1 => Ok(t.min(MAX_WAIT_SECS)),
+                _ => Err(bad()),
+            },
+            Some(other) => Err(format!("\"{key}\" must be a number, but you sent {}.", kind(other))),
+        }
+    };
+    let job = || -> Result<usize, String> {
+        let bad = |what: &str| format!("\"job\" for {name} must be the job number exec gave you, but you sent {what}.");
+        match args.get("job") {
+            None => Err(format!("{name} needs a \"job\" field with the job number, for example {{\"job\": 1}}.")),
+            Some(Value::Number(n)) => {
+                n.as_u64().filter(|&n| n > 0).map(|n| n as usize).ok_or_else(|| bad("that number"))
+            }
+            Some(Value::String(s)) => {
+                s.trim().trim_start_matches(['#', 'j', 'o', 'b', ' ']).parse::<usize>().map_err(|_| bad("text"))
+            }
+            Some(other) => Err(bad(kind(other))),
+        }
+    };
     match name {
         "exec" => {
             let command = text("command", false)?;
-            let timeout_secs = match args.get("timeout_secs") {
-                None | Some(Value::Null) => DEFAULT_TIMEOUT_SECS,
-                Some(Value::Number(n)) => match n.as_f64() {
-                    Some(t) if t >= 1.0 => (t as u64).min(MAX_TIMEOUT_SECS),
-                    _ => return Err("\"timeout_secs\" must be a whole number of seconds, 1 or more.".into()),
-                },
-                Some(Value::String(s)) => match s.trim().parse::<u64>() {
-                    Ok(t) if t >= 1 => t.min(MAX_TIMEOUT_SECS),
-                    _ => return Err("\"timeout_secs\" must be a whole number of seconds, 1 or more.".into()),
-                },
-                Some(other) => return Err(format!("\"timeout_secs\" must be a number, but you sent {}.", kind(other))),
+            // timeout_secs is what the first version called wait_secs; small models remember it.
+            let wait_secs = if args.contains_key("wait_secs") {
+                seconds("wait_secs", DEFAULT_WAIT_SECS)?
+            } else {
+                seconds("timeout_secs", DEFAULT_WAIT_SECS)?
             };
-            Ok(Action::Exec { command, timeout_secs })
+            let background = match args.get("background") {
+                None | Some(Value::Null) => false,
+                Some(Value::Bool(b)) => *b,
+                Some(Value::String(s)) if s == "true" || s == "false" => s == "true",
+                Some(other) => {
+                    return Err(format!("\"background\" must be true or false, but you sent {}.", kind(other)));
+                }
+            };
+            Ok(Action::Exec { command, wait_secs, background })
         }
+        "job_wait" => Ok(Action::JobWait { job: job()?, wait_secs: seconds("wait_secs", DEFAULT_JOB_WAIT_SECS)? }),
+        "job_output" => Ok(Action::JobOutput { job: job()? }),
+        "job_stop" => Ok(Action::JobStop { job: job()? }),
         "read_file" => Ok(Action::ReadFile { path: text("path", false)? }),
         "write_file" => Ok(Action::WriteFile { path: text("path", false)?, content: text("content", true)? }),
-        "" => Err("The tool call has no tool name. The tools are exec, read_file and write_file.".into()),
-        other => Err(format!("There's no tool called \"{other}\". The tools are exec, read_file and write_file.")),
+        "" => Err(format!("The tool call has no tool name. The tools are {TOOL_NAMES}.")),
+        other => Err(format!("There's no tool called \"{other}\". The tools are {TOOL_NAMES}.")),
     }
 }
 
@@ -138,6 +225,7 @@ fn example(tool: &str) -> &'static str {
     match tool {
         "read_file" => r#"{"path": "~/notes.txt"}"#,
         "write_file" => r#"{"path": "~/notes.txt", "content": "hello"}"#,
+        "job_wait" | "job_output" | "job_stop" => r#"{"job": 1}"#,
         _ => r#"{"command": "ls -la ~"}"#,
     }
 }
@@ -171,18 +259,32 @@ pub struct Done {
 /// The model's text streams to the terminal; each tool call shows as a line, with its output.
 pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
     let tools = tools();
+    let budget = model::context_tokens().saturating_sub(CONTEXT_RESERVE).max(2000) * CHARS_PER_TOKEN;
+    let mut runs: HashMap<String, usize> = HashMap::new();
     let mut retries = 0;
     for step in 0..MAX_STEPS {
-        let mut out = io::stdout();
-        let reply = model::stream(history, Some(&tools), cancel, |piece| {
-            let _ = write!(out, "{piece}");
-            let _ = out.flush();
-        })?;
+        compact(history, budget);
+        let reply = match ask(history, &tools, cancel) {
+            Err(e) if e.downcast_ref::<ContextFull>().is_some() => {
+                // The estimate was off; keep only the newest output and try once more.
+                note("the conversation got too long for the model's memory; trimming old output");
+                compact(history, 0);
+                ask(history, &tools, cancel).map_err(|e| match e.downcast_ref::<ContextFull>() {
+                    Some(_) => anyhow::anyhow!("this task got too long for the model's memory. try a smaller step."),
+                    None => e,
+                })?
+            }
+            other => other?,
+        };
         if !reply.text.is_empty() && !reply.text.ends_with('\n') {
             println!();
         }
         if reply.cancelled {
             bail!("stopped");
+        }
+        if reply.cut_off {
+            // A runaway reply; its half-written tool calls can't be trusted.
+            bail!("the model's reply ran on too long, so it was cut off. try asking again, more specifically.");
         }
         if reply.calls.is_empty() {
             history.push(Message::assistant(&reply.text));
@@ -207,6 +309,13 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
         let mut broken = false;
         for call in &calls {
             let result = match verify(call) {
+                Ok(Action::Exec { command, .. }) if bump(&mut runs, &command) > MAX_REPEATS => {
+                    note(&format!("not running `{}` again; it already ran {MAX_REPEATS} times", one_line(&command)));
+                    format!(
+                        "Not run: you've already run this exact command {MAX_REPEATS} times in this task. \
+Don't repeat it. Try a different approach, or tell the person what's blocking you."
+                    )
+                }
                 Ok(action) => perform(&action, cancel),
                 Err(problem) => {
                     broken = true;
@@ -232,6 +341,53 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
     bail!("stopped after {MAX_STEPS} steps without finishing. ask again to keep going.")
 }
 
+/// One model turn, streamed to the terminal.
+fn ask(history: &[Message], tools: &Value, cancel: &AtomicBool) -> Result<model::Reply> {
+    let mut out = io::stdout();
+    model::stream(history, Some(tools), cancel, |piece| {
+        let _ = write!(out, "{piece}");
+        let _ = out.flush();
+    })
+}
+
+fn bump(runs: &mut HashMap<String, usize>, command: &str) -> usize {
+    let n = runs.entry(command.trim().to_string()).or_default();
+    *n += 1;
+    *n
+}
+
+fn one_line(text: &str) -> String {
+    let line = text.lines().next().unwrap_or("");
+    if line.chars().count() > 60 {
+        format!("{}…", line.chars().take(60).collect::<String>())
+    } else {
+        line.to_string()
+    }
+}
+
+/// Keeps the conversation under `budget` characters by replacing the oldest tool outputs with a
+/// short note. The newest tool result always stays, so the model can see what just happened.
+fn compact(history: &mut [Message], budget: usize) {
+    let size = |h: &[Message]| h.iter().map(|m| m.0.to_string().len()).sum::<usize>();
+    let mut total = size(history);
+    if total <= budget {
+        return;
+    }
+    let newest = history.iter().rposition(|m| m.0["role"] == "tool");
+    for (i, msg) in history.iter_mut().enumerate() {
+        if total <= budget {
+            break;
+        }
+        let m = &mut msg.0;
+        if m["role"] != "tool" || Some(i) == newest || m["content"] == TRIMMED {
+            continue;
+        }
+        let before = m.to_string().len();
+        m["content"] = Value::String(TRIMMED.into());
+        total = total - before + m.to_string().len();
+    }
+}
+
 fn note(text: &str) {
     println!("{DIM}{text}{RESET}");
 }
@@ -246,9 +402,30 @@ fn show_step(tool: &str, detail: &str) {
 
 fn perform(action: &Action, cancel: &AtomicBool) -> String {
     match action {
-        Action::Exec { command, timeout_secs } => {
-            show_step("exec", command);
-            exec(command, Duration::from_secs(*timeout_secs), cancel)
+        Action::Exec { command, wait_secs, background } => {
+            show_step(if *background { "exec in the background" } else { "exec" }, command);
+            let id = match jobs::start(command, !*background) {
+                Ok(id) => id,
+                Err(e) => return format!("Error: {e}"),
+            };
+            let wait = if *background { Duration::ZERO } else { Duration::from_secs(*wait_secs) };
+            let result = jobs::wait(id, wait, cancel);
+            if !jobs::finished(id) && !*background {
+                jobs::note_backgrounded(id);
+            }
+            result
+        }
+        Action::JobWait { job, wait_secs } => {
+            show_step(&format!("waiting on job {job}"), &jobs::command(*job).unwrap_or_default());
+            jobs::wait(*job, Duration::from_secs(*wait_secs), cancel)
+        }
+        Action::JobOutput { job } => {
+            show_step(&format!("checking job {job}"), &jobs::command(*job).unwrap_or_default());
+            jobs::output(*job)
+        }
+        Action::JobStop { job } => {
+            show_step(&format!("stopping job {job}"), &jobs::command(*job).unwrap_or_default());
+            jobs::stop(*job)
         }
         Action::ReadFile { path } => {
             show_step("read", path);
@@ -301,108 +478,6 @@ fn write_file(path: &str, content: &str) -> String {
     }
 }
 
-/// Runs a command with bash. Output shows in the terminal as it happens and is collected for the
-/// model. The keyboard stays connected, so sudo can ask for a password.
-fn exec(command: &str, timeout: Duration, cancel: &AtomicBool) -> String {
-    let child = Command::new("bash")
-        .arg("-c")
-        .arg(command)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .env("TRIPPPIN_IN_SHELL", "1")
-        .spawn();
-    let mut child = match child {
-        Ok(c) => c,
-        Err(e) => return format!("Error: couldn't start bash: {e}"),
-    };
-    let (tx, rx) = mpsc::channel::<String>();
-    let readers: Vec<Box<dyn Read + Send>> = [
-        child.stdout.take().map(|s| Box::new(s) as Box<dyn Read + Send>),
-        child.stderr.take().map(|s| Box::new(s) as Box<dyn Read + Send>),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
-    for stream in readers {
-        let tx = tx.clone();
-        std::thread::spawn(move || {
-            let mut reader = BufReader::new(stream);
-            let mut buf = Vec::new();
-            while reader.read_until(b'\n', &mut buf).is_ok_and(|n| n > 0) {
-                let line = String::from_utf8_lossy(&buf).trim_end_matches(['\n', '\r']).to_string();
-                if tx.send(line).is_err() {
-                    break;
-                }
-                buf.clear();
-            }
-        });
-    }
-    drop(tx);
-
-    let start = Instant::now();
-    let mut output = String::new();
-    let mut stopped: Option<&str> = None;
-    let mut killed_at: Option<Instant> = None;
-    loop {
-        match rx.recv_timeout(Duration::from_millis(100)) {
-            Ok(line) => {
-                println!("{DIM}  │ {line}{RESET}");
-                // Keep memory bounded on very chatty commands; the middle gets cut anyway.
-                if output.len() < 4 * MAX_RESULT_CHARS * 16 {
-                    output.push_str(&line);
-                    output.push('\n');
-                }
-            }
-            Err(mpsc::RecvTimeoutError::Disconnected) => break,
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
-        }
-        if stopped.is_none() {
-            if cancel.load(Ordering::Relaxed) {
-                stopped = Some("stopped by the person (Ctrl-C)");
-            } else if start.elapsed() > timeout {
-                stopped = Some("timed out");
-            }
-            if stopped.is_some() {
-                let _ = child.kill();
-                killed_at = Some(Instant::now());
-            }
-        }
-        // Something it started in the background can keep the output open; don't wait on it forever.
-        if killed_at.is_some_and(|t| t.elapsed() > Duration::from_secs(2)) {
-            break;
-        }
-        if stopped.is_none() && child.try_wait().ok().flatten().is_some() && rx_idle(&rx, &mut output) {
-            break;
-        }
-    }
-    let status = child.wait();
-    let head = match (stopped, status) {
-        (Some("timed out"), _) => format!("The command timed out after {} s and was stopped.", timeout.as_secs()),
-        (Some(why), _) => format!("The command was {why}."),
-        (None, Ok(s)) => match s.code() {
-            Some(code) => format!("Exit code {code}."),
-            None => "The command was ended by a signal.".to_string(),
-        },
-        (None, Err(e)) => format!("Couldn't get the command's result: {e}"),
-    };
-    if output.trim().is_empty() { format!("{head} No output.") } else { format!("{head} Output:\n{}", clip(&output)) }
-}
-
-/// After the command exits, drains what's left. Returns true once the output is closed or quiet.
-fn rx_idle(rx: &mpsc::Receiver<String>, output: &mut String) -> bool {
-    loop {
-        match rx.recv_timeout(Duration::from_millis(300)) {
-            Ok(line) => {
-                println!("{DIM}  │ {line}{RESET}");
-                output.push_str(&line);
-                output.push('\n');
-            }
-            Err(_) => return true,
-        }
-    }
-}
-
 /// Cuts long text from the middle, keeping the start and the end (where errors usually are).
 fn clip(text: &str) -> String {
     let count = text.chars().count();
@@ -439,16 +514,19 @@ mod tests {
     fn accepts_well_formed_calls() {
         assert_eq!(
             verify(&call("exec", r#"{"command":"ls"}"#)),
-            Ok(Action::Exec { command: "ls".into(), timeout_secs: DEFAULT_TIMEOUT_SECS })
+            Ok(Action::Exec { command: "ls".into(), wait_secs: DEFAULT_WAIT_SECS, background: false })
         );
         assert_eq!(
             verify(&call("exec", r#"{"command":"sleep 1","timeout_secs":"30"}"#)),
-            Ok(Action::Exec { command: "sleep 1".into(), timeout_secs: 30 })
+            Ok(Action::Exec { command: "sleep 1".into(), wait_secs: 30, background: false })
         );
         assert_eq!(
-            verify(&call("exec", r#"{"command":"x","timeout_secs":99999}"#)),
-            Ok(Action::Exec { command: "x".into(), timeout_secs: MAX_TIMEOUT_SECS })
+            verify(&call("exec", r#"{"command":"x","wait_secs":99999,"background":true}"#)),
+            Ok(Action::Exec { command: "x".into(), wait_secs: MAX_WAIT_SECS, background: true })
         );
+        assert_eq!(verify(&call("job_wait", r#"{"job":2}"#)), Ok(Action::JobWait { job: 2, wait_secs: 120 }));
+        assert_eq!(verify(&call("job_output", r##"{"job":"#3"}"##)), Ok(Action::JobOutput { job: 3 }));
+        assert_eq!(verify(&call("job_stop", r#"{"job":"job 4"}"#)), Ok(Action::JobStop { job: 4 }));
         assert_eq!(verify(&call("read_file", r#"{"path":"~/a"}"#)), Ok(Action::ReadFile { path: "~/a".into() }));
         assert_eq!(
             verify(&call("write_file", r#"{"path":"a","content":""}"#)),
@@ -468,6 +546,38 @@ mod tests {
         assert!(err("run_shell", r#"{"command": "ls"}"#).contains("no tool called \"run_shell\""));
         assert!(err("", "{}").contains("no tool name"));
         assert!(err("write_file", r#"{"path": "a"}"#).contains("needs a \"content\" field"));
+        assert!(err("job_wait", "{}").contains("needs a \"job\" field"));
+        assert!(err("job_stop", r#"{"job": 0}"#).contains("job number"));
+        assert!(err("exec", r#"{"command": "ls", "background": 1}"#).contains("true or false"));
+    }
+
+    #[test]
+    fn compacts_old_tool_output_first() {
+        let big = "x".repeat(5000);
+        let mut h = vec![
+            Message::system(),
+            Message::user("task"),
+            Message::tool("a", &big),
+            Message::tool("b", &big),
+            Message::tool("c", &big),
+        ];
+        compact(&mut h, 8000);
+        assert_eq!(h[2].0["content"], TRIMMED);
+        assert_eq!(h[3].0["content"], TRIMMED);
+        assert_eq!(h[4].0["content"], big.as_str(), "the newest output stays");
+        assert_eq!(h[1].0["content"], "task", "the request stays");
+        let mut small = vec![Message::user("hi"), Message::tool("a", "ok")];
+        compact(&mut small, 10_000);
+        assert_eq!(small[1].0["content"], "ok");
+    }
+
+    #[test]
+    fn counts_repeated_commands() {
+        let mut runs = HashMap::new();
+        assert_eq!(bump(&mut runs, "ls"), 1);
+        assert_eq!(bump(&mut runs, " ls "), 2);
+        assert_eq!(bump(&mut runs, "ls"), 3);
+        assert_eq!(bump(&mut runs, "pwd"), 1);
     }
 
     #[test]
@@ -484,18 +594,6 @@ mod tests {
         assert!(clipped.starts_with("start") && clipped.ends_with("end"));
         assert!(clipped.contains("characters cut"));
         assert_eq!(clip("short"), "short");
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn runs_commands_and_reports_exit_codes() {
-        let cancel = AtomicBool::new(false);
-        let ok = exec("echo hi; echo oops >&2", Duration::from_secs(10), &cancel);
-        assert!(ok.starts_with("Exit code 0.") && ok.contains("hi") && ok.contains("oops"), "{ok}");
-        let fail = exec("exit 3", Duration::from_secs(10), &cancel);
-        assert_eq!(fail, "Exit code 3. No output.");
-        let slow = exec("sleep 5", Duration::from_secs(1), &cancel);
-        assert!(slow.contains("timed out"), "{slow}");
     }
 
     #[test]

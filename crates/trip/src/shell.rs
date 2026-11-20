@@ -185,7 +185,7 @@ fn respond(history: &mut Vec<Message>, cancel: &AtomicBool) -> bool {
             false
         }
         Err(e) => {
-            println!("{ACCENT}!{RESET} {e}");
+            println!("{ACCENT}!{RESET} {e:#}");
             false
         }
     }
