@@ -11,6 +11,7 @@ use crate::keyboard;
 use crate::nm;
 use crate::pointer;
 use crate::power;
+use crate::printers;
 use crate::privacy;
 use crate::region;
 use crate::snd;
@@ -22,7 +23,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 20] = [
+const SECTIONS: [(&str, &str); 21] = [
     ("wifi", "wi-fi"),
     ("network", "network & vpn"),
     ("bluetooth", "bluetooth"),
@@ -35,6 +36,7 @@ const SECTIONS: [(&str, &str); 20] = [
     ("apps", "apps"),
     ("keyboard", "keyboard"),
     ("pointer", "mouse & touchpad"),
+    ("printers", "printers & scanners"),
     ("time", "date & time"),
     ("language", "language & region"),
     ("accounts", "accounts"),
@@ -104,6 +106,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&apps_page(), Some("apps"));
     stack.add_named(&keyboard_page(), Some("keyboard"));
     stack.add_named(&pointer_page(), Some("pointer"));
+    stack.add_named(&printers_page(), Some("printers"));
     stack.add_named(&time_page(), Some("time"));
     stack.add_named(&language_page(), Some("language"));
     stack.add_named(&accounts_page(), Some("accounts"));
@@ -3698,6 +3701,151 @@ fn network_page() -> gtk::ScrolledWindow {
                     row.add_css_class("net-row");
                     row.append(&add);
                     vpns.append(&row);
+                },
+            );
+        }));
+    }
+    scroll.connect_map(move |_| {
+        if let Some(f) = load.borrow().clone() {
+            f();
+        }
+    });
+    scroll
+}
+
+fn printers_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, right) = page("printers & scanners");
+    let add = gtk::Button::with_label("add a printer");
+    add.add_css_class("link");
+    add.add_css_class("accent");
+    add.connect_clicked(|_| {
+        let _ = std::process::Command::new("system-config-printer").spawn();
+    });
+    right.append(&add);
+    let list = card();
+    body.append(&list);
+    body.append(&caption("waiting to print"));
+    let queue = card();
+    body.append(&queue);
+    body.append(&caption("scanners"));
+    let scan = card();
+    let open = gtk::Button::with_label("open the scanner");
+    open.add_css_class("link");
+    open.add_css_class("accent");
+    open.connect_clicked(|_| {
+        let _ = std::process::Command::new("simple-scan").spawn();
+    });
+    scan.append(&setting_row("scan a page or a photo", &open));
+    body.append(&scan);
+    let note =
+        label("printers on your wi-fi or plugged in by usb show up by themselves; most need no driver.", &["row-sub"]);
+    note.set_wrap(true);
+    note.set_xalign(0.0);
+    body.append(&note);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    body.append(&error);
+
+    let load: LoadSlot = Rc::new(RefCell::new(None));
+    {
+        let slot = load.clone();
+        *load.borrow_mut() = Some(Rc::new(move || {
+            let (slot, list, queue, status, error, add, scan) =
+                (slot.clone(), list.clone(), queue.clone(), status.clone(), error.clone(), add.clone(), scan.clone());
+            background(
+                || (printers::printers(), printers::jobs()),
+                move |(found, jobs)| {
+                    let reload = {
+                        let slot = slot.clone();
+                        move || {
+                            if let Some(f) = slot.borrow().clone() {
+                                f();
+                            }
+                        }
+                    };
+                    clear(&list);
+                    clear(&queue);
+                    let Some(found) = found else {
+                        status.set_text("printing comes with the next update");
+                        add.set_visible(false);
+                        scan.set_visible(false);
+                        list.append(&setting_row("printers", &label("comes with the next update", &["row-sub"])));
+                        queue.append(&setting_row("nothing waiting", &label("", &["row-sub"])));
+                        return;
+                    };
+                    status.set_text(&match found.iter().find(|p| p.default) {
+                        Some(p) => {
+                            format!("{} printers · default: {}", found.len(), p.name.replace('_', " ").to_lowercase())
+                        }
+                        None if found.is_empty() => "no printers found".to_string(),
+                        None => format!("{} printers", found.len()),
+                    });
+                    if found.is_empty() {
+                        list.append(&setting_row("no printers found yet", &label("", &["row-sub"])));
+                    }
+                    let fail = {
+                        let error = error.clone();
+                        move |e: String| {
+                            error.set_text(&e);
+                            error.set_visible(true);
+                        }
+                    };
+                    for p in &found {
+                        let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+                        row.add_css_class("net-row");
+                        if p.default {
+                            row.add_css_class("connected");
+                        }
+                        let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+                        text.set_hexpand(true);
+                        text.set_valign(gtk::Align::Center);
+                        text.append(&label(
+                            &p.name.replace('_', " ").to_lowercase(),
+                            &[if p.default { "row-title-strong" } else { "row-title" }],
+                        ));
+                        let sub = if p.default { format!("{} · default", p.state) } else { p.state.clone() };
+                        text.append(&label(&sub, &if p.default { vec!["row-sub", "on"] } else { vec!["row-sub"] }));
+                        row.append(&text);
+                        let test = gtk::Button::with_label("test page");
+                        test.add_css_class("link");
+                        {
+                            let (name, fail, reload) = (p.name.clone(), fail.clone(), reload.clone());
+                            test.connect_clicked(move |_| match printers::test_page(&name) {
+                                Ok(()) => reload(),
+                                Err(e) => fail(format!("couldn't print: {e}")),
+                            });
+                        }
+                        row.append(&test);
+                        if !p.default {
+                            let make = gtk::Button::with_label("make default");
+                            make.add_css_class("link");
+                            make.add_css_class("accent");
+                            let (name, fail, reload) = (p.name.clone(), fail.clone(), reload.clone());
+                            make.connect_clicked(move |_| match printers::set_default(&name) {
+                                Ok(()) => reload(),
+                                Err(e) => fail(format!("couldn't change it: {e}")),
+                            });
+                            row.append(&make);
+                        }
+                        list.append(&row);
+                    }
+                    if jobs.is_empty() {
+                        queue.append(&setting_row("nothing waiting", &label("", &["row-sub"])));
+                    }
+                    for j in jobs {
+                        let stop = gtk::Button::with_label("cancel");
+                        stop.add_css_class("link");
+                        let (fail, reload) = (fail.clone(), reload.clone());
+                        let id = j.id.clone();
+                        stop.connect_clicked(move |_| match printers::cancel(&id) {
+                            Ok(()) => reload(),
+                            Err(e) => fail(format!("couldn't cancel it: {e}")),
+                        });
+                        queue.append(&setting_row(
+                            &format!("{} · {}", j.printer.replace('_', " ").to_lowercase(), j.size),
+                            &stop,
+                        ));
+                    }
                 },
             );
         }));
