@@ -12,13 +12,14 @@ use crate::pointer;
 use crate::power;
 use crate::region;
 use crate::snd;
+use crate::system;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 13] = [
+const SECTIONS: [(&str, &str); 15] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -32,6 +33,8 @@ const SECTIONS: [(&str, &str); 13] = [
     ("pointer", "mouse & touchpad"),
     ("time", "date & time"),
     ("language", "language & region"),
+    ("updates", "updates"),
+    ("about", "about"),
 ];
 
 pub fn run() -> glib::ExitCode {
@@ -94,6 +97,8 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&pointer_page(), Some("pointer"));
     stack.add_named(&time_page(), Some("time"));
     stack.add_named(&language_page(), Some("language"));
+    stack.add_named(&updates_page(), Some("updates"));
+    stack.add_named(&about_page(), Some("about"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -2562,6 +2567,235 @@ fn language_page() -> gtk::ScrolledWindow {
                 }
                 list.append(&setting_row("language", &pick_lang));
                 list.append(&setting_row("region formats", &pick_formats));
+            },
+        );
+    });
+    scroll
+}
+
+fn updates_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, right) = page("updates");
+    let check = gtk::Button::with_label("check now");
+    check.add_css_class("pill");
+    right.append(&check);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    let list = gtk::ListBox::new();
+    list.add_css_class("list-card");
+    list.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&list);
+    body.append(&error);
+    let note = label(
+        "tripppin checks once a day and downloads updates quietly. the new version starts the next time you restart, never in the middle of your work. if something's wrong after an update, go back to the version before.",
+        &["row-sub"],
+    );
+    note.set_wrap(true);
+    note.set_xalign(0.0);
+    body.append(&note);
+
+    let load: LoadSlot = Rc::new(RefCell::new(None));
+    let fail = {
+        let error = error.clone();
+        move |what: &str, e: String| {
+            error.set_text(&format!("couldn't {what}: {e}"));
+            error.set_visible(true);
+        }
+    };
+    {
+        let (slot, list, status, check, fail) =
+            (load.clone(), list.clone(), status.clone(), check.clone(), fail.clone());
+        *load.borrow_mut() = Some(Rc::new(move || {
+            let (slot, list, status, check, fail) =
+                (slot.clone(), list.clone(), status.clone(), check.clone(), fail.clone());
+            background(
+                || (system::status(), system::checking()),
+                move |(st, busy)| {
+                    clear(&list);
+                    check.set_sensitive(!busy);
+                    check.set_label(if busy { "checking…" } else { "check now" });
+                    if busy {
+                        // Look again until the check is done.
+                        let slot = slot.clone();
+                        glib::timeout_add_local_once(std::time::Duration::from_secs(3), move || {
+                            if let Some(f) = slot.borrow().clone() {
+                                f();
+                            }
+                        });
+                    }
+                    let Some(now) = &st.booted else {
+                        status.set_text("couldn't read the system version");
+                        return;
+                    };
+                    status.set_text(&match &st.staged {
+                        Some(_) => "an update is ready · restart to finish".to_string(),
+                        None if busy => "looking for updates…".to_string(),
+                        None => "up to date".to_string(),
+                    });
+                    list.append(&setting_row(
+                        "this version",
+                        &label(&format!("{} · {}", now.version, system::date(now.timestamp)), &["row-value"]),
+                    ));
+                    list.append(&setting_row("updates from", &label(&system::channel(&now.image), &["row-value"])));
+                    if let Some(next) = &st.staged {
+                        let restart = gtk::Button::with_label("restart now");
+                        restart.add_css_class("link");
+                        restart.add_css_class("accent");
+                        let fail = fail.clone();
+                        restart.connect_clicked(move |_| {
+                            if let Err(e) = system::restart() {
+                                fail("restart", e);
+                            }
+                        });
+                        list.append(&setting_row(
+                            &format!("ready: {} · {}", next.version, system::date(next.timestamp)),
+                            &restart,
+                        ));
+                    }
+                    if let Some(prev) = &st.previous {
+                        let back = gtk::Button::with_label("go back");
+                        back.add_css_class("link");
+                        let (fail, slot) = (fail.clone(), slot.clone());
+                        back.connect_clicked(move |b| {
+                            if b.label().as_deref() != Some("sure? go back") {
+                                b.set_label("sure? go back");
+                                b.add_css_class("danger");
+                                return;
+                            }
+                            b.set_sensitive(false);
+                            let (fail, slot) = (fail.clone(), slot.clone());
+                            background(system::roll_back, move |r| {
+                                if let Err(e) = r {
+                                    fail("go back", e);
+                                }
+                                if let Some(f) = slot.borrow().clone() {
+                                    f();
+                                }
+                            });
+                        });
+                        list.append(&setting_row(
+                            &format!("previous: {} · {}", prev.version, system::date(prev.timestamp)),
+                            &back,
+                        ));
+                    }
+                },
+            );
+        }));
+    }
+    {
+        let (slot, fail) = (load.clone(), fail.clone());
+        check.connect_clicked(move |_| {
+            if let Err(e) = system::check() {
+                fail("check for updates", e);
+            }
+            let slot = slot.clone();
+            glib::timeout_add_local_once(std::time::Duration::from_millis(500), move || {
+                if let Some(f) = slot.borrow().clone() {
+                    f();
+                }
+            });
+        });
+    }
+    scroll.connect_map(move |_| {
+        if let Some(f) = load.borrow().clone() {
+            f();
+        }
+    });
+    scroll
+}
+
+fn gb(bytes: u64) -> String {
+    format!("{:.0} gb", bytes as f64 / 1e9)
+}
+
+fn about_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("about");
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    body.append(&crate::common::logo(64));
+    let device = gtk::ListBox::new();
+    device.add_css_class("list-card");
+    device.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&caption("this computer"));
+    body.append(&device);
+    body.append(&error);
+    body.append(&caption("software"));
+    let software = gtk::ListBox::new();
+    software.add_css_class("list-card");
+    software.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&software);
+
+    scroll.connect_map(move |_| {
+        let (device, software, status, error) = (device.clone(), software.clone(), status.clone(), error.clone());
+        background(
+            || {
+                (
+                    hwdetect::detect().ok(),
+                    system::disk(),
+                    system::hostname(),
+                    system::pretty_name(),
+                    system::status(),
+                    system::package_count(),
+                )
+            },
+            move |(hw, disk, host, name, st, packages)| {
+                clear(&device);
+                clear(&software);
+                status.set_text(&name);
+                let entry = gtk::Entry::new();
+                entry.set_text(&host);
+                entry.add_css_class("field");
+                entry.set_width_chars(22);
+                {
+                    let error = error.clone();
+                    entry.connect_activate(move |e| {
+                        let name = e.text().trim().to_lowercase();
+                        if !system::valid_hostname(&name) {
+                            error.set_text("a name is letters, numbers and dashes, with no spaces");
+                            error.set_visible(true);
+                            return;
+                        }
+                        match system::set_hostname(&name) {
+                            Ok(()) => error.set_visible(false),
+                            Err(e) => {
+                                error.set_text(&format!("couldn't rename it: {e}"));
+                                error.set_visible(true);
+                            }
+                        }
+                    });
+                }
+                device.append(&setting_row("name (press enter to save)", &entry));
+                if let Some(hw) = &hw {
+                    device.append(&setting_row(
+                        "processor",
+                        &label(
+                            &format!("{} · {} threads", hw.cpu.model.to_lowercase(), hw.cpu.threads),
+                            &["row-value"],
+                        ),
+                    ));
+                    device.append(&setting_row("memory", &label(&gb(hw.memory_bytes), &["row-value"])));
+                    for g in &hw.gpus {
+                        let name = g.name.clone().unwrap_or_else(|| format!("{:?}", g.vendor)).to_lowercase();
+                        device.append(&setting_row("graphics", &label(&name, &["row-value"])));
+                    }
+                }
+                if let Some((size, free)) = disk {
+                    device.append(&setting_row(
+                        "storage",
+                        &label(&format!("{} free of {}", gb(free), gb(size)), &["row-value"]),
+                    ));
+                }
+                if let Some(now) = &st.booted {
+                    software.append(&setting_row(
+                        "version",
+                        &label(&format!("{} · {}", now.version, system::date(now.timestamp)), &["row-value"]),
+                    ));
+                }
+                software.append(&setting_row("licence", &label("apache-2.0 · open source", &["row-value"])));
+                software.append(&setting_row("packages in the system", &label(&packages.to_string(), &["row-value"])));
+                let site = gtk::LinkButton::with_label("https://trippp.in", "trippp.in");
+                site.add_css_class("link");
+                site.add_css_class("accent");
+                software.append(&setting_row("website", &site));
             },
         );
     });

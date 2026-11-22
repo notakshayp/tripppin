@@ -24,6 +24,7 @@ mod power;
 mod region;
 mod settings;
 mod snd;
+mod system;
 
 use gtk::glib::ExitCode;
 
