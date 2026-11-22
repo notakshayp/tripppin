@@ -1,5 +1,6 @@
 //! Printers through CUPS's command-line tools. Network and USB printers that speak IPP
-//! Everywhere appear by themselves (cups-browsed, ipp-usb); the default is per person
+//! Everywhere appear by themselves (CUPS's own discovery makes temporary queues for them,
+//! which only `lpstat -e` lists; ipp-usb does the same for USB); the default is per person
 //! (`lpoptions -d`, kept in ~/.cups/lpoptions), so it needs no administrator.
 
 use std::process::Command;
@@ -64,12 +65,22 @@ fn lpstat(args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
+/// Adds the printers only `lpstat -e` knows (discovered, not yet used) as ready.
+pub fn with_discovered(mut list: Vec<Printer>, every: &str) -> Vec<Printer> {
+    for name in every.lines().map(str::trim).filter(|n| !n.is_empty()) {
+        if !list.iter().any(|p| p.name == name) {
+            list.push(Printer { name: name.to_string(), state: "ready".into(), default: false });
+        }
+    }
+    list
+}
+
 /// None when CUPS isn't installed.
 pub fn printers() -> Option<Vec<Printer>> {
     if !std::path::Path::new("/usr/bin/lpstat").exists() {
         return None;
     }
-    Some(parse_printers(&lpstat(&["-p", "-d"])))
+    Some(with_discovered(parse_printers(&lpstat(&["-p", "-d"])), &lpstat(&["-e"])))
 }
 
 pub fn jobs() -> Vec<Job> {
@@ -106,6 +117,9 @@ mod tests {
         assert_eq!(list[1].state, "printing");
         assert!(list[1].default);
         assert_eq!(list[2].state, "turned off");
+        let all = with_discovered(list.clone(), "Office_HP\nHP_LaserJet_M110\n");
+        assert_eq!(all.len(), 4);
+        assert_eq!(all[3].name, "HP_LaserJet_M110");
         let jobs = parse_jobs("Brother-7               anu            4096   Mon 23 Nov 2026 04:00:00\n");
         assert_eq!(jobs, vec![Job { id: "Brother-7".into(), printer: "Brother".into(), size: "4 kb".into() }]);
     }
