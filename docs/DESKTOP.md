@@ -94,8 +94,8 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [x] Mouse & touchpad: speed, tap to click, natural scroll, gestures (touchpad settings show only when one is found; checked on hardware)
 - [ ] Printers & scanners: add, default, queue → system-config-printer
 - [ ] Accounts: name, picture, password, auto-login, add a person
-- [ ] Date & time: time zone (automatic), 24-hour, date format
-- [ ] Language & region
+- [~] Date & time: time zone (automatic), 24-hour, date format (zone, automatic time, 12/24-hour built and checked; picking the zone from location to do; date format follows region formats)
+- [~] Language & region (language and region formats built; the choices appear once the next image brings the langpacks and Indian-script fonts; our own screens are English only)
 - [ ] Privacy: location, camera and microphone access, recent files, lock-screen content, firewall
 - [ ] Accessibility: screen reader (orca), larger text, high contrast, zoom, sticky keys, reduce motion
 - [ ] Storage: what's using space, clean up, external drives

@@ -7,3 +7,14 @@ polkit.addRule(function (action, subject) {
         return polkit.Result.YES;
     }
 });
+
+// Settings → Date & time and Language: administrators set the time zone, automatic time
+// and the system language without a password.
+polkit.addRule(function (action, subject) {
+    if ((action.id == "org.freedesktop.timedate1.set-timezone" ||
+         action.id == "org.freedesktop.timedate1.set-ntp" ||
+         action.id == "org.freedesktop.locale1.set-locale") &&
+        subject.local && subject.active && subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});

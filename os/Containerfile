@@ -92,6 +92,12 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       dconf polkit libnotify wl-clipboard brightnessctl playerctl \
       adw-gtk3-theme papirus-icon-theme qt6ct qt5ct qt6-qtwayland \
       grim slurp swappy wf-recorder cliphist nm-connection-editor blueman bluez pavucontrol pulseaudio-utils wdisplays upower power-profiles-daemon \
+      glibc-langpack-en glibc-langpack-hi glibc-langpack-bn glibc-langpack-ta glibc-langpack-te \
+      glibc-langpack-mr glibc-langpack-kn glibc-langpack-ml glibc-langpack-gu glibc-langpack-pa \
+      glibc-langpack-es glibc-langpack-fr glibc-langpack-de glibc-langpack-pt \
+      google-noto-sans-devanagari-vf-fonts google-noto-sans-bengali-vf-fonts google-noto-sans-tamil-vf-fonts \
+      google-noto-sans-telugu-vf-fonts google-noto-sans-kannada-vf-fonts google-noto-sans-malayalam-vf-fonts \
+      google-noto-sans-gujarati-vf-fonts google-noto-sans-gurmukhi-vf-fonts \
     && dnf clean all
 
 COPY os/files/ /

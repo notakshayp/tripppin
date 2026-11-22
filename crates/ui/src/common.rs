@@ -128,7 +128,8 @@ pub fn arrow(up: bool) -> gtk::DrawingArea {
 }
 
 pub fn clock() -> String {
-    glib::DateTime::now_local().ok().and_then(|t| t.format("%H:%M").ok()).map(|s| s.to_string()).unwrap_or_default()
+    let format = if crate::region::twelve_hour() { "%-I:%M %p" } else { "%H:%M" };
+    glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_lowercase()).unwrap_or_default()
 }
 
 /// "sunday, 22 november"

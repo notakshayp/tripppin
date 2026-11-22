@@ -10,6 +10,7 @@ use crate::keyboard;
 use crate::nm;
 use crate::pointer;
 use crate::power;
+use crate::region;
 use crate::snd;
 use gtk::prelude::*;
 use gtk::{gio, glib};
@@ -17,7 +18,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 11] = [
+const SECTIONS: [(&str, &str); 13] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -29,6 +30,8 @@ const SECTIONS: [(&str, &str); 11] = [
     ("apps", "apps"),
     ("keyboard", "keyboard"),
     ("pointer", "mouse & touchpad"),
+    ("time", "date & time"),
+    ("language", "language & region"),
 ];
 
 pub fn run() -> glib::ExitCode {
@@ -46,6 +49,10 @@ pub fn run() -> glib::ExitCode {
             stack.set_visible_child_name(SECTIONS[i].0);
             if let Some(row) = nav.row_at_index(i as i32) {
                 nav.select_row(Some(&row));
+                // Once the window is laid out, scroll the sidebar so the open section shows.
+                glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
+                    row.grab_focus();
+                });
             }
         }
         win.present();
@@ -85,6 +92,8 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&apps_page(), Some("apps"));
     stack.add_named(&keyboard_page(), Some("keyboard"));
     stack.add_named(&pointer_page(), Some("pointer"));
+    stack.add_named(&time_page(), Some("time"));
+    stack.add_named(&language_page(), Some("language"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -124,7 +133,15 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     }
     nav.select_row(nav.row_at_index(0).as_ref());
     side.append(&search);
-    side.append(&nav);
+    // The list scrolls once there are more sections than fit.
+    let nav_scroll = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .propagate_natural_height(false)
+        .child(&nav)
+        .build();
+    nav.set_adjustment(Some(&nav_scroll.vadjustment()));
+    side.append(&nav_scroll);
 
     let root = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     root.append(&side);
@@ -1004,6 +1021,42 @@ fn dropdown(items: &[String], selected: usize) -> gtk::DropDown {
     let strs: Vec<&str> = items.iter().map(String::as_str).collect();
     let d = gtk::DropDown::from_strings(&strs);
     d.add_css_class("choice");
+    // Long names (time zones, apps, layouts) are cut short so they can't widen the window;
+    // the list itself shows them whole.
+    let button = gtk::SignalListItemFactory::new();
+    button.connect_setup(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        let l = gtk::Label::new(None);
+        l.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        l.set_max_width_chars(26);
+        l.set_xalign(0.0);
+        item.set_child(Some(&l));
+    });
+    button.connect_bind(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        if let (Some(l), Some(s)) =
+            (item.child().and_downcast::<gtk::Label>(), item.item().and_downcast::<gtk::StringObject>())
+        {
+            l.set_text(&s.string());
+        }
+    });
+    d.set_factory(Some(&button));
+    let list = gtk::SignalListItemFactory::new();
+    list.connect_setup(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        let l = gtk::Label::new(None);
+        l.set_xalign(0.0);
+        item.set_child(Some(&l));
+    });
+    list.connect_bind(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        if let (Some(l), Some(s)) =
+            (item.child().and_downcast::<gtk::Label>(), item.item().and_downcast::<gtk::StringObject>())
+        {
+            l.set_text(&s.string());
+        }
+    });
+    d.set_list_factory(Some(&list));
     d.set_selected(selected.min(items.len().saturating_sub(1)) as u32);
     d
 }
@@ -1459,10 +1512,13 @@ fn ai_page() -> gtk::ScrolledWindow {
     // Another server: any OpenAI-style chat API.
     let remote = gtk::Box::new(gtk::Orientation::Vertical, 12);
     remote.append(&caption("another server"));
-    remote.append(&label(
+    let about = label(
         "a cloud provider with a key, or your own llama.cpp or ollama machine. anything that speaks the openai chat api.",
         &["row-sub"],
-    ));
+    );
+    about.set_wrap(true);
+    about.set_xalign(0.0);
+    remote.append(&about);
     let url = gtk::Entry::builder().placeholder_text("address, like https://api.example.com/v1").build();
     let model = gtk::Entry::builder().placeholder_text("model name").build();
     let key = gtk::PasswordEntry::builder()
@@ -2367,5 +2423,147 @@ fn pointer_page() -> gtk::ScrolledWindow {
     list.append(&setting_row("left-handed: swap the buttons", &switch(p.left_handed, |p, on| p.left_handed = on)));
     body.append(&list);
     body.append(&error);
+    scroll
+}
+
+fn time_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("date & time");
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    let list = gtk::ListBox::new();
+    list.add_css_class("list-card");
+    list.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&list);
+    body.append(&error);
+    let show_status = {
+        let status = status.clone();
+        move |zone: &str| {
+            let now = glib::DateTime::now_local()
+                .ok()
+                .and_then(|t| t.format("%A %-d %B").ok())
+                .map(|s| s.to_lowercase())
+                .unwrap_or_default();
+            status.set_text(&format!("{now} · {} · {}", crate::common::clock(), region::zone_label(zone)));
+        }
+    };
+    let fail = {
+        let error = error.clone();
+        move |what: &str, e: String| {
+            error.set_text(&format!("couldn't {what}: {e}"));
+            error.set_visible(true);
+        }
+    };
+    scroll.connect_map(move |_| {
+        let (list, show_status, fail) = (list.clone(), show_status.clone(), fail.clone());
+        background(
+            || (region::time(), region::zones()),
+            move |(t, zones)| {
+                clear(&list);
+                show_status(&t.zone);
+                let auto = gtk::Switch::new();
+                auto.set_active(t.automatic);
+                {
+                    let fail = fail.clone();
+                    auto.connect_state_set(move |_, on| {
+                        if let Err(e) = region::set_automatic(on) {
+                            fail("change it", e);
+                        }
+                        glib::Propagation::Proceed
+                    });
+                }
+                list.append(&setting_row("set the time automatically", &auto));
+                let labels: Vec<String> = zones.iter().map(|z| region::zone_label(z)).collect();
+                let at = zones.iter().position(|z| *z == t.zone).unwrap_or(0);
+                let zone = dropdown(&labels, at);
+                zone.set_enable_search(true);
+                {
+                    let (zones, fail, show_status) = (zones.clone(), fail.clone(), show_status.clone());
+                    zone.connect_selected_notify(move |d| {
+                        let z = zones[d.selected() as usize].clone();
+                        match region::set_zone(&z) {
+                            Ok(()) => show_status(&z),
+                            Err(e) => fail("change the time zone", e),
+                        }
+                    });
+                }
+                list.append(&setting_row("time zone", &zone));
+                let twelve = gtk::Switch::new();
+                twelve.set_active(region::twelve_hour());
+                {
+                    let (fail, show_status, zone) = (fail.clone(), show_status.clone(), t.zone.clone());
+                    twelve.connect_state_set(move |_, on| {
+                        match region::set_twelve_hour(on) {
+                            Ok(()) => show_status(&zone),
+                            Err(e) => fail("save it", e.to_string()),
+                        }
+                        glib::Propagation::Proceed
+                    });
+                }
+                list.append(&setting_row("12-hour clock (2:30 pm)", &twelve));
+            },
+        );
+    });
+    scroll
+}
+
+fn language_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("language & region");
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    let list = gtk::ListBox::new();
+    list.add_css_class("list-card");
+    list.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&list);
+    let note = label(
+        "region sets how dates, numbers and money are written. changes apply to apps the next time you log in. tripppin's own screens are in english for now.",
+        &["row-sub"],
+    );
+    note.set_wrap(true);
+    note.set_xalign(0.0);
+    body.append(&note);
+    body.append(&error);
+    scroll.connect_map(move |_| {
+        let (list, status, error) = (list.clone(), status.clone(), error.clone());
+        background(
+            || (region::installed_languages(), region::locale()),
+            move |(langs, (lang, formats))| {
+                clear(&list);
+                let name = |l: &str| match langs.iter().find(|(c, _)| *c == l) {
+                    Some((_, n)) => n.to_string(),
+                    None if l.starts_with('C') || l == "POSIX" => "english (basic)".to_string(),
+                    None => l.to_lowercase(),
+                };
+                status.set_text(&format!("{} · formats: {}", name(&lang), name(&formats)));
+                if langs.is_empty() {
+                    list.append(&setting_row("language", &label(&name(&lang), &["row-sub"])));
+                    return;
+                }
+                let names: Vec<String> = langs.iter().map(|(_, n)| n.to_string()).collect();
+                let pick_lang = dropdown(&names, langs.iter().position(|(c, _)| *c == lang).unwrap_or(0));
+                let pick_formats = dropdown(&names, langs.iter().position(|(c, _)| *c == formats).unwrap_or(0));
+                let save = {
+                    let (pick_lang, pick_formats, langs, status, error) =
+                        (pick_lang.clone(), pick_formats.clone(), langs.clone(), status.clone(), error.clone());
+                    Rc::new(move || {
+                        let l = langs[pick_lang.selected() as usize];
+                        let f = langs[pick_formats.selected() as usize];
+                        match region::set_locale(l.0, f.0) {
+                            Ok(()) => status.set_text(&format!("{} · formats: {} · from your next login", l.1, f.1)),
+                            Err(e) => {
+                                error.set_text(&format!("couldn't change the language: {e}"));
+                                error.set_visible(true);
+                            }
+                        }
+                    })
+                };
+                for d in [&pick_lang, &pick_formats] {
+                    let save = save.clone();
+                    d.connect_selected_notify(move |_| save());
+                }
+                list.append(&setting_row("language", &pick_lang));
+                list.append(&setting_row("region formats", &pick_formats));
+            },
+        );
+    });
     scroll
 }

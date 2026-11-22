@@ -34,7 +34,7 @@
         }
     },
     "custom/clock": {
-        "exec": "date '+%a %d %b · %H:%M' | tr '[:upper:]' '[:lower:]'",
+        "exec": "f=%H:%M; [ \"$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/clock 2>/dev/null)\" = 12 ] && f='%-I:%M %p'; date \"+%a %d %b · $f\" | tr '[:upper:]' '[:lower:]'",
         "interval": 15,
         "tooltip": false
     },
