@@ -8,6 +8,7 @@ use crate::common::label;
 use crate::display;
 use crate::keyboard;
 use crate::nm;
+use crate::pointer;
 use crate::power;
 use crate::snd;
 use gtk::prelude::*;
@@ -16,7 +17,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 10] = [
+const SECTIONS: [(&str, &str); 11] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -27,6 +28,7 @@ const SECTIONS: [(&str, &str); 10] = [
     ("notifications", "notifications"),
     ("apps", "apps"),
     ("keyboard", "keyboard"),
+    ("pointer", "mouse & touchpad"),
 ];
 
 pub fn run() -> glib::ExitCode {
@@ -82,6 +84,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&notifications_page(), Some("notifications"));
     stack.add_named(&apps_page(), Some("apps"));
     stack.add_named(&keyboard_page(), Some("keyboard"));
+    stack.add_named(&pointer_page(), Some("pointer"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -2298,5 +2301,71 @@ fn keyboard_page() -> gtk::ScrolledWindow {
             f();
         }
     });
+    scroll
+}
+
+fn pointer_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("mouse & touchpad");
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    let state = Rc::new(RefCell::new(pointer::current()));
+    let save = {
+        let (state, error) = (state.clone(), error.clone());
+        Rc::new(move || {
+            if let Err(e) = pointer::save(&state.borrow()) {
+                error.set_text(&format!("couldn't save: {e}"));
+                error.set_visible(true);
+            }
+        })
+    };
+    let switch = |on: bool, set: fn(&mut pointer::Pointer, bool)| {
+        let s = gtk::Switch::new();
+        s.set_active(on);
+        let (state, save) = (state.clone(), save.clone());
+        s.connect_state_set(move |_, on| {
+            set(&mut state.borrow_mut(), on);
+            save();
+            glib::Propagation::Proceed
+        });
+        s
+    };
+    let speed = |now: f64, set: fn(&mut pointer::Pointer, f64)| {
+        let names: Vec<String> = pointer::SPEEDS.iter().map(|s| s.1.to_string()).collect();
+        let at = pointer::SPEEDS.iter().position(|s| (s.0 - now).abs() < 0.05).unwrap_or(2);
+        let d = dropdown(&names, at);
+        let (state, save) = (state.clone(), save.clone());
+        d.connect_selected_notify(move |d| {
+            set(&mut state.borrow_mut(), pointer::SPEEDS[d.selected() as usize].0);
+            save();
+        });
+        d
+    };
+    let p = state.borrow().clone();
+    let touchpad = pointer::has_touchpad();
+    status.set_text(if touchpad { "touchpad found" } else { "no touchpad · mouse only" });
+    if touchpad {
+        body.append(&caption("touchpad"));
+        let list = gtk::ListBox::new();
+        list.add_css_class("list-card");
+        list.set_selection_mode(gtk::SelectionMode::None);
+        list.append(&setting_row("tap to click", &switch(p.tap, |p, on| p.tap = on)));
+        list.append(&setting_row(
+            "natural scrolling: content follows your fingers",
+            &switch(p.touchpad_natural, |p, on| p.touchpad_natural = on),
+        ));
+        list.append(&setting_row("ignore the touchpad while typing", &switch(p.dwt, |p, on| p.dwt = on)));
+        list.append(&setting_row("speed", &speed(p.touchpad_speed, |p, v| p.touchpad_speed = v)));
+        list.append(&setting_row("gestures", &label("three fingers: switch windows and workspaces", &["row-sub"])));
+        body.append(&list);
+    }
+    body.append(&caption("mouse"));
+    let list = gtk::ListBox::new();
+    list.add_css_class("list-card");
+    list.set_selection_mode(gtk::SelectionMode::None);
+    list.append(&setting_row("speed", &speed(p.mouse_speed, |p, v| p.mouse_speed = v)));
+    list.append(&setting_row("natural scrolling", &switch(p.mouse_natural, |p, on| p.mouse_natural = on)));
+    list.append(&setting_row("left-handed: swap the buttons", &switch(p.left_handed, |p, on| p.left_handed = on)));
+    body.append(&list);
+    body.append(&error);
     scroll
 }

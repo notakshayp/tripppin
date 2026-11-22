@@ -91,7 +91,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [x] Apps: installed apps, update, remove, default apps (browser, mail, files, music, video)
 - [~] Notifications: do not disturb, schedule, per-app settings, lock-screen notifications (do not disturb, quiet hours, muting apps built; lock-screen notifications come with the lock item)
 - [~] Keyboard: layouts and input methods (ibus, Indian languages), repeat, shortcuts editor (layouts, switch keys, repeat and a shortcuts list built; ibus transliteration and editing shortcuts to do)
-- [ ] Mouse & touchpad: speed, tap to click, natural scroll, gestures
+- [x] Mouse & touchpad: speed, tap to click, natural scroll, gestures (touchpad settings show only when one is found; checked on hardware)
 - [ ] Printers & scanners: add, default, queue → system-config-printer
 - [ ] Accounts: name, picture, password, auto-login, add a person
 - [ ] Date & time: time zone (automatic), 24-hour, date format

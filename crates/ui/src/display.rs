@@ -1,6 +1,6 @@
 //! Screens through niri: resolution, refresh rate, scale and rotation, changed live with
 //! `niri msg output` and remembered in ~/.config/niri/tripppin-displays.kdl, which the
-//! person's niri config includes (after /etc/niri/config.kdl). Brightness is brightnessctl.
+//! person's niri config includes (after /etc/niri/desktop.kdl). Brightness is brightnessctl.
 
 use serde_json::Value;
 use std::path::PathBuf;
@@ -137,17 +137,27 @@ fn remember(name: &str, mode: &Mode, scale: f64, transform: &str) -> std::io::Re
     include_in_niri("tripppin-displays.kdl")
 }
 
-/// Makes sure the person's niri config includes the system config and then `file` (which
-/// lives next to it), so settings written there take effect and survive restarts.
+/// Makes sure the person's niri config includes the system desktop, their own pointer
+/// settings (seeded from the system defaults) and then `file`, which lives next to it, so
+/// settings written there take effect and survive restarts.
 pub fn include_in_niri(file: &str) -> std::io::Result<()> {
     let dir = config_dir();
     std::fs::create_dir_all(&dir)?;
+    let pointer = dir.join("tripppin-pointer.kdl");
+    if !pointer.exists() {
+        std::fs::write(&pointer, crate::pointer::to_kdl(&crate::pointer::Pointer::default()))?;
+    }
     let config = dir.join("config.kdl");
     let mut text = std::fs::read_to_string(&config).unwrap_or_default();
-    if !text.contains("/etc/niri/config.kdl") {
+    // The whole system config would bring its pointer flags back with it.
+    text = text.replace("include \"/etc/niri/config.kdl\"", "include \"/etc/niri/desktop.kdl\"");
+    if !text.contains("/etc/niri/desktop.kdl") {
         text = format!(
-            "// Your niri settings. The tripppin desktop comes from the system file.\ninclude \"/etc/niri/config.kdl\"\n{text}"
+            "// Your niri settings. The tripppin desktop comes from the system file.\ninclude \"/etc/niri/desktop.kdl\"\n{text}"
         );
+    }
+    if !text.contains("tripppin-pointer.kdl") {
+        text.push_str("include \"tripppin-pointer.kdl\"\n");
     }
     if !text.contains(file) {
         text.push_str(&format!("include \"{file}\"\n"));
