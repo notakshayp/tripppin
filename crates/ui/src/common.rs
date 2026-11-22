@@ -202,3 +202,38 @@ pub fn people() -> Vec<String> {
 pub fn current_user() -> String {
     std::env::var("USER").unwrap_or_else(|_| "you".into())
 }
+
+/// The shortcuts niri's config binds, grouped, for the cheat sheet (Super + /) and
+/// Settings → Keyboard. Keep in step with os/files/etc/niri/desktop.kdl.
+pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
+    (
+        "tripppin",
+        &[
+            ("ask tripppin", "super + space"),
+            ("terminal", "super + return"),
+            ("apps", "super + d"),
+            ("quick settings", "super + n"),
+            ("these shortcuts", "super + /"),
+        ],
+    ),
+    (
+        "windows",
+        &[
+            ("close a window", "super + q"),
+            ("full screen", "super + f"),
+            ("float or tile a window", "super + t"),
+            ("next window", "super + tab"),
+            ("workspace 1, 2, 3", "super + 1, 2, 3"),
+            ("move a window to 1, 2, 3", "super + shift + 1, 2, 3"),
+        ],
+    ),
+    (
+        "system",
+        &[
+            ("lock", "super + l"),
+            ("power menu", "super + escape"),
+            ("screenshot of an area", "print"),
+            ("screenshot of the screen", "ctrl + print"),
+        ],
+    ),
+];

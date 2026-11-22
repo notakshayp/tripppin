@@ -857,6 +857,34 @@ calendar.month > grid > label.day-number:selected {
     font-weight: 700;
 }
 
+/* ---- shortcuts cheat sheet -------------------------------------------- */
+
+.keys-card {
+    padding: 34px 40px 28px;
+    border-radius: 24px;
+    background: #101614;
+    border: 1px solid #2a3632;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+.keys-title {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    color: #f2f5ef;
+}
+
+.keys-combo {
+    font-family: "DM Mono", monospace;
+    font-size: 14px;
+    color: #57d99a;
+}
+
+.keys-what {
+    font-size: 14px;
+    color: #c9d4ce;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

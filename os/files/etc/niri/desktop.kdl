@@ -92,7 +92,7 @@ binds {
     Mod+Shift+1 { move-window-to-workspace 1; }
     Mod+Shift+2 { move-window-to-workspace 2; }
     Mod+Shift+3 { move-window-to-workspace 3; }
-    Mod+Shift+Slash { show-hotkey-overlay; }
+    Mod+Slash { spawn "tripppin-ui" "keys"; }
     Mod+Shift+E { quit; }
     Print { screenshot; }
     Ctrl+Print { screenshot-screen; }

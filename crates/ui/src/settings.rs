@@ -2222,22 +2222,6 @@ fn apps_page() -> gtk::ScrolledWindow {
     scroll
 }
 
-/// The main shortcuts, as niri's config binds them.
-const SHORTCUTS: [(&str, &str); 12] = [
-    ("ask tripppin", "super + space"),
-    ("terminal", "super + return"),
-    ("apps", "super + d"),
-    ("quick settings", "super + n"),
-    ("power menu", "super + escape"),
-    ("lock", "super + l"),
-    ("close a window", "super + q"),
-    ("full screen", "super + f"),
-    ("next window", "super + tab"),
-    ("workspace 1, 2, 3", "super + 1, 2, 3"),
-    ("float or tile a window", "super + t"),
-    ("screenshot", "print"),
-];
-
 fn keyboard_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("keyboard");
     let error = label("", &["error"]);
@@ -2264,7 +2248,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
     let keys = gtk::ListBox::new();
     keys.add_css_class("list-card");
     keys.set_selection_mode(gtk::SelectionMode::None);
-    for (what, combo) in SHORTCUTS {
+    for (what, combo) in crate::common::SHORTCUTS.iter().flat_map(|(_, list)| list.iter()) {
         keys.append(&setting_row(what, &label(combo, &["row-value"])));
     }
     body.append(&keys);

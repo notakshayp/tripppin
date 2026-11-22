@@ -17,6 +17,7 @@ mod firstboot;
 mod greetd;
 mod greeter;
 mod keyboard;
+mod keys;
 mod lock;
 mod nm;
 mod orb;
@@ -61,9 +62,10 @@ fn main() -> ExitCode {
         Some("osd") => osd::run(),
         Some("settings") => settings::run(),
         Some("calendar") => calendar::run(),
+        Some("keys") => keys::run(),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys"
             );
             ExitCode::from(2)
         }

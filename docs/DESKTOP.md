@@ -56,7 +56,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [ ] Launcher: settings pages, files, calculator, "ask tripppin" handing over to the orb
 - [ ] Window switcher (Alt+Tab) with previews; overview of all windows and workspaces
 - [ ] Window controls: snap halves/quarters, maximise, minimise, always on top, move to workspace
-- [ ] Keyboard shortcuts cheat sheet (Super+/), in our style
+- [x] Keyboard shortcuts cheat sheet (Super+/), in our style
 - [ ] Clipboard history (cliphist) with a picker
 - [ ] Emoji and symbol picker
 - [ ] Screenshots (grim + slurp + swappy): area, window, screen; annotate; copy or save
