@@ -17,6 +17,7 @@ mod nm;
 mod orb;
 mod osd;
 mod settings;
+mod snd;
 
 use gtk::glib::ExitCode;
 

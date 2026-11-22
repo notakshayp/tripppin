@@ -25,7 +25,12 @@
             "org\\.gnome\\.Nautilus": "files",
             "in\\.trippp\\.Settings": "settings",
             "in\\.trippp\\.FirstBoot": "welcome",
-            "^(?:[a-z]+\\.)+([A-Za-z]+)$": "$1"
+            "in\\.trippp\\.Orb": "tripppin",
+            "org\\.gnome\\.TextEditor": "text editor",
+            "org\\.gnome\\.Calculator": "calculator",
+            "org\\.pulseaudio\\.pavucontrol": "sound",
+            "blueman-manager": "bluetooth",
+            "nm-connection-editor": "network"
         }
     },
     "custom/clock": {

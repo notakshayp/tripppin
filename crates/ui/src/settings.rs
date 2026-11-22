@@ -5,13 +5,14 @@
 use crate::bt;
 use crate::common::label;
 use crate::nm;
+use crate::snd;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 2] = [("wifi", "wi-fi"), ("bluetooth", "bluetooth")];
+const SECTIONS: [(&str, &str); 3] = [("wifi", "wi-fi"), ("bluetooth", "bluetooth"), ("sound", "sound")];
 
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder()
@@ -58,6 +59,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.set_hexpand(true);
     stack.add_named(&wifi_page(), Some("wifi"));
     stack.add_named(&bluetooth_page(), Some("bluetooth"));
+    stack.add_named(&sound_page(), Some("sound"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -795,4 +797,168 @@ fn device_row(d: &bt::Device, paired: bool, error: &gtk::Label, reload: Reload) 
         row.add_controller(gesture);
     }
     row
+}
+
+/// Whether a device is muted, and how to change that.
+type Mute = (bool, Box<dyn Fn(bool)>);
+
+/// A row with a word, a green slider (0–100) and an optional mute switch.
+fn level_row(name: &str, value: u32, on_change: impl Fn(u32) + 'static, mute: Option<Mute>) -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    row.add_css_class("net-row");
+    let word = label(name, &["level-name"]);
+    word.set_width_chars(6);
+    row.append(&word);
+    let scale = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 100.0, 1.0);
+    scale.add_css_class("level");
+    scale.set_hexpand(true);
+    scale.set_draw_value(false);
+    scale.set_value(f64::from(value.min(100)));
+    let shown = label(&value.to_string(), &["level-value"]);
+    shown.set_width_chars(3);
+    shown.set_xalign(1.0);
+    {
+        let shown = shown.clone();
+        scale.connect_value_changed(move |s| {
+            let v = s.value().round() as u32;
+            shown.set_text(&v.to_string());
+            on_change(v);
+        });
+    }
+    row.append(&scale);
+    row.append(&shown);
+    if let Some((muted, set)) = mute {
+        let switch = gtk::Switch::new();
+        switch.set_active(!muted);
+        switch.set_valign(gtk::Align::Center);
+        switch.set_tooltip_text(Some("on / muted"));
+        switch.connect_state_set(move |_, on| {
+            set(!on);
+            glib::Propagation::Proceed
+        });
+        row.append(&switch);
+    }
+    row
+}
+
+fn fill_devices(list: &gtk::ListBox, devices: &[snd::Device], default: &str, output: bool, reload: Reload) {
+    clear(list);
+    if devices.is_empty() {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        row.add_css_class("net-row");
+        row.append(&label(
+            if output { "no speakers or headphones found" } else { "no microphone found" },
+            &["row-sub"],
+        ));
+        list.append(&row);
+        return;
+    }
+    for d in devices {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        row.add_css_class("net-row");
+        let in_use = d.name == default;
+        if in_use {
+            row.add_css_class("connected");
+        }
+        let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        dot.add_css_class("dot");
+        if in_use {
+            dot.add_css_class("on");
+        }
+        dot.set_valign(gtk::Align::Center);
+        row.append(&dot);
+        let title = label(&d.description, &[if in_use { "row-title-strong" } else { "row-title" }]);
+        title.set_hexpand(true);
+        title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        row.append(&title);
+        if !in_use {
+            let use_it = gtk::Button::with_label("use this");
+            use_it.add_css_class("link");
+            use_it.add_css_class("accent");
+            let (name, reload) = (d.name.clone(), reload.clone());
+            use_it.connect_clicked(move |_| {
+                let (name, reload) = (name.clone(), reload.clone());
+                background(
+                    move || snd::set_default(output, &name),
+                    move |()| {
+                        if let Some(reload) = reload {
+                            reload(false);
+                        }
+                    },
+                );
+            });
+            row.append(&use_it);
+        }
+        list.append(&row);
+    }
+    if let Some(d) = devices.iter().find(|d| d.name == default) {
+        let (name, name2) = (d.name.clone(), d.name.clone());
+        list.append(&level_row(
+            if output { "volume" } else { "mic" },
+            d.volume,
+            move |v| snd::set_volume(output, &name, v),
+            Some((d.muted, Box::new(move |m| snd::set_mute(output, &name2, m)))),
+        ));
+    }
+}
+
+fn sound_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("sound");
+    let outs = gtk::ListBox::new();
+    let ins = gtk::ListBox::new();
+    let apps = gtk::ListBox::new();
+    for l in [&outs, &ins, &apps] {
+        l.add_css_class("list-card");
+        l.set_selection_mode(gtk::SelectionMode::None);
+    }
+    let more = gtk::Button::with_label("more options");
+    more.add_css_class("link");
+    more.set_halign(gtk::Align::Start);
+    more.connect_clicked(|_| {
+        let _ = std::process::Command::new("pavucontrol").spawn();
+    });
+    body.append(&caption("output"));
+    body.append(&outs);
+    body.append(&caption("input"));
+    body.append(&ins);
+    body.append(&caption("apps"));
+    body.append(&apps);
+    body.append(&more);
+
+    let reload: Rc<RefCell<Reload>> = Rc::new(RefCell::new(None));
+    let load: Rc<dyn Fn(bool)> = {
+        let (outs, ins, apps, status, reload) =
+            (outs.clone(), ins.clone(), apps.clone(), status.clone(), reload.clone());
+        Rc::new(move |_| {
+            let (outs, ins, apps, status, reload) =
+                (outs.clone(), ins.clone(), apps.clone(), status.clone(), reload.clone());
+            background(
+                || (snd::outputs(), snd::inputs(), snd::streams()),
+                move |((out_list, out_default), (in_list, in_default), streams)| {
+                    let current = out_list.iter().find(|d| d.name == out_default);
+                    status.set_text(&match current {
+                        Some(d) if d.muted => format!("{} · muted", d.description),
+                        Some(d) => format!("{} · {}%", d.description, d.volume),
+                        None => "no sound device".to_string(),
+                    });
+                    fill_devices(&outs, &out_list, &out_default, true, reload.borrow().clone());
+                    fill_devices(&ins, &in_list, &in_default, false, reload.borrow().clone());
+                    clear(&apps);
+                    if streams.is_empty() {
+                        let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                        row.add_css_class("net-row");
+                        row.append(&label("nothing is playing", &["row-sub"]));
+                        apps.append(&row);
+                    }
+                    for st in &streams {
+                        let index = st.index;
+                        apps.append(&level_row(&st.app, st.volume, move |v| snd::set_stream_volume(index, v), None));
+                    }
+                },
+            );
+        })
+    };
+    *reload.borrow_mut() = Some(load.clone());
+    scroll.connect_map(move |_| load(false));
+    scroll
 }

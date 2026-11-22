@@ -91,7 +91,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome xdg-user-dirs \
       dconf polkit libnotify wl-clipboard brightnessctl playerctl \
       adw-gtk3-theme papirus-icon-theme qt6ct qt5ct qt6-qtwayland \
-      grim slurp swappy wf-recorder cliphist nm-connection-editor blueman bluez \
+      grim slurp swappy wf-recorder cliphist nm-connection-editor blueman bluez pavucontrol pulseaudio-utils \
     && dnf clean all
 
 COPY os/files/ /
