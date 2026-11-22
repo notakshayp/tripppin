@@ -15,7 +15,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 8] = [
+const SECTIONS: [(&str, &str); 9] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -24,6 +24,7 @@ const SECTIONS: [(&str, &str); 8] = [
     ("power", "power & battery"),
     ("ai", "ai"),
     ("notifications", "notifications"),
+    ("apps", "apps"),
 ];
 
 pub fn run() -> glib::ExitCode {
@@ -77,6 +78,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&power_page(), Some("power"));
     stack.add_named(&ai_page(), Some("ai"));
     stack.add_named(&notifications_page(), Some("notifications"));
+    stack.add_named(&apps_page(), Some("apps"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -1952,5 +1954,187 @@ fn notifications_page() -> gtk::ScrolledWindow {
             }
         });
     }
+    scroll
+}
+
+fn apps_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, right) = page("apps");
+    let update = gtk::Button::with_label("update all");
+    update.add_css_class("pill");
+    update.set_visible(false);
+    right.append(&update);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    body.append(&caption("open things with"));
+    let defaults = gtk::ListBox::new();
+    defaults.add_css_class("list-card");
+    defaults.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&defaults);
+    body.append(&caption("your apps"));
+    let mine = gtk::ListBox::new();
+    mine.add_css_class("list-card");
+    mine.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&mine);
+    body.append(&error);
+    let more = gtk::Button::with_label("get more apps: ask tripppin (super + space)");
+    more.add_css_class("link");
+    more.add_css_class("accent");
+    more.set_halign(gtk::Align::Start);
+    more.connect_clicked(|_| {
+        let _ = std::process::Command::new("tripppin-ui").args(["orb", "--toggle"]).spawn();
+    });
+    body.append(&more);
+    body.append(&caption("part of tripppin"));
+    let system = label("", &["row-sub"]);
+    system.set_wrap(true);
+    system.set_xalign(0.0);
+    body.append(&system);
+
+    let load: LoadSlot = Rc::new(RefCell::new(None));
+    {
+        let (slot, status, update, defaults, mine, system, error) = (
+            load.clone(),
+            status.clone(),
+            update.clone(),
+            defaults.clone(),
+            mine.clone(),
+            system.clone(),
+            error.clone(),
+        );
+        *load.borrow_mut() = Some(Rc::new(move || {
+            let (slot, status, update, defaults, mine, system, error) = (
+                slot.clone(),
+                status.clone(),
+                update.clone(),
+                defaults.clone(),
+                mine.clone(),
+                system.clone(),
+                error.clone(),
+            );
+            background(
+                || (apps::installed(), apps::flatpaks(), apps::updates()),
+                move |(installed, flatpaks, updates)| {
+                    let reload = {
+                        let slot = slot.clone();
+                        move || {
+                            if let Some(f) = slot.borrow().clone() {
+                                f();
+                            }
+                        }
+                    };
+                    status.set_text(&format!(
+                        "{} apps · {}",
+                        installed.len(),
+                        match updates.len() {
+                            0 => "up to date".to_string(),
+                            1 => "1 update".to_string(),
+                            n => format!("{n} updates"),
+                        }
+                    ));
+                    update.set_visible(!updates.is_empty());
+
+                    clear(&defaults);
+                    for (what, mimes) in apps::DEFAULTS {
+                        let can: Vec<&apps::App> =
+                            installed.iter().filter(|a| a.mime.iter().any(|m| mimes.contains(&m.as_str()))).collect();
+                        if can.is_empty() {
+                            defaults.append(&setting_row(what, &label("no app for this yet", &["row-sub"])));
+                            continue;
+                        }
+                        let current = apps::default_for(mimes);
+                        let names: Vec<String> = can.iter().map(|a| a.name.to_lowercase()).collect();
+                        let now = can.iter().position(|a| Some(&a.id) == current.as_ref()).unwrap_or(0);
+                        let pick = dropdown(&names, now);
+                        let ids: Vec<String> = can.iter().map(|a| a.id.clone()).collect();
+                        let error = error.clone();
+                        pick.connect_selected_notify(move |d| {
+                            if let Err(e) = apps::set_default(mimes, &ids[d.selected() as usize]) {
+                                error.set_text(&format!("couldn't save: {e}"));
+                                error.set_visible(true);
+                            }
+                        });
+                        defaults.append(&setting_row(what, &pick));
+                    }
+
+                    clear(&mine);
+                    if flatpaks.is_empty() {
+                        mine.append(&setting_row("nothing installed yet", &label("", &["row-sub"])));
+                    }
+                    for app in &flatpaks {
+                        let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+                        row.add_css_class("net-row");
+                        let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+                        text.set_hexpand(true);
+                        text.set_valign(gtk::Align::Center);
+                        text.append(&label(&app.name.to_lowercase(), &["row-title"]));
+                        let mut sub = format!("{} · {}", app.version, app.size);
+                        if updates.contains(&app.id) {
+                            sub.push_str(" · update waiting");
+                        }
+                        text.append(&label(&sub, &["row-sub"]));
+                        row.append(&text);
+                        let remove = gtk::Button::with_label("remove");
+                        remove.add_css_class("link");
+                        let (app, error, reload) = (app.clone(), error.clone(), reload.clone());
+                        remove.connect_clicked(move |b| {
+                            // A second click confirms.
+                            if b.label().as_deref() != Some("sure? remove") {
+                                b.set_label("sure? remove");
+                                b.add_css_class("danger");
+                                return;
+                            }
+                            b.set_sensitive(false);
+                            b.set_label("removing…");
+                            let (app, error, reload) = (app.clone(), error.clone(), reload.clone());
+                            background(
+                                move || apps::remove(&app),
+                                move |r| {
+                                    if let Err(e) = r {
+                                        error.set_text(&format!("couldn't remove it: {e}"));
+                                        error.set_visible(true);
+                                    }
+                                    reload();
+                                },
+                            );
+                        });
+                        row.append(&remove);
+                        mine.append(&row);
+                    }
+
+                    let flat_ids: Vec<&str> = flatpaks.iter().map(|f| f.id.as_str()).collect();
+                    let builtin: Vec<String> = installed
+                        .iter()
+                        .filter(|a| !a.flatpak && !flat_ids.contains(&a.id.as_str()))
+                        .map(|a| a.name.to_lowercase())
+                        .collect();
+                    system.set_text(&format!("{}. these update with the system.", builtin.join(" · ")));
+                },
+            );
+        }));
+    }
+    {
+        let (slot, error) = (load.clone(), error.clone());
+        update.connect_clicked(move |b| {
+            b.set_sensitive(false);
+            b.set_label("updating…");
+            let (b, slot, error) = (b.clone(), slot.clone(), error.clone());
+            background(apps::update_all, move |r| {
+                b.set_sensitive(true);
+                b.set_label("update all");
+                if let Err(e) = r {
+                    error.set_text(&format!("couldn't update: {e}"));
+                    error.set_visible(true);
+                }
+                if let Some(f) = slot.borrow().clone() {
+                    f();
+                }
+            });
+        });
+    }
+    scroll.connect_map(move |_| {
+        if let Some(f) = load.borrow().clone() {
+            f();
+        }
+    });
     scroll
 }

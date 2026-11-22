@@ -13,12 +13,15 @@ pub struct App {
     pub name: String,
     pub icon: String,
     pub flatpak: bool,
+    /// The file types it says it can open.
+    pub mime: Vec<String>,
 }
 
 /// Reads the [Desktop Entry] group of a .desktop file; `None` for hidden entries.
 pub fn parse_desktop(id: &str, text: &str, flatpak: bool) -> Option<App> {
     let (mut name, mut icon, mut in_entry, mut hidden, mut is_app) =
         (String::new(), String::new(), false, false, false);
+    let mut mime = Vec::new();
     for line in text.lines().map(str::trim) {
         if line.starts_with('[') {
             in_entry = line == "[Desktop Entry]";
@@ -31,12 +34,13 @@ pub fn parse_desktop(id: &str, text: &str, flatpak: bool) -> Option<App> {
         match k.trim() {
             "Name" => name = v.trim().to_string(),
             "Icon" => icon = v.trim().to_string(),
+            "MimeType" => mime = v.split(';').map(str::trim).filter(|m| !m.is_empty()).map(str::to_string).collect(),
             "Type" => is_app = v.trim() == "Application",
             "NoDisplay" | "Hidden" if v.trim() == "true" => hidden = true,
             _ => {}
         }
     }
-    (is_app && !hidden && !name.is_empty()).then(|| App { id: id.to_string(), name, icon, flatpak })
+    (is_app && !hidden && !name.is_empty()).then(|| App { id: id.to_string(), name, icon, flatpak, mime })
 }
 
 fn data_home() -> PathBuf {
@@ -71,6 +75,145 @@ pub fn installed() -> Vec<App> {
     }
     apps.sort_by_key(|a| a.name.to_lowercase());
     apps
+}
+
+// ---- flatpak ----------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Flatpak {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub size: String,
+    /// "system" or "user"
+    pub installation: String,
+}
+
+/// Parses `flatpak list --app --columns=application,name,version,size,installation`.
+pub fn parse_flatpaks(out: &str) -> Vec<Flatpak> {
+    out.lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split('\t').collect();
+            (f.len() >= 5 && !f[0].is_empty()).then(|| Flatpak {
+                id: f[0].to_string(),
+                name: f[1].to_string(),
+                version: f[2].to_string(),
+                size: f[3].to_lowercase(),
+                installation: f[4].to_string(),
+            })
+        })
+        .collect()
+}
+
+fn flatpak(args: &[&str]) -> Result<String, String> {
+    let out = Command::new("flatpak").args(args).output().map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        let err = String::from_utf8_lossy(&out.stderr);
+        Err(err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("flatpak failed").trim().to_lowercase())
+    }
+}
+
+pub fn flatpaks() -> Vec<Flatpak> {
+    flatpak(&["list", "--app", "--columns=application,name,version,size,installation"])
+        .map(|o| parse_flatpaks(&o))
+        .unwrap_or_default()
+}
+
+/// Ids of apps with an update waiting.
+pub fn updates() -> Vec<String> {
+    flatpak(&["remote-ls", "--updates", "--app", "--columns=application"])
+        .map(|o| o.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string).collect())
+        .unwrap_or_default()
+}
+
+pub fn update_all() -> Result<(), String> {
+    flatpak(&["update", "-y", "--noninteractive"]).map(|_| ())
+}
+
+pub fn remove(app: &Flatpak) -> Result<(), String> {
+    flatpak(&["uninstall", "-y", "--noninteractive", &format!("--{}", app.installation), &app.id]).map(|_| ())
+}
+
+// ---- default apps -------------------------------------------------------------------------
+
+/// What a default is for, and the file types that make it up (the first decides which app
+/// shows as current).
+pub const DEFAULTS: [(&str, &[&str]); 6] = [
+    ("web browser", &["x-scheme-handler/https", "x-scheme-handler/http", "text/html"]),
+    ("mail", &["x-scheme-handler/mailto"]),
+    ("files", &["inode/directory"]),
+    ("music", &["audio/mpeg", "audio/flac", "audio/ogg", "audio/x-wav"]),
+    ("video", &["video/mp4", "video/x-matroska", "video/webm"]),
+    ("pictures", &["image/png", "image/jpeg", "image/webp"]),
+];
+
+fn mimeapps() -> PathBuf {
+    config_home().join("mimeapps.list")
+}
+
+/// The desktop id set as default for `mime` in a mimeapps.list.
+pub fn default_in(text: &str, mime: &str) -> Option<String> {
+    let mut in_defaults = false;
+    for line in text.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_defaults = line == "[Default Applications]";
+        } else if in_defaults
+            && let Some((k, v)) = line.split_once('=')
+            && k.trim() == mime
+        {
+            return v.split(';').next().map(|d| d.trim().trim_end_matches(".desktop").to_string());
+        }
+    }
+    None
+}
+
+/// The mimeapps.list text with `app` as the default for every type in `mimes`.
+pub fn with_default(text: &str, mimes: &[&str], app: &str) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut in_defaults = false;
+    let mut found = false;
+    let entries: Vec<String> = mimes.iter().map(|m| format!("{m}={app}.desktop;")).collect();
+    for line in text.lines() {
+        let t = line.trim();
+        if t.starts_with('[') {
+            if in_defaults {
+                out.extend(entries.iter().cloned());
+            }
+            in_defaults = t == "[Default Applications]";
+            found |= in_defaults;
+            out.push(line.to_string());
+            continue;
+        }
+        if in_defaults && t.split_once('=').is_some_and(|(k, _)| mimes.contains(&k.trim())) {
+            continue;
+        }
+        out.push(line.to_string());
+    }
+    if in_defaults {
+        out.extend(entries.iter().cloned());
+    }
+    if !found {
+        out.push("[Default Applications]".to_string());
+        out.extend(entries);
+    }
+    out.join("\n") + "\n"
+}
+
+pub fn default_for(mimes: &[&str]) -> Option<String> {
+    let mine = std::fs::read_to_string(mimeapps()).unwrap_or_default();
+    let system = std::fs::read_to_string("/usr/share/applications/mimeapps.list").unwrap_or_default();
+    default_in(&mine, mimes[0]).or_else(|| default_in(&system, mimes[0]))
+}
+
+pub fn set_default(mimes: &[&str], app: &str) -> std::io::Result<()> {
+    let path = mimeapps();
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let text = std::fs::read_to_string(&path).unwrap_or_default();
+    std::fs::write(&path, with_default(&text, mimes, app))
 }
 
 // ---- notifications -----------------------------------------------------------------------
@@ -236,9 +379,32 @@ mod tests {
             "[Desktop Entry]\nType=Application\nName=Firefox\nIcon=firefox\n[Desktop Action new]\nName=New Window\n";
         assert_eq!(
             parse_desktop("firefox", text, false),
-            Some(App { id: "firefox".into(), name: "Firefox".into(), icon: "firefox".into(), flatpak: false })
+            Some(App {
+                id: "firefox".into(),
+                name: "Firefox".into(),
+                icon: "firefox".into(),
+                flatpak: false,
+                mime: Vec::new()
+            })
         );
         assert!(parse_desktop("x", "[Desktop Entry]\nType=Application\nName=X\nNoDisplay=true\n", false).is_none());
+    }
+
+    #[test]
+    fn reads_flatpaks_and_defaults() {
+        let out = "org.videolan.VLC\tVLC\t3.0.24\t165.3 MB\tsystem\n";
+        assert_eq!(parse_flatpaks(out)[0].id, "org.videolan.VLC");
+        assert_eq!(parse_flatpaks(out)[0].installation, "system");
+        let text = "[Added Associations]\nvideo/mp4=a.desktop;\n[Default Applications]\nvideo/mp4=old.desktop;\ntext/plain=gedit.desktop;\n";
+        assert_eq!(default_in(text, "video/mp4").as_deref(), Some("old"));
+        let next = with_default(text, &["video/mp4", "video/webm"], "org.videolan.VLC");
+        assert_eq!(default_in(&next, "video/mp4").as_deref(), Some("org.videolan.VLC"));
+        assert_eq!(default_in(&next, "text/plain").as_deref(), Some("gedit"));
+        assert!(next.contains("[Added Associations]\nvideo/mp4=a.desktop;"));
+        assert_eq!(
+            default_in(&with_default("", &["inode/directory"], "thunar"), "inode/directory").as_deref(),
+            Some("thunar")
+        );
     }
 
     #[test]

@@ -745,6 +745,10 @@ button.segment.selected {
     font-weight: 600;
 }
 
+button.link.danger {
+    color: #ff8a7a;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {
