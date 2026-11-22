@@ -74,6 +74,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [ ] Ask about the screen or a selected file ("summarise this pdf")
 - [ ] History of past requests; continue a conversation
 - [ ] Permission prompts before risky steps (M4)
+- [ ] The "super + space" hint shows only until the orb has been used once (it draws over windows near the corner)
 
 ## Settings (ours, one window with a sidebar)
 
@@ -84,7 +85,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] Bluetooth: on/off, devices, pair, connect, battery levels; advanced → blueman (built; the VM has no Bluetooth, so pairing is checked on real hardware)
 - [~] Sound: output and input device, volume, mic level and test, per-app volume, alert sound; advanced → pavucontrol (devices, volume, mute, per-app built; mic test and alert sound to do; real devices checked on hardware)
 - [~] Display: resolution, scale, refresh rate, rotation, brightness, night light, arrangement → wdisplays (built; mode changes and brightness checked on hardware)
-- [ ] Appearance: wallpaper (ours and your own), dark/light/auto, accent, text size, reduce motion
+- [~] Appearance: wallpaper (ours and your own), dark/light/auto, accent, text size, reduce motion (wallpapers, your own, text size, reduce motion done; light mode and accent to do)
 - [ ] Power & battery: health, time left, power mode, dim/off/sleep timing, lid action, low-battery behaviour
 - [ ] AI: the model in use, switch or download, cloud key or own server, what it may do alone, history
 - [ ] Apps: installed apps, update, remove, default apps (browser, mail, files, music, video)

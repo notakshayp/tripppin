@@ -52,7 +52,8 @@ environment {
     TRIPPPIN_NO_LOGO "1"
 }
 
-spawn-at-startup "swaybg" "-i" "/usr/share/tripppin/wallpaper.png" "-m" "fill"
+// The wallpaper: the person's choice (Settings → Appearance), else ours.
+spawn-at-startup "sh" "-c" "w=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
 spawn-at-startup "waybar"
 spawn-at-startup "swaync"
 spawn-at-startup "tripppin-ui" "orb"

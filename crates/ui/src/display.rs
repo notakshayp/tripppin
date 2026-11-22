@@ -134,6 +134,14 @@ fn remember(name: &str, mode: &Mode, scale: f64, transform: &str) -> std::io::Re
     blocks.push(output_block(name, mode, scale, transform));
     std::fs::write(&file, format!("// Screens, written by tripppin settings.\n{}", blocks.join("")))?;
 
+    include_in_niri("tripppin-displays.kdl")
+}
+
+/// Makes sure the person's niri config includes the system config and then `file` (which
+/// lives next to it), so settings written there take effect and survive restarts.
+pub fn include_in_niri(file: &str) -> std::io::Result<()> {
+    let dir = config_dir();
+    std::fs::create_dir_all(&dir)?;
     let config = dir.join("config.kdl");
     let mut text = std::fs::read_to_string(&config).unwrap_or_default();
     if !text.contains("/etc/niri/config.kdl") {
@@ -141,10 +149,26 @@ fn remember(name: &str, mode: &Mode, scale: f64, transform: &str) -> std::io::Re
             "// Your niri settings. The tripppin desktop comes from the system file.\ninclude \"/etc/niri/config.kdl\"\n{text}"
         );
     }
-    if !text.contains("tripppin-displays.kdl") {
-        text.push_str("include \"tripppin-displays.kdl\"\n");
+    if !text.contains(file) {
+        text.push_str(&format!("include \"{file}\"\n"));
     }
     std::fs::write(&config, text)
+}
+
+/// Turns niri's window animations off (reduce motion) or back on.
+pub fn set_reduce_motion(on: bool) -> std::io::Result<()> {
+    let dir = config_dir();
+    std::fs::create_dir_all(&dir)?;
+    let body = if on { "animations {\n    off\n}\n" } else { "" };
+    std::fs::write(
+        dir.join("tripppin-motion.kdl"),
+        format!("// Reduce motion, written by tripppin settings.\n{body}"),
+    )?;
+    include_in_niri("tripppin-motion.kdl")
+}
+
+pub fn reduce_motion() -> bool {
+    std::fs::read_to_string(config_dir().join("tripppin-motion.kdl")).is_ok_and(|t| t.contains("off"))
 }
 
 /// The screen's brightness (0–1), when it has a backlight.

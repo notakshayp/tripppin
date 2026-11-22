@@ -697,6 +697,26 @@ dropdown.choice popover listview > row:selected {
     color: #f2f5ef;
 }
 
+button.wall-tile {
+    padding: 8px;
+    border-radius: 16px;
+    background: #141b19;
+    border: 2px solid #222d2a;
+    box-shadow: none;
+}
+
+button.wall-tile:hover {
+    border-color: #3d4a45;
+}
+
+button.wall-tile.selected {
+    border-color: #57d99a;
+}
+
+picture.wall-pic {
+    border-radius: 10px;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

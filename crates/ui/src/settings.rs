@@ -13,8 +13,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 4] =
-    [("wifi", "wi-fi"), ("bluetooth", "bluetooth"), ("sound", "sound"), ("display", "display")];
+const SECTIONS: [(&str, &str); 5] = [
+    ("wifi", "wi-fi"),
+    ("bluetooth", "bluetooth"),
+    ("sound", "sound"),
+    ("display", "display"),
+    ("appearance", "appearance"),
+];
 
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder()
@@ -63,6 +68,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&bluetooth_page(), Some("bluetooth"));
     stack.add_named(&sound_page(), Some("sound"));
     stack.add_named(&display_page(), Some("display"));
+    stack.add_named(&appearance_page(), Some("appearance"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -1098,4 +1104,138 @@ fn screen_card(o: &display::Output, error: &gtk::Label) -> gtk::Box {
         d.connect_selected_notify(move |_| apply());
     }
     card
+}
+
+const WALLPAPERS: [(&str, &str); 4] = [("ink", "ink"), ("night", "night"), ("forest", "forest"), ("paper", "paper")];
+const TEXT_SIZES: [(&str, f64); 4] = [("small", 0.9), ("default", 1.0), ("large", 1.15), ("larger", 1.3)];
+
+fn tripppin_config() -> std::path::PathBuf {
+    std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join("tripppin")
+}
+
+/// Copies an image to ~/.config/tripppin/wallpaper and restarts swaybg with it.
+fn set_wallpaper(from: &std::path::Path, name: &str) -> std::io::Result<()> {
+    let dir = tripppin_config();
+    std::fs::create_dir_all(&dir)?;
+    std::fs::copy(from, dir.join("wallpaper"))?;
+    std::fs::write(dir.join("wallpaper-name"), name)?;
+    let _ = std::process::Command::new("pkill").args(["-x", "swaybg"]).status();
+    let wall = dir.join("wallpaper");
+    let _ = std::process::Command::new("niri")
+        .args(["msg", "action", "spawn", "--", "swaybg", "-i", &wall.to_string_lossy(), "-m", "fill"])
+        .status();
+    Ok(())
+}
+
+fn text_scale() -> f64 {
+    std::process::Command::new("gsettings")
+        .args(["get", "org.gnome.desktop.interface", "text-scaling-factor"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse().ok())
+        .unwrap_or(1.0)
+}
+
+fn gsettings_set(key: &str, value: &str) {
+    let _ = std::process::Command::new("gsettings").args(["set", "org.gnome.desktop.interface", key, value]).status();
+}
+
+fn appearance_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("appearance");
+    let current = std::fs::read_to_string(tripppin_config().join("wallpaper-name")).unwrap_or_else(|_| "ink".into());
+    status.set_text(&format!("dark · {} wallpaper", current.trim()));
+    body.append(&caption("wallpaper"));
+    let grid = gtk::FlowBox::new();
+    grid.set_selection_mode(gtk::SelectionMode::None);
+    grid.set_max_children_per_line(4);
+    grid.set_min_children_per_line(2);
+    grid.set_column_spacing(12);
+    grid.set_row_spacing(12);
+    let tiles: Rc<RefCell<Vec<gtk::Button>>> = Rc::new(RefCell::new(Vec::new()));
+    for (id, name) in WALLPAPERS {
+        let path = std::path::PathBuf::from(format!("/usr/share/tripppin/wallpapers/{id}.png"));
+        let tile = gtk::Button::new();
+        tile.add_css_class("wall-tile");
+        if current.trim() == id {
+            tile.add_css_class("selected");
+        }
+        let inner = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        let pic = gtk::Picture::for_filename(&path);
+        pic.set_content_fit(gtk::ContentFit::Cover);
+        pic.set_size_request(184, 115);
+        pic.add_css_class("wall-pic");
+        inner.append(&pic);
+        inner.append(&label(name, &["card-sub"]));
+        tile.set_child(Some(&inner));
+        let (tiles2, status) = (tiles.clone(), status.clone());
+        tile.connect_clicked(move |b| {
+            if set_wallpaper(&path, id).is_ok() {
+                for t in tiles2.borrow().iter() {
+                    t.remove_css_class("selected");
+                }
+                b.add_css_class("selected");
+                status.set_text(&format!("dark · {id} wallpaper"));
+            }
+        });
+        tiles.borrow_mut().push(tile.clone());
+        grid.insert(&tile, -1);
+    }
+    body.append(&grid);
+    let own = gtk::Button::with_label("choose your own…");
+    own.add_css_class("link");
+    own.add_css_class("accent");
+    own.set_halign(gtk::Align::Start);
+    {
+        let (status, tiles) = (status.clone(), tiles.clone());
+        own.connect_clicked(move |b| {
+            let filter = gtk::FileFilter::new();
+            filter.add_mime_type("image/*");
+            filter.set_name(Some("images"));
+            let filters = gio::ListStore::new::<gtk::FileFilter>();
+            filters.append(&filter);
+            let dialog = gtk::FileDialog::builder().title("choose a wallpaper").filters(&filters).modal(true).build();
+            let window = b.root().and_downcast::<gtk::Window>();
+            let (status, tiles) = (status.clone(), tiles.clone());
+            dialog.open(window.as_ref(), gio::Cancellable::NONE, move |r| {
+                if let Ok(file) = r
+                    && let Some(path) = file.path()
+                    && set_wallpaper(&path, "your own").is_ok()
+                {
+                    for t in tiles.borrow().iter() {
+                        t.remove_css_class("selected");
+                    }
+                    status.set_text("dark · your own wallpaper");
+                }
+            });
+        });
+    }
+    body.append(&own);
+
+    body.append(&caption("look"));
+    let look = gtk::ListBox::new();
+    look.add_css_class("list-card");
+    look.set_selection_mode(gtk::SelectionMode::None);
+    look.append(&setting_row("mode", &label("dark · light mode comes in a later update", &["row-sub"])));
+    let sizes: Vec<String> = TEXT_SIZES.iter().map(|s| s.0.to_string()).collect();
+    let now = text_scale();
+    let size_now = TEXT_SIZES.iter().position(|s| (s.1 - now).abs() < 0.02).unwrap_or(1);
+    let size = dropdown(&sizes, size_now);
+    size.connect_selected_notify(|d| {
+        gsettings_set("text-scaling-factor", &TEXT_SIZES[d.selected() as usize].1.to_string())
+    });
+    look.append(&setting_row("text size", &size));
+    let motion = gtk::Switch::new();
+    motion.set_active(display::reduce_motion());
+    motion.connect_state_set(|_, on| {
+        let _ = display::set_reduce_motion(on);
+        gsettings_set("enable-animations", if on { "false" } else { "true" });
+        glib::Propagation::Proceed
+    });
+    look.append(&setting_row("reduce motion", &motion));
+    body.append(&look);
+    scroll
 }
