@@ -14,6 +14,7 @@ mod display;
 mod firstboot;
 mod greetd;
 mod greeter;
+mod keyboard;
 mod lock;
 mod nm;
 mod orb;

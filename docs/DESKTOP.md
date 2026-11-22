@@ -90,7 +90,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] AI: the model in use, switch or download, cloud key or own server, what it may do alone, history (model in use, switch, download, service restart, other server with a key built; permission prompts come with M4, history to do)
 - [x] Apps: installed apps, update, remove, default apps (browser, mail, files, music, video)
 - [~] Notifications: do not disturb, schedule, per-app settings, lock-screen notifications (do not disturb, quiet hours, muting apps built; lock-screen notifications come with the lock item)
-- [ ] Keyboard: layouts and input methods (ibus, Indian languages), repeat, shortcuts editor
+- [~] Keyboard: layouts and input methods (ibus, Indian languages), repeat, shortcuts editor (layouts, switch keys, repeat and a shortcuts list built; ibus transliteration and editing shortcuts to do)
 - [ ] Mouse & touchpad: speed, tap to click, natural scroll, gestures
 - [ ] Printers & scanners: add, default, queue → system-config-printer
 - [ ] Accounts: name, picture, password, auto-login, add a person

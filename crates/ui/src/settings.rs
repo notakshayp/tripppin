@@ -6,6 +6,7 @@ use crate::apps;
 use crate::bt;
 use crate::common::label;
 use crate::display;
+use crate::keyboard;
 use crate::nm;
 use crate::power;
 use crate::snd;
@@ -15,7 +16,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 9] = [
+const SECTIONS: [(&str, &str); 10] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -25,6 +26,7 @@ const SECTIONS: [(&str, &str); 9] = [
     ("ai", "ai"),
     ("notifications", "notifications"),
     ("apps", "apps"),
+    ("keyboard", "keyboard"),
 ];
 
 pub fn run() -> glib::ExitCode {
@@ -79,6 +81,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&ai_page(), Some("ai"));
     stack.add_named(&notifications_page(), Some("notifications"));
     stack.add_named(&apps_page(), Some("apps"));
+    stack.add_named(&keyboard_page(), Some("keyboard"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -2133,6 +2136,165 @@ fn apps_page() -> gtk::ScrolledWindow {
     }
     scroll.connect_map(move |_| {
         if let Some(f) = load.borrow().clone() {
+            f();
+        }
+    });
+    scroll
+}
+
+/// The main shortcuts, as niri's config binds them.
+const SHORTCUTS: [(&str, &str); 12] = [
+    ("ask tripppin", "super + space"),
+    ("terminal", "super + return"),
+    ("apps", "super + d"),
+    ("quick settings", "super + n"),
+    ("power menu", "super + escape"),
+    ("lock", "super + l"),
+    ("close a window", "super + q"),
+    ("full screen", "super + f"),
+    ("next window", "super + tab"),
+    ("workspace 1, 2, 3", "super + 1, 2, 3"),
+    ("float or tile a window", "super + t"),
+    ("screenshot", "print"),
+];
+
+fn keyboard_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("keyboard");
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    let all = Rc::new(keyboard::all_layouts());
+    let name_of = {
+        let all = all.clone();
+        move |code: &str| {
+            all.iter().find(|(c, _)| c == code).map(|(_, n)| n.to_lowercase()).unwrap_or_else(|| code.to_string())
+        }
+    };
+    body.append(&caption("layouts"));
+    let layouts = gtk::ListBox::new();
+    layouts.add_css_class("list-card");
+    layouts.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&layouts);
+    body.append(&caption("typing"));
+    let typing = gtk::ListBox::new();
+    typing.add_css_class("list-card");
+    typing.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&typing);
+    body.append(&error);
+    body.append(&caption("shortcuts"));
+    let keys = gtk::ListBox::new();
+    keys.add_css_class("list-card");
+    keys.set_selection_mode(gtk::SelectionMode::None);
+    for (what, combo) in SHORTCUTS {
+        keys.append(&setting_row(what, &label(combo, &["row-value"])));
+    }
+    body.append(&keys);
+
+    let state = Rc::new(RefCell::new(keyboard::current()));
+    let fill: LoadSlot = Rc::new(RefCell::new(None));
+    let save = {
+        let (state, error, slot) = (state.clone(), error.clone(), fill.clone());
+        Rc::new(move |refill: bool| {
+            if let Err(e) = keyboard::save(&state.borrow()) {
+                error.set_text(&format!("couldn't save: {e}"));
+                error.set_visible(true);
+            }
+            if refill && let Some(f) = slot.borrow().clone() {
+                f();
+            }
+        })
+    };
+    {
+        let (state, layouts, typing, status, all, save) =
+            (state.clone(), layouts.clone(), typing.clone(), status.clone(), all.clone(), save.clone());
+        *fill.borrow_mut() = Some(Rc::new(move || {
+            let k = state.borrow().clone();
+            let names: Vec<String> = k.layouts.iter().map(|c| name_of(c)).collect();
+            status.set_text(&names.join(" · "));
+            clear(&layouts);
+            for (i, code) in k.layouts.iter().enumerate() {
+                let control: gtk::Widget = if k.layouts.len() > 1 {
+                    let remove = gtk::Button::with_label("remove");
+                    remove.add_css_class("link");
+                    let (state, save, code) = (state.clone(), save.clone(), code.clone());
+                    remove.connect_clicked(move |_| {
+                        state.borrow_mut().layouts.retain(|c| *c != code);
+                        save(true);
+                    });
+                    remove.upcast()
+                } else {
+                    label("", &["row-sub"]).upcast()
+                };
+                let title = if i == 0 { format!("{} · default", names[i]) } else { names[i].clone() };
+                layouts.append(&setting_row(&title, &control));
+            }
+            let choices: Vec<(String, String)> = all.iter().filter(|(c, _)| !k.layouts.contains(c)).cloned().collect();
+            let labels: Vec<String> = choices
+                .iter()
+                .map(|(_, n)| {
+                    let n = n.to_lowercase();
+                    if n.chars().count() > 26 { format!("{}…", n.chars().take(25).collect::<String>()) } else { n }
+                })
+                .collect();
+            let pick = dropdown(&labels, choices.iter().position(|(c, _)| c == "in").unwrap_or(0));
+            pick.set_enable_search(true);
+            let add = gtk::Button::with_label("add");
+            add.add_css_class("link");
+            add.add_css_class("accent");
+            let controls = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+            controls.append(&pick);
+            controls.append(&add);
+            {
+                let (state, save) = (state.clone(), save.clone());
+                add.connect_clicked(move |_| {
+                    if let Some((code, _)) = choices.get(pick.selected() as usize) {
+                        state.borrow_mut().layouts.push(code.clone());
+                        save(true);
+                    }
+                });
+            }
+            layouts.append(&setting_row("add a layout", &controls));
+
+            clear(&typing);
+            if k.layouts.len() > 1 {
+                let names: Vec<String> = keyboard::SWITCHES.iter().map(|s| s.1.to_string()).collect();
+                let now = keyboard::SWITCHES.iter().position(|s| s.0 == k.switch).unwrap_or(0);
+                let d = dropdown(&names, now);
+                let (state, save) = (state.clone(), save.clone());
+                d.connect_selected_notify(move |d| {
+                    state.borrow_mut().switch = keyboard::SWITCHES[d.selected() as usize].0.to_string();
+                    save(false);
+                });
+                typing.append(&setting_row("switch layouts with", &d));
+            }
+            let delays: Vec<String> = keyboard::DELAYS.iter().map(|d| d.1.to_string()).collect();
+            let delay = dropdown(&delays, keyboard::DELAYS.iter().position(|d| d.0 == k.delay).unwrap_or(2));
+            {
+                let (state, save) = (state.clone(), save.clone());
+                delay.connect_selected_notify(move |d| {
+                    state.borrow_mut().delay = keyboard::DELAYS[d.selected() as usize].0;
+                    save(false);
+                });
+            }
+            typing.append(&setting_row("wait before a held key repeats", &delay));
+            let rates: Vec<String> = keyboard::RATES.iter().map(|r| r.1.to_string()).collect();
+            let rate = dropdown(&rates, keyboard::RATES.iter().position(|r| r.0 == k.rate).unwrap_or(1));
+            {
+                let (state, save) = (state.clone(), save.clone());
+                rate.connect_selected_notify(move |d| {
+                    state.borrow_mut().rate = keyboard::RATES[d.selected() as usize].0;
+                    save(false);
+                });
+            }
+            typing.append(&setting_row("repeat speed", &rate));
+            typing.append(&setting_row(
+                "type indian languages in english letters",
+                &label("comes in a later update", &["row-sub"]),
+            ));
+        }));
+    }
+    scroll.connect_map(move |_| {
+        *state.borrow_mut() = keyboard::current();
+        if let Some(f) = fill.borrow().clone() {
             f();
         }
     });
