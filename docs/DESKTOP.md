@@ -87,7 +87,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] Display: resolution, scale, refresh rate, rotation, brightness, night light, arrangement → wdisplays (built; mode changes and brightness checked on hardware)
 - [~] Appearance: wallpaper (ours and your own), dark/light/auto, accent, text size, reduce motion (wallpapers, your own, text size, reduce motion done; light mode and accent to do)
 - [~] Power & battery: health, time left, power mode, dim/off/sleep timing, lid action, low-battery behaviour (battery, mode, lock/screen-off/sleep timing built; lid action and low-battery to do; battery and mode checked on hardware)
-- [ ] AI: the model in use, switch or download, cloud key or own server, what it may do alone, history
+- [~] AI: the model in use, switch or download, cloud key or own server, what it may do alone, history (model in use, switch, download, service restart, other server with a key built; permission prompts come with M4, history to do)
 - [ ] Apps: installed apps, update, remove, default apps (browser, mail, files, music, video)
 - [ ] Notifications: do not disturb, schedule, per-app settings, lock-screen notifications
 - [ ] Keyboard: layouts and input methods (ibus, Indian languages), repeat, shortcuts editor

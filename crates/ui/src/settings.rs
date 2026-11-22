@@ -14,13 +14,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 6] = [
+const SECTIONS: [(&str, &str); 7] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
     ("display", "display"),
     ("appearance", "appearance"),
     ("power", "power & battery"),
+    ("ai", "ai"),
 ];
 
 pub fn run() -> glib::ExitCode {
@@ -72,6 +73,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&display_page(), Some("display"));
     stack.add_named(&appearance_page(), Some("appearance"));
     stack.add_named(&power_page(), Some("power"));
+    stack.add_named(&ai_page(), Some("ai"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -1370,4 +1372,364 @@ fn power_page() -> gtk::ScrolledWindow {
     };
     scroll.connect_map(move |_| load());
     scroll
+}
+
+fn llm_running() -> bool {
+    std::process::Command::new("systemctl")
+        .args(["is-active", "--quiet", "tripppin-llm.service"])
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+fn restart_llm() -> Result<(), String> {
+    let out = std::process::Command::new("systemctl")
+        .args(["restart", "tripppin-llm.service"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() { Ok(()) } else { Err(String::from_utf8_lossy(&out.stderr).trim().to_lowercase()) }
+}
+
+/// Filled in once the page's loader exists, so its own buttons can call it again.
+type LoadSlot = Rc<RefCell<Option<Rc<dyn Fn()>>>>;
+
+/// What the AI page shows: the models, which one is downloaded, recommended and in use.
+struct AiState {
+    tiers: Vec<hwdetect::Tier>,
+    installed: Vec<bool>,
+    recommended: Option<String>,
+    active: Option<String>,
+    running: bool,
+    endpoint: Option<trip::model::Endpoint>,
+}
+
+fn ai_state() -> AiState {
+    let catalog = hwdetect::Catalog::builtin().ok();
+    let tiers = catalog.as_ref().map(|c| c.tiers.clone()).unwrap_or_default();
+    let installed = tiers.iter().map(trip::model::is_installed).collect();
+    let active =
+        catalog.as_ref().and_then(|c| trip::model::active_tier(c, &trip::model::models_dir())).map(|t| t.id.clone());
+    AiState {
+        tiers,
+        installed,
+        recommended: trip::model::recommended().ok().map(|t| t.id),
+        active,
+        running: llm_running(),
+        endpoint: trip::model::endpoint(),
+    }
+}
+
+fn ai_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("ai");
+    body.append(&caption("where it runs"));
+    let modes = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    modes.set_homogeneous(true);
+    let here = gtk::Button::with_label("this computer");
+    let there = gtk::Button::with_label("another server");
+    for b in [&here, &there] {
+        b.add_css_class("segment");
+        modes.append(b);
+    }
+    body.append(&modes);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+
+    // This computer: the models and the service that runs them.
+    let local = gtk::Box::new(gtk::Orientation::Vertical, 22);
+    local.append(&caption("models"));
+    let models = gtk::ListBox::new();
+    models.add_css_class("list-card");
+    models.set_selection_mode(gtk::SelectionMode::None);
+    local.append(&models);
+    let service = gtk::ListBox::new();
+    service.add_css_class("list-card");
+    service.set_selection_mode(gtk::SelectionMode::None);
+    local.append(&service);
+
+    // Another server: any OpenAI-style chat API.
+    let remote = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    remote.append(&caption("another server"));
+    remote.append(&label(
+        "a cloud provider with a key, or your own llama.cpp or ollama machine. anything that speaks the openai chat api.",
+        &["row-sub"],
+    ));
+    let url = gtk::Entry::builder().placeholder_text("address, like https://api.example.com/v1").build();
+    let model = gtk::Entry::builder().placeholder_text("model name").build();
+    let key = gtk::PasswordEntry::builder()
+        .placeholder_text("key (leave empty for your own server)")
+        .show_peek_icon(true)
+        .build();
+    url.add_css_class("field");
+    model.add_css_class("field");
+    key.add_css_class("field");
+    let save = gtk::Button::with_label("test and use");
+    save.add_css_class("pill");
+    save.set_halign(gtk::Align::Start);
+    remote.append(&url);
+    remote.append(&model);
+    remote.append(&key);
+    remote.append(&save);
+    body.append(&local);
+    body.append(&remote);
+    body.append(&error);
+
+    body.append(&caption("what it may do alone"));
+    let alone = gtk::ListBox::new();
+    alone.add_css_class("list-card");
+    alone.set_selection_mode(gtk::SelectionMode::None);
+    alone.append(&setting_row("run commands and change files", &label("yes, and it checks its work", &["row-sub"])));
+    alone.append(&setting_row("ask before risky steps", &label("comes in a later update", &["row-sub"])));
+    body.append(&alone);
+
+    let show_remote = {
+        let (here, there, local, remote) = (here.clone(), there.clone(), local.clone(), remote.clone());
+        Rc::new(move |on: bool| {
+            local.set_visible(!on);
+            remote.set_visible(on);
+            if on {
+                here.remove_css_class("selected");
+                there.add_css_class("selected");
+            } else {
+                there.remove_css_class("selected");
+                here.add_css_class("selected");
+            }
+        })
+    };
+
+    let load: LoadSlot = Rc::new(RefCell::new(None));
+    let reload = {
+        let load = load.clone();
+        move || {
+            if let Some(f) = load.borrow().clone() {
+                f();
+            }
+        }
+    };
+    {
+        let (models, service, status, error, show_remote, url, model, key) = (
+            models.clone(),
+            service.clone(),
+            status.clone(),
+            error.clone(),
+            show_remote.clone(),
+            url.clone(),
+            model.clone(),
+            key.clone(),
+        );
+        let reload = reload.clone();
+        *load.borrow_mut() = Some(Rc::new(move || {
+            let (models, service, status, error, show_remote, url, model, key) = (
+                models.clone(),
+                service.clone(),
+                status.clone(),
+                error.clone(),
+                show_remote.clone(),
+                url.clone(),
+                model.clone(),
+                key.clone(),
+            );
+            let reload = reload.clone();
+            background(ai_state, move |st| {
+                if let Some(e) = &st.endpoint {
+                    let host = e.url.split("://").nth(1).unwrap_or(&e.url).split('/').next().unwrap_or("").to_string();
+                    status.set_text(&format!("{} · on {host}", e.model.to_lowercase()));
+                    url.set_text(&e.url);
+                    model.set_text(&e.model);
+                    key.set_text(&e.key);
+                } else {
+                    let name = st
+                        .active
+                        .as_ref()
+                        .and_then(|id| st.tiers.iter().find(|t| &t.id == id))
+                        .map(|t| t.model.to_lowercase());
+                    status.set_text(&match (name, st.running) {
+                        (Some(n), true) => format!("{n} · on this computer · ready"),
+                        (Some(n), false) => format!("{n} · on this computer · stopped"),
+                        (None, _) => "no model downloaded yet".to_string(),
+                    });
+                }
+                show_remote(st.endpoint.is_some());
+                clear(&models);
+                for (i, t) in st.tiers.iter().enumerate() {
+                    models.append(&model_row(t, &st, st.installed[i], &error, reload.clone()));
+                }
+                clear(&service);
+                let restart = gtk::Button::with_label(if st.running { "restart" } else { "start" });
+                restart.add_css_class("link");
+                restart.add_css_class("accent");
+                let (error, reload2) = (error.clone(), reload.clone());
+                restart.connect_clicked(move |b| {
+                    b.set_sensitive(false);
+                    let (error, reload) = (error.clone(), reload2.clone());
+                    background(restart_llm, move |r| {
+                        if let Err(e) = r {
+                            error.set_text(&format!("couldn't start the model: {e}"));
+                            error.set_visible(true);
+                        }
+                        reload();
+                    });
+                });
+                let row = setting_row(
+                    if st.running { "model service · running" } else { "model service · stopped" },
+                    &restart,
+                );
+                service.append(&row);
+            });
+        }));
+    }
+    {
+        let (show_remote, error) = (show_remote.clone(), error.clone());
+        let reload = reload.clone();
+        here.connect_clicked(move |_| match trip::model::set_endpoint(None) {
+            Ok(()) => {
+                show_remote(false);
+                reload();
+            }
+            Err(e) => {
+                error.set_text(&format!("couldn't switch back: {e:#}"));
+                error.set_visible(true);
+            }
+        });
+    }
+    {
+        let show_remote = show_remote.clone();
+        there.connect_clicked(move |_| show_remote(true));
+    }
+    {
+        let (url, model, key, error) = (url.clone(), model.clone(), key.clone(), error.clone());
+        let reload = reload.clone();
+        save.connect_clicked(move |b| {
+            let e = trip::model::Endpoint {
+                url: url.text().trim().trim_end_matches('/').to_string(),
+                model: model.text().trim().to_string(),
+                key: key.text().trim().to_string(),
+            };
+            if e.url.is_empty() || e.model.is_empty() {
+                error.set_text("fill in the address and the model name");
+                error.set_visible(true);
+                return;
+            }
+            b.set_sensitive(false);
+            b.set_label("testing…");
+            let (b, error, reload) = (b.clone(), error.clone(), reload.clone());
+            background(
+                move || {
+                    trip::model::test_endpoint(&e)
+                        .and_then(|()| trip::model::set_endpoint(Some(&e)))
+                        .map_err(|e| format!("{e:#}"))
+                },
+                move |r| {
+                    b.set_sensitive(true);
+                    b.set_label("test and use");
+                    match r {
+                        Ok(()) => {
+                            error.set_visible(false);
+                            reload();
+                        }
+                        Err(e) => {
+                            error.set_text(&e.to_lowercase());
+                            error.set_visible(true);
+                        }
+                    }
+                },
+            );
+        });
+    }
+    scroll.connect_map(move |_| reload());
+    scroll
+}
+
+enum Pull {
+    Bytes(u64, u64),
+    Done(Result<(), String>),
+}
+
+fn model_row(
+    t: &hwdetect::Tier,
+    st: &AiState,
+    installed: bool,
+    error: &gtk::Label,
+    reload: impl Fn() + Clone + 'static,
+) -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    row.add_css_class("net-row");
+    let in_use = st.endpoint.is_none() && st.active.as_deref() == Some(t.id.as_str());
+    if in_use {
+        row.add_css_class("connected");
+    }
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    text.set_hexpand(true);
+    text.set_valign(gtk::Align::Center);
+    text.append(&label(&t.model.to_lowercase(), &[if in_use { "row-title-strong" } else { "row-title" }]));
+    let mut words = vec![format!("{:.1} gb", t.download_gb())];
+    if st.recommended.as_deref() == Some(t.id.as_str()) {
+        words.push("best for this computer".into());
+    }
+    if in_use {
+        words.push("in use".into());
+    } else if installed {
+        words.push("downloaded".into());
+    }
+    let sub = label(&words.join(" · "), if in_use { &["row-sub", "on"][..] } else { &["row-sub"][..] });
+    text.append(&sub);
+    row.append(&text);
+    if in_use {
+        return row;
+    }
+    let action = gtk::Button::with_label(if installed { "use" } else { "download" });
+    action.add_css_class("link");
+    action.add_css_class("accent");
+    let (tier, error) = (t.clone(), error.clone());
+    action.connect_clicked(move |b| {
+        b.set_sensitive(false);
+        let (error, reload) = (error.clone(), reload.clone());
+        if trip::model::is_installed(&tier) {
+            let tier = tier.clone();
+            background(
+                move || trip::model::choose(&tier).map_err(|e| format!("{e:#}")).and_then(|()| restart_llm()),
+                move |r| {
+                    if let Err(e) = r {
+                        error.set_text(&format!("couldn't switch models: {e}"));
+                        error.set_visible(true);
+                    }
+                    reload();
+                },
+            );
+            return;
+        }
+        let (tx, rx) = async_channel::unbounded::<Pull>();
+        let tier = tier.clone();
+        std::thread::spawn(move || {
+            let progress = tx.clone();
+            let r = trip::model::pull_tier(&tier, &mut |done, total, _| {
+                let _ = progress.send_blocking(Pull::Bytes(done, total));
+            })
+            .map_err(|e| format!("{e:#}"));
+            let _ = tx.send_blocking(Pull::Done(r));
+        });
+        let (b, sub) = (b.clone(), sub.clone());
+        glib::spawn_future_local(async move {
+            while let Ok(p) = rx.recv().await {
+                match p {
+                    Pull::Bytes(done, total) => {
+                        b.set_label(&format!("{:.0}%", 100.0 * done as f64 / total.max(1) as f64));
+                        sub.set_text(&format!(
+                            "downloading · {:.1} of {:.1} gb",
+                            done as f64 / 1e9,
+                            total as f64 / 1e9
+                        ));
+                    }
+                    Pull::Done(r) => {
+                        if let Err(e) = r {
+                            error.set_text(&format!("the download stopped: {}", e.to_lowercase()));
+                            error.set_visible(true);
+                        }
+                        reload();
+                        break;
+                    }
+                }
+            }
+        });
+    });
+    row.append(&action);
+    row
 }
