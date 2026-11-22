@@ -179,7 +179,7 @@ fn wifi_page() -> gtk::ScrolledWindow {
 
     let extras = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     extras.set_homogeneous(true);
-    let saved_label = label("", &["card-sub"]);
+    let saved_label = label("none yet", &["card-sub"]);
     let hotspot_label = label("share this connection", &["card-sub"]);
     for (title, sub) in [
         ("hotspot", &hotspot_label),
@@ -225,7 +225,10 @@ fn wifi_page() -> gtk::ScrolledWindow {
             refresh.clone(),
             open_row.clone(),
         );
+        // A hotspot shares the connection over Wi-Fi, so its card goes when there's no card.
+        let hotspot_card = hotspot_label.ancestor(gtk::Button::static_type());
         Rc::new(move |rescan: bool| {
+            let hotspot_card = hotspot_card.clone();
             let (list, status, switch, error, saved_label, refresh, open_row) = (
                 list.clone(),
                 status.clone(),
@@ -247,6 +250,12 @@ fn wifi_page() -> gtk::ScrolledWindow {
                     )
                 },
                 move |(has_wifi, wired, enabled, nets, saved, address)| {
+                    if let Some(card) = &hotspot_card {
+                        card.set_visible(has_wifi);
+                    }
+                    if !saved.is_empty() {
+                        saved_label.set_text(&format!("{} remembered", saved.len()));
+                    }
                     if !has_wifi {
                         switch.set_visible(false);
                         list.set_visible(false);
@@ -258,7 +267,6 @@ fn wifi_page() -> gtk::ScrolledWindow {
                         return;
                     }
                     switch.set_active(enabled);
-                    saved_label.set_text(&format!("{} remembered", saved.len()));
                     while let Some(child) = list.first_child() {
                         list.remove(&child);
                     }
