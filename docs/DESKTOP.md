@@ -99,8 +99,8 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [ ] Privacy: location, camera and microphone access, recent files, lock-screen content, firewall
 - [ ] Accessibility: screen reader (orca), larger text, high contrast, zoom, sticky keys, reduce motion
 - [ ] Storage: what's using space, clean up, external drives
-- [ ] Updates: check, install (one click), automatic, roll back to the previous version
-- [ ] About: device name, hardware, Tripppin version, licences, bill of materials
+- [x] Updates: check, install (one click), automatic, roll back to the previous version (daily download, never a surprise restart: the version starts at the next restart, which the page offers; checked in the VM)
+- [~] About: device name, hardware, Tripppin version, licences, bill of materials (name, hardware, storage, version, licence built; a browsable bill of materials waits for CI to publish an SBOM)
 
 ## Apps that come with it
 

@@ -2765,17 +2765,17 @@ fn about_page() -> gtk::ScrolledWindow {
                 }
                 device.append(&setting_row("name (press enter to save)", &entry));
                 if let Some(hw) = &hw {
-                    device.append(&setting_row(
-                        "processor",
-                        &label(
-                            &format!("{} · {} threads", hw.cpu.model.to_lowercase(), hw.cpu.threads),
-                            &["row-value"],
-                        ),
-                    ));
+                    // ARM chips often don't name themselves; then only the thread count shows.
+                    let model = hw.cpu.model.to_lowercase();
+                    let cpu = if model.is_empty() || model == "unknown" {
+                        format!("{} threads", hw.cpu.threads)
+                    } else {
+                        format!("{model} · {} threads", hw.cpu.threads)
+                    };
+                    device.append(&setting_row("processor", &label(&cpu, &["row-value"])));
                     device.append(&setting_row("memory", &label(&gb(hw.memory_bytes), &["row-value"])));
-                    for g in &hw.gpus {
-                        let name = g.name.clone().unwrap_or_else(|| format!("{:?}", g.vendor)).to_lowercase();
-                        device.append(&setting_row("graphics", &label(&name, &["row-value"])));
+                    for name in hw.gpus.iter().filter_map(|g| g.name.as_ref()) {
+                        device.append(&setting_row("graphics", &label(&name.to_lowercase(), &["row-value"])));
                     }
                 }
                 if let Some((size, free)) = disk {
