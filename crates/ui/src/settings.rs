@@ -2,6 +2,7 @@
 //! `tripppin-ui settings [section]` opens it (on a section); a second call brings it forward.
 //! Sections are added here as they're built; each talks to the system service behind it.
 
+use crate::bt;
 use crate::common::label;
 use crate::nm;
 use gtk::prelude::*;
@@ -10,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 1] = [("wifi", "wi-fi")];
+const SECTIONS: [(&str, &str); 2] = [("wifi", "wi-fi"), ("bluetooth", "bluetooth")];
 
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder()
@@ -56,6 +57,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.set_transition_type(gtk::StackTransitionType::Crossfade);
     stack.set_hexpand(true);
     stack.add_named(&wifi_page(), Some("wifi"));
+    stack.add_named(&bluetooth_page(), Some("bluetooth"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -536,4 +538,261 @@ fn hidden_row(error: &gtk::Label, reload: Reload) -> gtk::Box {
         );
     });
     outer
+}
+
+/// A small caption above a list, in DM Mono.
+fn caption(text: &str) -> gtk::Label {
+    label(text, &["caption"])
+}
+
+fn clear(list: &gtk::ListBox) {
+    while let Some(child) = list.first_child() {
+        list.remove(&child);
+    }
+}
+
+fn bluetooth_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, right) = page("bluetooth");
+    let switch = gtk::Switch::new();
+    right.append(&switch);
+    let mine_caption = caption("your devices");
+    let mine = gtk::ListBox::new();
+    mine.add_css_class("list-card");
+    mine.set_selection_mode(gtk::SelectionMode::None);
+    let near_head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let near_caption = caption("nearby");
+    let spinner = gtk::Spinner::new();
+    let again = gtk::Button::with_label("look again");
+    again.add_css_class("link");
+    again.add_css_class("accent");
+    let filler = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    filler.set_hexpand(true);
+    near_head.append(&near_caption);
+    near_head.append(&spinner);
+    near_head.append(&filler);
+    near_head.append(&again);
+    let near = gtk::ListBox::new();
+    near.add_css_class("list-card");
+    near.set_selection_mode(gtk::SelectionMode::None);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    let more = gtk::Button::with_label("more options");
+    more.add_css_class("link");
+    more.set_halign(gtk::Align::Start);
+    more.connect_clicked(|_| {
+        let _ = std::process::Command::new("blueman-manager").spawn();
+    });
+    for w in [
+        mine_caption.upcast_ref::<gtk::Widget>(),
+        mine.upcast_ref(),
+        near_head.upcast_ref(),
+        near.upcast_ref(),
+        error.upcast_ref(),
+        more.upcast_ref(),
+    ] {
+        body.append(w);
+    }
+    let parts = [
+        mine_caption.clone().upcast::<gtk::Widget>(),
+        mine.clone().upcast(),
+        near_head.clone().upcast(),
+        near.clone().upcast(),
+    ];
+
+    let reload: Rc<RefCell<Reload>> = Rc::new(RefCell::new(None));
+    let scan: Rc<dyn Fn()> = {
+        let (near, spinner, reload, error) = (near.clone(), spinner.clone(), reload.clone(), error.clone());
+        Rc::new(move || {
+            spinner.start();
+            let (near, spinner, reload, error) = (near.clone(), spinner.clone(), reload.clone(), error.clone());
+            background(
+                || bt::scan(8),
+                move |found| {
+                    spinner.stop();
+                    clear(&near);
+                    if found.is_empty() {
+                        let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                        row.add_css_class("net-row");
+                        row.append(&label("nothing nearby in pairing mode", &["row-sub"]));
+                        near.append(&row);
+                    }
+                    for d in &found {
+                        near.append(&device_row(d, false, &error, reload.borrow().clone()));
+                    }
+                },
+            );
+        })
+    };
+    let load: Rc<dyn Fn(bool)> = {
+        let (mine, status, switch, error, reload, scan, parts, more) = (
+            mine.clone(),
+            status.clone(),
+            switch.clone(),
+            error.clone(),
+            reload.clone(),
+            scan.clone(),
+            parts.clone(),
+            more.clone(),
+        );
+        Rc::new(move |also_scan: bool| {
+            let (mine, status, switch, error, reload, scan, parts, more) = (
+                mine.clone(),
+                status.clone(),
+                switch.clone(),
+                error.clone(),
+                reload.clone(),
+                scan.clone(),
+                parts.clone(),
+                more.clone(),
+            );
+            background(
+                || (bt::has_adapter(), bt::status(), bt::paired()),
+                move |(has, (on, name), devices)| {
+                    switch.set_visible(has);
+                    more.set_visible(has);
+                    for p in &parts {
+                        p.set_visible(has && on);
+                    }
+                    if !has {
+                        status.set_text("no bluetooth on this computer");
+                        return;
+                    }
+                    switch.set_active(on);
+                    if !on {
+                        status.set_text("bluetooth is off");
+                        return;
+                    }
+                    status.set_text(&format!("visible as \"{}\" while this page is open", name.to_lowercase()));
+                    clear(&mine);
+                    if devices.is_empty() {
+                        let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                        row.add_css_class("net-row");
+                        row.append(&label("none yet: pair something from nearby", &["row-sub"]));
+                        mine.append(&row);
+                    }
+                    for d in &devices {
+                        mine.append(&device_row(d, true, &error, reload.borrow().clone()));
+                    }
+                    if also_scan {
+                        scan();
+                    }
+                },
+            );
+        })
+    };
+    *reload.borrow_mut() = Some(load.clone());
+    {
+        let (load, error) = (load.clone(), error.clone());
+        switch.connect_state_set(move |_, on| {
+            let (load, error) = (load.clone(), error.clone());
+            background(
+                move || bt::set_power(on),
+                move |r| {
+                    if let Err(e) = r {
+                        error.set_text(&e);
+                        error.set_visible(true);
+                    }
+                    load(on);
+                },
+            );
+            glib::Propagation::Proceed
+        });
+    }
+    {
+        let scan = scan.clone();
+        again.connect_clicked(move |_| scan());
+    }
+    // Look for devices each time the page is opened.
+    {
+        let load = load.clone();
+        scroll.connect_map(move |_| load(true));
+    }
+    scroll
+}
+
+fn device_row(d: &bt::Device, paired: bool, error: &gtk::Label, reload: Reload) -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    row.add_css_class("net-row");
+    row.add_css_class("dev-row");
+    let word = bt::kind_word(&d.kind);
+    let icon = gtk::CenterBox::new();
+    icon.add_css_class("dev-icon");
+    if d.connected {
+        icon.add_css_class("on");
+    }
+    icon.set_valign(gtk::Align::Center);
+    icon.set_center_widget(Some(&label(&word[..1], &["dev-letter"])));
+    row.append(&icon);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    text.set_hexpand(true);
+    text.set_valign(gtk::Align::Center);
+    text.append(&label(&d.name.to_lowercase(), &[if d.connected { "row-title-strong" } else { "row-title" }]));
+    let sub = match (d.connected, d.battery) {
+        (true, Some(b)) => format!("connected · battery {b}%"),
+        (true, None) => "connected".to_string(),
+        (false, _) if paired => format!("{word} · not connected"),
+        _ => word.to_string(),
+    };
+    text.append(&label(&sub, &["row-sub", if d.connected { "on" } else { "plain" }]));
+    row.append(&text);
+    let verb = if !paired {
+        "pair"
+    } else if d.connected {
+        "disconnect"
+    } else {
+        "connect"
+    };
+    let action = gtk::Button::with_label(verb);
+    action.add_css_class("link");
+    if verb != "disconnect" {
+        action.add_css_class("accent");
+    }
+    row.append(&action);
+    let address = d.address.clone();
+    let error = error.clone();
+    {
+        let (address, error, reload) = (address.clone(), error.clone(), reload.clone());
+        action.connect_clicked(move |b| {
+            b.set_label(match verb {
+                "pair" => "pairing…",
+                "connect" => "connecting…",
+                _ => "disconnecting…",
+            });
+            let (address, error, reload) = (address.clone(), error.clone(), reload.clone());
+            background(
+                move || match verb {
+                    "pair" => bt::pair(&address),
+                    "connect" => bt::connect(&address),
+                    _ => bt::disconnect(&address),
+                },
+                move |r| {
+                    if let Err(e) = r {
+                        error.set_text(&format!("couldn't {verb}: {e}"));
+                        error.set_visible(true);
+                    }
+                    if let Some(reload) = reload {
+                        reload(false);
+                    }
+                },
+            );
+        });
+    }
+    if paired {
+        row.set_tooltip_text(Some("right-click to remove this device"));
+        let gesture = gtk::GestureClick::new();
+        gesture.set_button(3);
+        gesture.connect_released(move |_, _, _, _| {
+            let (address, reload) = (address.clone(), reload.clone());
+            background(
+                move || bt::remove(&address),
+                move |_| {
+                    if let Some(reload) = reload {
+                        reload(false);
+                    }
+                },
+            );
+        });
+        row.add_controller(gesture);
+    }
+    row
 }

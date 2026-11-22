@@ -81,7 +81,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 
 - [~] Wi-Fi: nearby networks, connect with a password, forget, hidden network, hotspot, airplane mode (built; the VM has no Wi-Fi card, so connecting is checked on real hardware)
 - [ ] Network details: IP, DNS, proxy, VPN (WireGuard, OpenVPN), Ethernet; advanced → nm-connection-editor
-- [ ] Bluetooth: on/off, devices, pair, connect, battery levels; advanced → blueman
+- [~] Bluetooth: on/off, devices, pair, connect, battery levels; advanced → blueman (built; the VM has no Bluetooth, so pairing is checked on real hardware)
 - [ ] Sound: output and input device, volume, mic level and test, per-app volume, alert sound; advanced → pavucontrol
 - [ ] Display: resolution, scale, refresh rate, rotation, brightness, night light, arrangement → wdisplays
 - [ ] Appearance: wallpaper (ours and your own), dark/light/auto, accent, text size, reduce motion

@@ -7,6 +7,7 @@
 //! - `osd`: the volume, mic and brightness pop-ups.
 //! - `settings`: the Settings app.
 
+mod bt;
 mod common;
 mod firstboot;
 mod greetd;
