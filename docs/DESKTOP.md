@@ -45,12 +45,12 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 
 - [~] Bar (waybar): logo, workspaces, focused app, date, orb status, network, volume, battery
 - [ ] Bar: Bluetooth, tray (for apps like Discord), keyboard layout, recording indicator, mic/camera in use
-- [ ] Quick settings (SwayNotificationCenter control centre): Wi-Fi, Bluetooth, do not disturb, night light,
+- [x] Quick settings (SwayNotificationCenter control centre): Wi-Fi, Bluetooth, do not disturb, night light,
       airplane mode, volume and brightness sliders, media player, power-mode, screenshot, lock
-- [ ] Notification centre (SwayNotificationCenter): history, grouping, actions, inline replies
-- [~] Notifications: our cards top right
+- [x] Notification centre (SwayNotificationCenter): history, grouping, actions, inline replies
+- [x] Notifications: our cards top right
 - [ ] Calendar pop-up from the clock, with upcoming events
-- [ ] Power menu (wlogout): lock, log out, sleep, restart, shut down
+- [x] Power menu (wlogout): lock, log out, sleep, restart, shut down
 - [ ] Volume, brightness, keyboard-light, caps-lock and mic-mute pop-ups (ours)
 - [x] Launcher (fuzzel): apps
 - [ ] Launcher: settings pages, files, calculator, "ask tripppin" handing over to the orb

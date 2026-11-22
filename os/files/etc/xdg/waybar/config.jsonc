@@ -69,7 +69,7 @@
     "custom/power": {
         "format": "⏻",
         "tooltip": false,
-        "on-click": "wlogout -b 5 -T 320 -B 320"
+        "on-click": "tripppin-power"
     },
     "battery": {
         "format": "{capacity}%",

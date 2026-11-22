@@ -31,6 +31,7 @@
     "title": { "text": "quick settings", "clear-all-button": true, "button-text": "clear all" },
     "dnd": { "text": "do not disturb" },
     "buttons-grid": {
+      "buttons-per-row": 3,
       "actions": [
         {
           "label": "wi-fi",
@@ -59,7 +60,7 @@
         { "label": "screenshot", "command": "sh -c 'swaync-client -cp; sleep 0.4; grim -g \"$(slurp)\" - | swappy -f -'" },
         { "label": "lock", "command": "sh -c 'swaync-client -cp; tripppin-ui lock'" },
         { "label": "settings", "command": "sh -c 'swaync-client -cp; tripppin-ui settings'" },
-        { "label": "power", "command": "sh -c 'swaync-client -cp; wlogout -b 5 -T 320 -B 320'" }
+        { "label": "power", "command": "sh -c 'swaync-client -cp; tripppin-power'" }
       ]
     },
     "volume": { "label": "vol", "show-per-app": true, "show-per-app-label": true },

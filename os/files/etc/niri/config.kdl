@@ -82,7 +82,7 @@ binds {
     Mod+Return { spawn "foot"; }
     Mod+D { spawn "fuzzel"; }
     Mod+N { spawn "swaync-client" "-t" "-sw"; }
-    Mod+Escape { spawn "wlogout" "-b" "5" "-T" "320" "-B" "320"; }
+    Mod+Escape { spawn "tripppin-power"; }
     Mod+L { spawn "tripppin-ui" "lock"; }
     Mod+Q { close-window; }
     Mod+F { fullscreen-window; }
