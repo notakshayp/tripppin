@@ -3773,12 +3773,12 @@ fn printers_page() -> gtk::ScrolledWindow {
                         queue.append(&setting_row("nothing waiting", &label("", &["row-sub"])));
                         return;
                     };
+                    let count =
+                        if found.len() == 1 { "1 printer".to_string() } else { format!("{} printers", found.len()) };
                     status.set_text(&match found.iter().find(|p| p.default) {
-                        Some(p) => {
-                            format!("{} printers · default: {}", found.len(), p.name.replace('_', " ").to_lowercase())
-                        }
+                        Some(p) => format!("{count} · default: {}", p.name.replace('_', " ").to_lowercase()),
                         None if found.is_empty() => "no printers found".to_string(),
-                        None => format!("{} printers", found.len()),
+                        None => count,
                     });
                     if found.is_empty() {
                         list.append(&setting_row("no printers found yet", &label("", &["row-sub"])));
