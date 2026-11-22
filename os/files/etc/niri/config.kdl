@@ -54,7 +54,7 @@ environment {
 
 spawn-at-startup "swaybg" "-i" "/usr/share/tripppin/wallpaper.png" "-m" "fill"
 spawn-at-startup "waybar"
-spawn-at-startup "mako" "--config" "/etc/xdg/mako/config"
+spawn-at-startup "swaync"
 spawn-at-startup "tripppin-ui" "orb"
 spawn-at-startup "tripppin-ui" "first-boot"
 // Lock after five idle minutes and before the laptop sleeps.
@@ -81,6 +81,8 @@ binds {
     Mod+Space { spawn "tripppin-ui" "orb" "--toggle"; }
     Mod+Return { spawn "foot"; }
     Mod+D { spawn "fuzzel"; }
+    Mod+N { spawn "swaync-client" "-t" "-sw"; }
+    Mod+Escape { spawn "wlogout" "-b" "5" "-T" "320" "-B" "320"; }
     Mod+L { spawn "tripppin-ui" "lock"; }
     Mod+Q { close-window; }
     Mod+F { fullscreen-window; }

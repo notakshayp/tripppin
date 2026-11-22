@@ -63,6 +63,8 @@ jobs:
           sudo podman run --rm localhost/tripppin:ci test -f /etc/profile.d/tripppin-shell.sh
           sudo podman run --rm localhost/tripppin:ci rpm -q NetworkManager-wifi wpa_supplicant iwlwifi-mvm-firmware
           sudo podman run --rm localhost/tripppin:ci flatpak remotes --system
+          # GTK 4 apps abort at start without the OpenGL/EGL libraries (libepoxy loads them at runtime).
+          sudo podman run --rm localhost/tripppin:ci sh -c 'ls /usr/lib*/libEGL.so.1 /usr/lib*/libGL.so.1 /usr/lib*/libGLESv2.so.2'
           sudo podman run --rm localhost/tripppin:ci sh -c 'systemctl is-enabled kmsconvt@tty1.service && fc-match "DM Mono" | grep -q DMMono'
 
       - name: Export image for scanning

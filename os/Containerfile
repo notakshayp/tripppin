@@ -84,9 +84,10 @@ RUN dnf -y install --setopt=install_weak_deps=False kmscon kmscon-pango dejavu-s
 # to end. waybar, fuzzel, mako, foot and swaybg are configured in os/files; the
 # orb, login and lock screens are ours (tripppin-ui). Inter is the interface font.
 RUN dnf -y install --setopt=install_weak_deps=False \
-      niri xwayland-satellite waybar fuzzel mako swaybg swayidle foot \
+      niri xwayland-satellite waybar fuzzel SwayNotificationCenter wlogout wlsunset swaybg swayidle foot \
       greetd gtk4 gtk4-layer-shell libadwaita adwaita-icon-theme adwaita-cursor-theme \
       rsms-inter-fonts mesa-dri-drivers pipewire wireplumber pipewire-pulseaudio pipewire-alsa \
+      mesa-libEGL mesa-libGL libglvnd-egl libglvnd-gles libglvnd-opengl libglvnd-glx \
       xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome xdg-user-dirs \
       dconf polkit libnotify wl-clipboard brightnessctl playerctl \
       adw-gtk3-theme papirus-icon-theme qt6ct qt5ct qt6-qtwayland \
