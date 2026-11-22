@@ -93,7 +93,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] Keyboard: layouts and input methods (ibus, Indian languages), repeat, shortcuts editor (layouts, switch keys, repeat and a shortcuts list built; ibus transliteration and editing shortcuts to do)
 - [x] Mouse & touchpad: speed, tap to click, natural scroll, gestures (touchpad settings show only when one is found; checked on hardware)
 - [ ] Printers & scanners: add, default, queue → system-config-printer
-- [ ] Accounts: name, picture, password, auto-login, add a person
+- [~] Accounts: name, picture, password, auto-login, add a person (all built; name checked in the VM; password, auto-login and adding a person run through sudo with your password and are checked on the laptop)
 - [~] Date & time: time zone (automatic), 24-hour, date format (zone, automatic time, 12/24-hour built and checked; picking the zone from location to do; date format follows region formats)
 - [~] Language & region (language and region formats built; the choices appear once the next image brings the langpacks and Indian-script fonts; our own screens are English only)
 - [ ] Privacy: location, camera and microphone access, recent files, lock-screen content, firewall

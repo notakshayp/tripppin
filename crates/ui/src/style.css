@@ -764,6 +764,22 @@ levelbar.usage > trough > block.empty {
     background: transparent;
 }
 
+frame.avatar-pic {
+    border-radius: 9999px;
+    border: none;
+}
+
+.inline-form {
+    padding: 18px;
+    border-radius: 16px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+}
+
+.inline-form checkbutton {
+    color: #c9d4ce;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

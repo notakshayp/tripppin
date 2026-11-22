@@ -2,6 +2,7 @@
 //! `tripppin-ui settings [section]` opens it (on a section); a second call brings it forward.
 //! Sections are added here as they're built; each talks to the system service behind it.
 
+use crate::accounts;
 use crate::apps;
 use crate::bt;
 use crate::common::label;
@@ -20,7 +21,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 16] = [
+const SECTIONS: [(&str, &str); 17] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -34,6 +35,7 @@ const SECTIONS: [(&str, &str); 16] = [
     ("pointer", "mouse & touchpad"),
     ("time", "date & time"),
     ("language", "language & region"),
+    ("accounts", "accounts"),
     ("storage", "storage"),
     ("updates", "updates"),
     ("about", "about"),
@@ -99,6 +101,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&pointer_page(), Some("pointer"));
     stack.add_named(&time_page(), Some("time"));
     stack.add_named(&language_page(), Some("language"));
+    stack.add_named(&accounts_page(), Some("accounts"));
     stack.add_named(&storage_page(), Some("storage"));
     stack.add_named(&updates_page(), Some("updates"));
     stack.add_named(&about_page(), Some("about"));
@@ -2921,6 +2924,331 @@ fn storage_page() -> gtk::ScrolledWindow {
                         });
                         drives.append(&setting_row(&title, &eject));
                     }
+                },
+            );
+        }));
+    }
+    scroll.connect_map(move |_| {
+        if let Some(f) = load.borrow().clone() {
+            f();
+        }
+    });
+    scroll
+}
+
+/// A round picture, or the first letter of the name on green when there's no picture.
+fn avatar(p: &accounts::Person, size: i32) -> gtk::Widget {
+    let file = std::path::Path::new(&p.picture);
+    if !p.picture.is_empty() && file.metadata().is_ok_and(|m| m.len() > 0) {
+        let pic = gtk::Picture::for_filename(file);
+        pic.set_content_fit(gtk::ContentFit::Cover);
+        pic.set_size_request(size, size);
+        let frame = gtk::Frame::new(None);
+        frame.add_css_class("avatar-pic");
+        frame.set_overflow(gtk::Overflow::Hidden);
+        frame.set_child(Some(&pic));
+        frame.set_valign(gtk::Align::Center);
+        return frame.upcast();
+    }
+    let shown = if p.name.is_empty() { &p.login } else { &p.name };
+    let initial = shown.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default();
+    let l = gtk::Label::new(Some(&initial));
+    l.add_css_class("avatar");
+    l.set_size_request(size, size);
+    l.set_valign(gtk::Align::Center);
+    l.upcast()
+}
+
+/// A small form that ends with "your password" and a button; `work` gets the typed values
+/// (fields in order, then your password) on a background thread.
+fn admin_form(
+    fields: &[(&str, bool)],
+    button: &str,
+    error: &gtk::Label,
+    work: impl Fn(Vec<String>) -> Result<(), String> + Send + Sync + Clone + 'static,
+    done: impl Fn() + Clone + 'static,
+) -> (gtk::Box, Vec<gtk::Editable>) {
+    let form = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    form.add_css_class("inline-form");
+    let mut inputs: Vec<gtk::Editable> = Vec::new();
+    for (placeholder, secret) in fields.iter().copied().chain(std::iter::once(("your password, to confirm", true))) {
+        let w: gtk::Editable = if secret {
+            let e = gtk::PasswordEntry::builder().placeholder_text(placeholder).show_peek_icon(true).build();
+            e.add_css_class("field");
+            e.upcast()
+        } else {
+            let e = gtk::Entry::builder().placeholder_text(placeholder).build();
+            e.add_css_class("field");
+            e.upcast()
+        };
+        form.append(&w);
+        inputs.push(w);
+    }
+    let go = gtk::Button::with_label(button);
+    go.add_css_class("pill");
+    go.set_halign(gtk::Align::Start);
+    form.append(&go);
+    {
+        let (inputs, error) = (inputs.clone(), error.clone());
+        go.connect_clicked(move |b| {
+            let values: Vec<String> = inputs.iter().map(|i| i.text().to_string()).collect();
+            if values.iter().any(String::is_empty) {
+                error.set_text("fill in every box");
+                error.set_visible(true);
+                return;
+            }
+            b.set_sensitive(false);
+            let (b, error, work, done, inputs) = (b.clone(), error.clone(), work.clone(), done.clone(), inputs.clone());
+            background(
+                move || work(values),
+                move |r| {
+                    b.set_sensitive(true);
+                    match r {
+                        Ok(()) => {
+                            error.set_visible(false);
+                            for i in &inputs {
+                                i.set_text("");
+                            }
+                            done();
+                        }
+                        Err(e) => {
+                            error.set_text(&e);
+                            error.set_visible(true);
+                        }
+                    }
+                },
+            );
+        });
+    }
+    (form, inputs)
+}
+
+fn accounts_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("accounts");
+    let me_box = gtk::Box::new(gtk::Orientation::Horizontal, 18);
+    body.append(&me_box);
+    let you = gtk::ListBox::new();
+    you.add_css_class("list-card");
+    you.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&you);
+    let forms = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    body.append(&forms);
+    body.append(&caption("people on this computer"));
+    let others = gtk::ListBox::new();
+    others.add_css_class("list-card");
+    others.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&others);
+    let add_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    body.append(&add_box);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    body.append(&error);
+
+    let load: LoadSlot = Rc::new(RefCell::new(None));
+    {
+        let slot = load.clone();
+        *load.borrow_mut() = Some(Rc::new(move || {
+            let (slot, me_box, you, forms, others, add_box, status, error) = (
+                slot.clone(),
+                me_box.clone(),
+                you.clone(),
+                forms.clone(),
+                others.clone(),
+                add_box.clone(),
+                status.clone(),
+                error.clone(),
+            );
+            background(
+                || (accounts::people(), accounts::auto_login()),
+                move |(people, auto)| {
+                    let reload = {
+                        let slot = slot.clone();
+                        move || {
+                            if let Some(f) = slot.borrow().clone() {
+                                f();
+                            }
+                        }
+                    };
+                    while let Some(c) = me_box.first_child() {
+                        me_box.remove(&c);
+                    }
+                    while let Some(c) = forms.first_child() {
+                        forms.remove(&c);
+                    }
+                    while let Some(c) = add_box.first_child() {
+                        add_box.remove(&c);
+                    }
+                    clear(&you);
+                    clear(&others);
+                    let Some(me) = people.first().cloned() else {
+                        status.set_text("couldn't read the accounts");
+                        return;
+                    };
+                    status.set_text(&format!(
+                        "{} · {}",
+                        me.login,
+                        if me.admin { "administrator" } else { "standard account" }
+                    ));
+                    me_box.append(&avatar(&me, 72));
+                    let words = gtk::Box::new(gtk::Orientation::Vertical, 4);
+                    words.set_valign(gtk::Align::Center);
+                    words.append(&label(if me.name.is_empty() { &me.login } else { &me.name }, &["row-title-strong"]));
+                    let pick = gtk::Button::with_label("change picture");
+                    pick.add_css_class("link");
+                    pick.add_css_class("accent");
+                    pick.set_halign(gtk::Align::Start);
+                    {
+                        let (me, error, reload) = (me.clone(), error.clone(), reload.clone());
+                        pick.connect_clicked(move |b| {
+                            let filter = gtk::FileFilter::new();
+                            filter.add_mime_type("image/*");
+                            let filters = gio::ListStore::new::<gtk::FileFilter>();
+                            filters.append(&filter);
+                            let dialog = gtk::FileDialog::builder()
+                                .title("choose a picture")
+                                .filters(&filters)
+                                .modal(true)
+                                .build();
+                            let (me, error, reload) = (me.clone(), error.clone(), reload.clone());
+                            dialog.open(
+                                b.root().and_downcast::<gtk::Window>().as_ref(),
+                                gio::Cancellable::NONE,
+                                move |r| {
+                                    if let Ok(f) = r
+                                        && let Some(path) = f.path()
+                                    {
+                                        match accounts::set_picture(&me, &path.to_string_lossy()) {
+                                            Ok(()) => reload(),
+                                            Err(e) => {
+                                                error.set_text(&format!("couldn't change the picture: {e}"));
+                                                error.set_visible(true);
+                                            }
+                                        }
+                                    }
+                                },
+                            );
+                        });
+                    }
+                    words.append(&pick);
+                    me_box.append(&words);
+
+                    let name = gtk::Entry::new();
+                    name.set_text(&me.name);
+                    name.set_placeholder_text(Some("your full name"));
+                    name.add_css_class("field");
+                    name.set_width_chars(22);
+                    {
+                        let (me, error, reload) = (me.clone(), error.clone(), reload.clone());
+                        name.connect_activate(move |e| match accounts::set_name(&me, e.text().trim()) {
+                            Ok(()) => reload(),
+                            Err(err) => {
+                                error.set_text(&format!("couldn't change the name: {err}"));
+                                error.set_visible(true);
+                            }
+                        });
+                    }
+                    you.append(&setting_row("name (press enter to save)", &name));
+
+                    // Password: a form opens under the list.
+                    let pw = gtk::Button::with_label("change");
+                    pw.add_css_class("link");
+                    pw.add_css_class("accent");
+                    let login = me.login.clone();
+                    let (pw_form, _) = admin_form(
+                        &[("new password", true)],
+                        "change password",
+                        &error,
+                        move |v| accounts::set_password(&v[1], &login, &v[0]),
+                        reload.clone(),
+                    );
+                    pw_form.set_visible(false);
+                    {
+                        let f = pw_form.clone();
+                        pw.connect_clicked(move |_| f.set_visible(!f.is_visible()));
+                    }
+                    you.append(&setting_row("password", &pw));
+                    forms.append(&pw_form);
+
+                    let auto_on = auto.as_deref() == Some(me.login.as_str());
+                    let auto_btn = gtk::Button::with_label(if auto_on { "turn off" } else { "turn on" });
+                    auto_btn.add_css_class("link");
+                    auto_btn.add_css_class("accent");
+                    let login = me.login.clone();
+                    let (auto_form, _) = admin_form(
+                        &[],
+                        if auto_on { "turn off" } else { "turn on" },
+                        &error,
+                        move |v| accounts::set_auto_login(&v[0], if auto_on { None } else { Some(&login) }),
+                        reload.clone(),
+                    );
+                    auto_form.set_visible(false);
+                    {
+                        let f = auto_form.clone();
+                        auto_btn.connect_clicked(move |_| f.set_visible(!f.is_visible()));
+                    }
+                    you.append(&setting_row(
+                        if auto_on { "logs in without a password · on" } else { "log in without a password" },
+                        &auto_btn,
+                    ));
+                    forms.append(&auto_form);
+
+                    for p in people.iter().skip(1) {
+                        let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+                        row.add_css_class("net-row");
+                        row.append(&avatar(p, 36));
+                        let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+                        text.set_valign(gtk::Align::Center);
+                        text.append(&label(if p.name.is_empty() { &p.login } else { &p.name }, &["row-title"]));
+                        text.append(&label(
+                            &format!("{} · {}", p.login, if p.admin { "administrator" } else { "standard" }),
+                            &["row-sub"],
+                        ));
+                        row.append(&text);
+                        others.append(&row);
+                    }
+                    let add = gtk::Button::with_label("add a person");
+                    add.add_css_class("link");
+                    add.add_css_class("accent");
+                    let admin =
+                        gtk::CheckButton::with_label("administrator: can install software and change system settings");
+                    let shared = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                    {
+                        let shared = shared.clone();
+                        admin.connect_toggled(move |c| {
+                            shared.store(c.is_active(), std::sync::atomic::Ordering::Relaxed)
+                        });
+                    }
+                    let (add_form, inputs) = admin_form(
+                        &[("their full name", false), ("login name", false), ("their password", true)],
+                        "add",
+                        &error,
+                        move |v| {
+                            accounts::add_person(
+                                &v[3],
+                                &v[0],
+                                &v[1],
+                                &v[2],
+                                shared.load(std::sync::atomic::Ordering::Relaxed),
+                            )
+                        },
+                        reload.clone(),
+                    );
+                    // Suggest a login from the name.
+                    if let [full, login, ..] = &inputs[..] {
+                        let login = login.clone();
+                        full.connect_changed(move |e| login.set_text(&accounts::login_from(&e.text())));
+                    }
+                    add_form.insert_child_after(&admin, inputs.get(2));
+                    add_form.set_visible(false);
+                    {
+                        let f = add_form.clone();
+                        add.connect_clicked(move |_| f.set_visible(!f.is_visible()));
+                    }
+                    let add_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                    add_row.add_css_class("net-row");
+                    add_row.append(&add);
+                    others.append(&add_row);
+                    add_box.append(&add_form);
                 },
             );
         }));
