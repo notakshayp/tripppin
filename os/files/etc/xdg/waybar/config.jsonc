@@ -36,7 +36,8 @@
     "custom/clock": {
         "exec": "f=%H:%M; [ \"$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/clock 2>/dev/null)\" = 12 ] && f='%-I:%M %p'; date \"+%a %d %b · $f\" | tr '[:upper:]' '[:lower:]'",
         "interval": 15,
-        "tooltip": false
+        "tooltip": false,
+        "on-click": "tripppin-ui calendar"
     },
     "custom/orb": {
         "exec": "cat \"$XDG_RUNTIME_DIR/tripppin/orb-status\" 2>/dev/null",

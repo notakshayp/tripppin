@@ -49,7 +49,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
       airplane mode, volume and brightness sliders, media player, power-mode, screenshot, lock
 - [x] Notification centre (SwayNotificationCenter): history, grouping, actions, inline replies
 - [x] Notifications: our cards top right
-- [ ] Calendar pop-up from the clock, with upcoming events
+- [~] Calendar pop-up from the clock, with upcoming events (the month and today, opened and closed from the clock; events wait for calendar accounts)
 - [x] Power menu (wlogout): lock, log out, sleep, restart, shut down
 - [~] Volume, brightness, keyboard-light, caps-lock and mic-mute pop-ups (ours): volume, mute, mic and brightness done; keyboard light and caps lock to do
 - [x] Launcher (fuzzel): apps

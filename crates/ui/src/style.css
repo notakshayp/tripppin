@@ -780,6 +780,83 @@ frame.avatar-pic {
     color: #c9d4ce;
 }
 
+/* ---- calendar from the clock ------------------------------------------ */
+
+.calendar-card {
+    padding: 22px 22px 18px;
+    border-radius: 20px;
+    background: #101614;
+    border: 1px solid #2a3632;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+    min-width: 320px;
+}
+
+.calendar-day {
+    font-size: 26px;
+    font-weight: 700;
+    color: #f2f5ef;
+    letter-spacing: -0.5px;
+}
+
+.calendar-date {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #8fa39b;
+    margin-top: -10px;
+}
+
+calendar.month {
+    background: transparent;
+    border: none;
+    color: #d9e1dd;
+    font-size: 14px;
+}
+
+calendar.month > header {
+    border: none;
+    background: transparent;
+}
+
+calendar.month > header > button {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #8fa39b;
+}
+
+calendar.month > header > label.month,
+calendar.month > header > label.year {
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+calendar.month > grid > label.day-name {
+    font-family: "DM Mono", monospace;
+    font-size: 11px;
+    color: #6b7d76;
+}
+
+calendar.month > grid > label.day-number {
+    padding: 6px;
+    border-radius: 9999px;
+}
+
+calendar.month > grid > label.day-number.other-month {
+    color: #3d4a45;
+}
+
+calendar.month > grid > label.today {
+    background: #1f6b45;
+    color: #f2f5ef;
+    font-weight: 700;
+}
+
+calendar.month > grid > label.day-number:selected {
+    background: #57d99a;
+    color: #0d1211;
+    font-weight: 700;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

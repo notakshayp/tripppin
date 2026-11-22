@@ -10,6 +10,7 @@
 mod accounts;
 mod apps;
 mod bt;
+mod calendar;
 mod common;
 mod display;
 mod firstboot;
@@ -59,9 +60,10 @@ fn main() -> ExitCode {
         Some("first-boot") => firstboot::run(),
         Some("osd") => osd::run(),
         Some("settings") => settings::run(),
+        Some("calendar") => calendar::run(),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section]"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar"
             );
             ExitCode::from(2)
         }
