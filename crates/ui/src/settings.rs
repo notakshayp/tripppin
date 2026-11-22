@@ -2,6 +2,7 @@
 //! `tripppin-ui settings [section]` opens it (on a section); a second call brings it forward.
 //! Sections are added here as they're built; each talks to the system service behind it.
 
+use crate::apps;
 use crate::bt;
 use crate::common::label;
 use crate::display;
@@ -14,7 +15,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 7] = [
+const SECTIONS: [(&str, &str); 8] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -22,6 +23,7 @@ const SECTIONS: [(&str, &str); 7] = [
     ("appearance", "appearance"),
     ("power", "power & battery"),
     ("ai", "ai"),
+    ("notifications", "notifications"),
 ];
 
 pub fn run() -> glib::ExitCode {
@@ -74,6 +76,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&appearance_page(), Some("appearance"));
     stack.add_named(&power_page(), Some("power"));
     stack.add_named(&ai_page(), Some("ai"));
+    stack.add_named(&notifications_page(), Some("notifications"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -1732,4 +1735,222 @@ fn model_row(
     });
     row.append(&action);
     row
+}
+
+fn notifications_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, right) = page("notifications");
+    let dnd = gtk::Switch::new();
+    right.append(&label("do not disturb", &["row-sub"]));
+    right.append(&dnd);
+    right.set_spacing(12);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+
+    body.append(&caption("quiet hours"));
+    let quiet = gtk::ListBox::new();
+    quiet.add_css_class("list-card");
+    quiet.set_selection_mode(gtk::SelectionMode::None);
+    let hours: Vec<String> = (0..24).map(|h| format!("{h:02}:00")).collect();
+    let on = gtk::Switch::new();
+    let from = dropdown(&hours, 22);
+    let to = dropdown(&hours, 7);
+    quiet.append(&setting_row("turn on do not disturb every day", &on));
+    let from_row = setting_row("from", &from);
+    let to_row = setting_row("until", &to);
+    quiet.append(&from_row);
+    quiet.append(&to_row);
+    body.append(&quiet);
+
+    body.append(&caption("muted apps"));
+    body.append(&label("their notifications are dropped quietly.", &["row-sub"]));
+    let muted = gtk::ListBox::new();
+    muted.add_css_class("list-card");
+    muted.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&muted);
+    body.append(&error);
+
+    let set_status = {
+        let status = status.clone();
+        move |dnd: bool, quiet: Option<&(String, String)>, muted: usize| {
+            let mut words =
+                vec![if dnd { "do not disturb is on".to_string() } else { "showing notifications".to_string() }];
+            if let Some((a, b)) = quiet {
+                words.push(format!("quiet {a}–{b}"));
+            }
+            if muted > 0 {
+                words.push(format!("{muted} muted"));
+            }
+            status.set_text(&words.join(" · "));
+        }
+    };
+
+    // Each change saves at once; `loading` stops the controls' own signals while filling them in.
+    let loading = Rc::new(std::cell::Cell::new(true));
+    {
+        let loading = loading.clone();
+        dnd.connect_state_set(move |_, on| {
+            if !loading.get() {
+                apps::set_dnd(on);
+            }
+            glib::Propagation::Proceed
+        });
+    }
+    let save_quiet = {
+        let (on, from, to, from_row, to_row, error, loading, hours) = (
+            on.clone(),
+            from.clone(),
+            to.clone(),
+            from_row.clone(),
+            to_row.clone(),
+            error.clone(),
+            loading.clone(),
+            hours.clone(),
+        );
+        Rc::new(move || {
+            from_row.set_sensitive(on.is_active());
+            to_row.set_sensitive(on.is_active());
+            if loading.get() {
+                return;
+            }
+            let range = on
+                .is_active()
+                .then(|| (hours[from.selected() as usize].clone(), hours[to.selected() as usize].clone()));
+            let error = error.clone();
+            background(
+                move || {
+                    apps::set_quiet_hours(range.as_ref().map(|(a, b)| (a.as_str(), b.as_str())))
+                        .map_err(|e| e.to_string())
+                },
+                move |r| {
+                    if let Err(e) = r {
+                        error.set_text(&format!("couldn't save quiet hours: {e}"));
+                        error.set_visible(true);
+                    }
+                },
+            );
+        })
+    };
+    {
+        let save = save_quiet.clone();
+        on.connect_active_notify(move |_| save());
+    }
+    for d in [&from, &to] {
+        let save = save_quiet.clone();
+        d.connect_selected_notify(move |_| save());
+    }
+
+    let fill_muted: LoadSlot = Rc::new(RefCell::new(None));
+    {
+        let (muted_list, error, slot) = (muted.clone(), error.clone(), fill_muted.clone());
+        *fill_muted.borrow_mut() = Some(Rc::new(move || {
+            let (muted_list, error, slot) = (muted_list.clone(), error.clone(), slot.clone());
+            background(
+                || (apps::muted(), apps::installed()),
+                move |(names, installed)| {
+                    clear(&muted_list);
+                    let names = Rc::new(names);
+                    let save = {
+                        let (error, slot) = (error.clone(), slot.clone());
+                        move |next: Vec<String>| {
+                            let (error, slot) = (error.clone(), slot.clone());
+                            background(
+                                move || apps::set_muted(&next).map_err(|e| e.to_string()),
+                                move |r| {
+                                    if let Err(e) = r {
+                                        error.set_text(&format!("couldn't save: {e}"));
+                                        error.set_visible(true);
+                                    }
+                                    if let Some(f) = slot.borrow().clone() {
+                                        f();
+                                    }
+                                },
+                            );
+                        }
+                    };
+                    for n in names.iter() {
+                        let unmute = gtk::Button::with_label("unmute");
+                        unmute.add_css_class("link");
+                        unmute.add_css_class("accent");
+                        let (n, names, save) = (n.clone(), names.clone(), save.clone());
+                        let row = setting_row(&n.to_lowercase(), &unmute);
+                        unmute.connect_clicked(move |b| {
+                            b.set_sensitive(false);
+                            save(names.iter().filter(|x| **x != n).cloned().collect())
+                        });
+                        muted_list.append(&row);
+                    }
+                    let choices: Vec<String> =
+                        installed.iter().map(|a| a.name.clone()).filter(|n| !names.contains(n)).collect();
+                    if choices.is_empty() {
+                        return;
+                    }
+                    // Short labels, so a long app name can't widen the window.
+                    let lower: Vec<String> = choices
+                        .iter()
+                        .map(|c| {
+                            let c = c.to_lowercase();
+                            if c.chars().count() > 26 {
+                                format!("{}…", c.chars().take(25).collect::<String>())
+                            } else {
+                                c
+                            }
+                        })
+                        .collect();
+                    let pick = dropdown(&lower, 0);
+                    pick.set_enable_search(true);
+                    let mute = gtk::Button::with_label("mute");
+                    mute.add_css_class("link");
+                    mute.add_css_class("accent");
+                    let controls = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+                    controls.append(&pick);
+                    controls.append(&mute);
+                    {
+                        let (pick, names) = (pick.clone(), names.clone());
+                        mute.connect_clicked(move |_| {
+                            let mut next: Vec<String> = names.to_vec();
+                            next.push(choices[pick.selected() as usize].clone());
+                            save(next);
+                        });
+                    }
+                    muted_list.append(&setting_row("mute an app", &controls));
+                },
+            );
+        }));
+    }
+
+    {
+        let (dnd, on, from, to, loading, fill_muted) =
+            (dnd.clone(), on.clone(), from.clone(), to.clone(), loading.clone(), fill_muted.clone());
+        scroll.connect_map(move |_| {
+            let (dnd, on, from, to, loading, set_status, save_quiet) = (
+                dnd.clone(),
+                on.clone(),
+                from.clone(),
+                to.clone(),
+                loading.clone(),
+                set_status.clone(),
+                save_quiet.clone(),
+            );
+            loading.set(true);
+            background(
+                || (apps::dnd(), apps::quiet_hours(), apps::muted().len()),
+                move |(is_dnd, quiet, muted)| {
+                    dnd.set_active(is_dnd);
+                    on.set_active(quiet.is_some());
+                    if let Some((a, b)) = &quiet {
+                        let hour = |t: &str| t.split(':').next().and_then(|h| h.parse::<u32>().ok()).unwrap_or(0);
+                        from.set_selected(hour(a));
+                        to.set_selected(hour(b));
+                    }
+                    set_status(is_dnd, quiet.as_ref(), muted);
+                    save_quiet();
+                    loading.set(false);
+                },
+            );
+            if let Some(f) = fill_muted.borrow().clone() {
+                f();
+            }
+        });
+    }
+    scroll
 }
