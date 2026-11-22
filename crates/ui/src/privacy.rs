@@ -59,10 +59,14 @@ pub fn set_camera(app: &str, allowed: bool) {
         .status();
 }
 
-/// Some(on) when firewalld is installed.
+/// Some(on) when firewalld is installed. (Asking systemd needs no authorisation;
+/// `firewall-cmd --state` does outside the desktop session.)
 pub fn firewall() -> Option<bool> {
-    let out = Command::new("firewall-cmd").arg("--state").output().ok()?;
-    Some(String::from_utf8_lossy(&out.stdout).trim() == "running")
+    if !std::path::Path::new("/usr/lib/systemd/system/firewalld.service").exists() {
+        return None;
+    }
+    let out = Command::new("systemctl").args(["is-active", "--quiet", "firewalld.service"]).status().ok()?;
+    Some(out.success())
 }
 
 /// Screen reader: Orca, when installed.

@@ -73,7 +73,8 @@ pub fn set_twelve_hour(on: bool) -> std::io::Result<()> {
 }
 
 /// Languages people pick from, as (locale, name). Only those installed show up.
-pub const LANGUAGES: [(&str, &str); 16] = [
+pub const LANGUAGES: [(&str, &str); 17] = [
+    ("C.UTF-8", "english (basic)"),
     ("en_IN.UTF-8", "english (india)"),
     ("en_US.UTF-8", "english (us)"),
     ("en_GB.UTF-8", "english (uk)"),
@@ -92,9 +93,14 @@ pub const LANGUAGES: [(&str, &str); 16] = [
     ("pt_BR.UTF-8", "português · portuguese"),
 ];
 
-/// `locale -a` prints "en_IN.utf8"; the names above use "en_IN.UTF-8".
+/// `locale -a` prints "en_US.utf8", or just "hi_IN" for languages only built as UTF-8;
+/// the names above use "en_US.UTF-8".
 pub fn normalise(locale: &str) -> String {
-    locale.replace(".utf8", ".UTF-8")
+    if locale.contains('.') || locale.contains('@') || !locale.contains('_') {
+        locale.replace(".utf8", ".UTF-8")
+    } else {
+        format!("{locale}.UTF-8")
+    }
 }
 
 pub fn installed_languages() -> Vec<(&'static str, &'static str)> {
@@ -138,5 +144,8 @@ mod tests {
         assert_eq!(zone_label("America/New_York"), "new york · america");
         assert_eq!(zone_label("UTC"), "utc");
         assert_eq!(normalise("hi_IN.utf8"), "hi_IN.UTF-8");
+        assert_eq!(normalise("hi_IN"), "hi_IN.UTF-8");
+        assert_eq!(normalise("C.utf8"), "C.UTF-8");
+        assert_eq!(normalise("POSIX"), "POSIX");
     }
 }
