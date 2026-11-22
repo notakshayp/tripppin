@@ -1,0 +1,7 @@
+# The login screen. tripppin-ui greeter talks to greetd; niri-session is the desktop.
+[terminal]
+vt = 1
+
+[default_session]
+command = "niri -c /etc/tripppin/greeter-niri.kdl"
+user = "greetd"

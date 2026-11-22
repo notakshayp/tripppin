@@ -5,3 +5,4 @@ target/
 *.iso
 *.qcow2
 .env
+out/

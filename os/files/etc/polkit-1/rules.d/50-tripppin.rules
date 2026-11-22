@@ -1,0 +1,9 @@
+// The first-boot screen starts the AI service once the model is downloaded; let
+// administrators (wheel) start, stop and restart just that service without a prompt.
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "tripppin-llm.service" &&
+        subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});

@@ -7,7 +7,7 @@
 
 use crate::jobs;
 use crate::model::{self, ContextFull, Message, ToolCall};
-use crate::shell::{ACCENT, DIM, RESET};
+use crate::term::{ACCENT, DIM, RESET};
 use anyhow::{Result, bail};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -250,6 +250,38 @@ fn looks_like_text_call(text: &str) -> bool {
 const FIX_TEXT_CALL: &str = "Your last reply looks like a tool call written as text, so nothing ran. \
 Call the tool through the tool interface with valid JSON arguments, or answer in plain words if you're done.";
 
+/// Where the agent's progress goes: the terminal, or the orb's window.
+pub trait Ui {
+    /// A piece of the model's answer, as it streams.
+    fn text(&mut self, piece: &str);
+    /// A tool call starting: what kind, and what it works on (one line).
+    fn step(&mut self, label: &str, detail: &str);
+    /// A line of output from a running command.
+    fn output(&mut self, line: &str);
+    /// Something the person should know that isn't the answer.
+    fn note(&mut self, text: &str);
+}
+
+/// Progress printed to the terminal, the way the AI shell shows it.
+pub struct Terminal;
+
+impl Ui for Terminal {
+    fn text(&mut self, piece: &str) {
+        let mut out = io::stdout();
+        let _ = write!(out, "{piece}");
+        let _ = out.flush();
+    }
+    fn step(&mut self, label: &str, detail: &str) {
+        println!("{ACCENT}▸{RESET} {DIM}{label}{RESET} {detail}");
+    }
+    fn output(&mut self, line: &str) {
+        println!("{DIM}  │ {line}{RESET}");
+    }
+    fn note(&mut self, text: &str) {
+        println!("{DIM}{text}{RESET}");
+    }
+}
+
 /// How a task ended.
 pub struct Done {
     pub stats: Option<String>,
@@ -257,19 +289,19 @@ pub struct Done {
 
 /// Works on the conversation in `history` until the model answers without calling a tool.
 /// The model's text streams to the terminal; each tool call shows as a line, with its output.
-pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
+pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<Done> {
     let tools = tools();
     let budget = model::context_tokens().saturating_sub(CONTEXT_RESERVE).max(2000) * CHARS_PER_TOKEN;
     let mut runs: HashMap<String, usize> = HashMap::new();
     let mut retries = 0;
     for step in 0..MAX_STEPS {
         compact(history, budget);
-        let reply = match ask(history, &tools, cancel) {
+        let reply = match ask(history, &tools, cancel, ui) {
             Err(e) if e.downcast_ref::<ContextFull>().is_some() => {
                 // The estimate was off; keep only the newest output and try once more.
-                note("the conversation got too long for the model's memory; trimming old output");
+                ui.note("the conversation got too long for the model's memory; trimming old output");
                 compact(history, 0);
-                ask(history, &tools, cancel).map_err(|e| match e.downcast_ref::<ContextFull>() {
+                ask(history, &tools, cancel, ui).map_err(|e| match e.downcast_ref::<ContextFull>() {
                     Some(_) => anyhow::anyhow!("this task got too long for the model's memory. try a smaller step."),
                     None => e,
                 })?
@@ -277,7 +309,7 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
             other => other?,
         };
         if !reply.text.is_empty() && !reply.text.ends_with('\n') {
-            println!();
+            ui.text("\n");
         }
         if reply.cancelled {
             bail!("stopped");
@@ -293,7 +325,9 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
                 if retries > MAX_RETRIES {
                     bail!("the model kept writing tool calls it couldn't send properly. try rephrasing.");
                 }
-                note(&format!("that tool call came out malformed; asking for a fixed one ({retries}/{MAX_RETRIES})"));
+                ui.note(&format!(
+                    "that tool call came out malformed; asking for a fixed one ({retries}/{MAX_RETRIES})"
+                ));
                 history.push(Message::user(FIX_TEXT_CALL));
                 continue;
             }
@@ -310,16 +344,16 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool) -> Result<Done> {
         for call in &calls {
             let result = match verify(call) {
                 Ok(Action::Exec { command, .. }) if bump(&mut runs, &command) > MAX_REPEATS => {
-                    note(&format!("not running `{}` again; it already ran {MAX_REPEATS} times", one_line(&command)));
+                    ui.note(&format!("not running `{}` again; it already ran {MAX_REPEATS} times", one_line(&command)));
                     format!(
                         "Not run: you've already run this exact command {MAX_REPEATS} times in this task. \
 Don't repeat it. Try a different approach, or tell the person what's blocking you."
                     )
                 }
-                Ok(action) => perform(&action, cancel),
+                Ok(action) => perform(&action, cancel, ui),
                 Err(problem) => {
                     broken = true;
-                    note(&format!("bad {} call: {problem}", if call.name.is_empty() { "tool" } else { &call.name }));
+                    ui.note(&format!("bad {} call: {problem}", if call.name.is_empty() { "tool" } else { &call.name }));
                     format!("Error: this call was not run. {problem} Fix the call and send it again.")
                 }
             };
@@ -333,7 +367,7 @@ Don't repeat it. Try a different approach, or tell the person what's blocking yo
             if retries > MAX_RETRIES {
                 bail!("the model kept sending broken tool calls ({MAX_RETRIES} retries). try rephrasing.");
             }
-            note(&format!("asking the model to fix its call ({retries}/{MAX_RETRIES})"));
+            ui.note(&format!("asking the model to fix its call ({retries}/{MAX_RETRIES})"));
         } else {
             retries = 0;
         }
@@ -342,12 +376,8 @@ Don't repeat it. Try a different approach, or tell the person what's blocking yo
 }
 
 /// One model turn, streamed to the terminal.
-fn ask(history: &[Message], tools: &Value, cancel: &AtomicBool) -> Result<model::Reply> {
-    let mut out = io::stdout();
-    model::stream(history, Some(tools), cancel, |piece| {
-        let _ = write!(out, "{piece}");
-        let _ = out.flush();
-    })
+fn ask(history: &[Message], tools: &Value, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<model::Reply> {
+    model::stream(history, Some(tools), cancel, |piece| ui.text(piece))
 }
 
 fn bump(runs: &mut HashMap<String, usize>, command: &str) -> usize {
@@ -388,51 +418,47 @@ fn compact(history: &mut [Message], budget: usize) {
     }
 }
 
-fn note(text: &str) {
-    println!("{DIM}{text}{RESET}");
-}
-
 /// Shows the step on one line, cut to a readable length.
-fn show_step(tool: &str, detail: &str) {
+fn show_step(ui: &mut dyn Ui, tool: &str, detail: &str) {
     let line = detail.lines().next().unwrap_or("");
     let more = line.chars().count() > 100 || detail.lines().nth(1).is_some();
     let line: String = line.chars().take(100).collect();
-    println!("{ACCENT}▸{RESET} {DIM}{tool}{RESET} {line}{}", if more { "…" } else { "" });
+    ui.step(tool, &format!("{line}{}", if more { "…" } else { "" }));
 }
 
-fn perform(action: &Action, cancel: &AtomicBool) -> String {
+fn perform(action: &Action, cancel: &AtomicBool, ui: &mut dyn Ui) -> String {
     match action {
         Action::Exec { command, wait_secs, background } => {
-            show_step(if *background { "exec in the background" } else { "exec" }, command);
+            show_step(ui, if *background { "exec in the background" } else { "exec" }, command);
             let id = match jobs::start(command, !*background) {
                 Ok(id) => id,
                 Err(e) => return format!("Error: {e}"),
             };
             let wait = if *background { Duration::ZERO } else { Duration::from_secs(*wait_secs) };
-            let result = jobs::wait(id, wait, cancel);
+            let result = jobs::wait(id, wait, cancel, &mut |line| ui.output(line));
             if !jobs::finished(id) && !*background {
-                jobs::note_backgrounded(id);
+                ui.note(&format!("  still running; carrying on in the background as job {id}"));
             }
             result
         }
         Action::JobWait { job, wait_secs } => {
-            show_step(&format!("waiting on job {job}"), &jobs::command(*job).unwrap_or_default());
-            jobs::wait(*job, Duration::from_secs(*wait_secs), cancel)
+            show_step(ui, &format!("waiting on job {job}"), &jobs::command(*job).unwrap_or_default());
+            jobs::wait(*job, Duration::from_secs(*wait_secs), cancel, &mut |line| ui.output(line))
         }
         Action::JobOutput { job } => {
-            show_step(&format!("checking job {job}"), &jobs::command(*job).unwrap_or_default());
+            show_step(ui, &format!("checking job {job}"), &jobs::command(*job).unwrap_or_default());
             jobs::output(*job)
         }
         Action::JobStop { job } => {
-            show_step(&format!("stopping job {job}"), &jobs::command(*job).unwrap_or_default());
+            show_step(ui, &format!("stopping job {job}"), &jobs::command(*job).unwrap_or_default());
             jobs::stop(*job)
         }
         Action::ReadFile { path } => {
-            show_step("read", path);
+            show_step(ui, "read", path);
             read_file(path)
         }
         Action::WriteFile { path, content } => {
-            show_step("write", path);
+            show_step(ui, "write", path);
             write_file(path, content)
         }
     }
@@ -495,7 +521,7 @@ fn clip(text: &str) -> String {
 pub fn once(task: &str) -> Result<()> {
     let cancel = AtomicBool::new(false);
     let mut history = vec![Message::system(), Message::user(task)];
-    let done = run(&mut history, &cancel)?;
+    let done = run(&mut history, &cancel, &mut Terminal)?;
     if let Some(stats) = done.stats {
         eprintln!("{DIM}{stats}{RESET}");
     }

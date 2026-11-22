@@ -1,0 +1,107 @@
+// The tripppin desktop. niri reads this when a person has no config of their own
+// (~/.config/niri/config.kdl). Every window floats, with rounded corners, a soft
+// shadow and a green ring on the focused one.
+
+input {
+    keyboard {
+        numlock
+    }
+    touchpad {
+        tap
+        natural-scroll
+        dwt
+    }
+    focus-follows-mouse max-scroll-amount="0%"
+}
+
+layout {
+    gaps 16
+    center-focused-column "never"
+    default-column-width { proportion 0.5; }
+
+    focus-ring {
+        width 2
+        active-color "#57d99a"
+        inactive-color "#2a3632"
+    }
+    border {
+        off
+    }
+    shadow {
+        on
+        softness 40
+        spread 4
+        offset x=0 y=14
+        color "#0000008c"
+    }
+}
+
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 24
+}
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+screenshot-path "~/Pictures/Screenshots/%Y-%m-%d %H-%M-%S.png"
+
+environment {
+    // The terminal opens straight into the AI shell; the animated logo is for consoles.
+    TRIPPPIN_NO_LOGO "1"
+}
+
+spawn-at-startup "swaybg" "-i" "/usr/share/tripppin/wallpaper.png" "-m" "fill"
+spawn-at-startup "waybar"
+spawn-at-startup "mako" "--config" "/etc/xdg/mako/config"
+spawn-at-startup "tripppin-ui" "orb"
+spawn-at-startup "tripppin-ui" "first-boot"
+// Lock after five idle minutes and before the laptop sleeps.
+spawn-at-startup "swayidle" "-w" "timeout" "300" "tripppin-ui lock" "before-sleep" "tripppin-ui lock"
+
+window-rule {
+    geometry-corner-radius 16
+    clip-to-geometry true
+    open-floating true
+}
+
+animations {
+    window-open {
+        duration-ms 220
+        curve "ease-out-expo"
+    }
+    window-close {
+        duration-ms 160
+        curve "ease-out-quad"
+    }
+}
+
+binds {
+    Mod+Space { spawn "tripppin-ui" "orb" "--toggle"; }
+    Mod+Return { spawn "foot"; }
+    Mod+D { spawn "fuzzel"; }
+    Mod+L { spawn "tripppin-ui" "lock"; }
+    Mod+Q { close-window; }
+    Mod+F { fullscreen-window; }
+    Mod+T { toggle-window-floating; }
+    Mod+Tab { focus-window-down-or-column-right; }
+    Mod+Shift+Tab { focus-window-up-or-column-left; }
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+Shift+1 { move-window-to-workspace 1; }
+    Mod+Shift+2 { move-window-to-workspace 2; }
+    Mod+Shift+3 { move-window-to-workspace 3; }
+    Mod+Shift+Slash { show-hotkey-overlay; }
+    Mod+Shift+E { quit; }
+    Print { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "wpctl" "set-volume" "-l" "1.0" "@DEFAULT_AUDIO_SINK@" "5%+"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
+    XF86AudioMute allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+    XF86AudioPlay allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "set" "5%+"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "set" "5%-"; }
+}

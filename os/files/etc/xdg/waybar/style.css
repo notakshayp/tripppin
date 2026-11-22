@@ -1,0 +1,71 @@
+/* Matches the mockup: ink pill, DM Mono, paper for what matters, green for live. */
+* {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+window#waybar {
+    background: rgba(20, 27, 25, 0.82);
+    border: 1px solid #222d2a;
+    border-radius: 12px;
+    color: #b7c3bd;
+}
+
+#image.logo {
+    padding: 0 10px 0 16px;
+}
+
+#workspaces {
+    margin: 0 4px;
+}
+
+#workspaces button {
+    padding: 0;
+    margin: 16px 3px;
+    min-width: 6px;
+    border-radius: 3px;
+    background: #3d4a45;
+    color: transparent;
+    transition: min-width 160ms ease;
+}
+
+#workspaces button.active {
+    min-width: 18px;
+    background: #57d99a;
+}
+
+#workspaces button:hover {
+    background: #8a9a93;
+}
+
+#window {
+    color: #f2f5ef;
+    margin-left: 10px;
+}
+
+#custom-clock {
+    color: #f2f5ef;
+}
+
+#custom-orb,
+#network,
+#pulseaudio,
+#battery {
+    padding: 0 8px;
+}
+
+#custom-orb {
+    color: #57d99a;
+}
+
+#battery {
+    padding-right: 16px;
+}
+
+#battery.warning:not(.charging) {
+    color: #f0a868;
+}

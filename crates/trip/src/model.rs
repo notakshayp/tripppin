@@ -87,16 +87,57 @@ pub fn pull(tier_id: Option<&str>) -> Result<()> {
             )?
         }
     };
+    if installed(&models_dir(), tier) {
+        println!("{} is already installed.", tier.model);
+        return Ok(());
+    }
+    let tty = io::stderr().is_terminal();
+    let name = tier.model.clone();
+    pull_tier(tier, &mut |done, total, rate| {
+        if tty {
+            eprint!(
+                "\r\x1b[2Kdownloading {name}  {:.2} / {:.2} GB  {:>3.0}%  {:.0} MB/s",
+                done as f64 / 1e9,
+                total as f64 / 1e9,
+                100.0 * done as f64 / total as f64,
+                rate / 1e6
+            );
+        }
+    })?;
+    if tty {
+        eprintln!();
+    }
+    println!(
+        "{} installed ({:.1} GB). Start it with: sudo systemctl start tripppin-llm",
+        tier.model,
+        tier.download_gb()
+    );
+    Ok(())
+}
+
+/// The tier this machine should use, from its hardware.
+pub fn recommended() -> Result<Tier> {
+    let catalog = Catalog::builtin()?;
+    let hw = hwdetect::detect()?;
+    catalog.recommend(&hw).cloned().context("this machine has under 16 GB of memory, so there's no local model for it")
+}
+
+/// Whether the given tier's model is downloaded.
+pub fn is_installed(tier: &Tier) -> bool {
+    installed(&models_dir(), tier)
+}
+
+/// Downloads `tier`'s model (resuming), checks its checksum and moves it into place.
+/// `on_progress` gets bytes done, bytes in all and the rate in bytes per second, a few times a second.
+pub fn pull_tier(tier: &Tier, on_progress: &mut dyn FnMut(u64, u64, f64)) -> Result<()> {
     let dir = models_dir();
     fs::create_dir_all(&dir).with_context(|| format!("can't create {}. Try again with sudo.", dir.display()))?;
     let dest = dir.join(&tier.file);
     if installed(&dir, tier) {
-        println!("{} is already installed.", tier.model);
         return Ok(());
     }
     let part = dir.join(format!("{}.part", tier.file));
-    download(&tier.url, &part, tier.size_bytes, &tier.model)?;
-    eprintln!("checking the file…");
+    download(&tier.url, &part, tier.size_bytes, on_progress)?;
     let actual = sha256_file(&part)?;
     if actual != tier.sha256 {
         fs::remove_file(&part).ok();
@@ -107,15 +148,10 @@ pub fn pull(tier_id: Option<&str>) -> Result<()> {
         );
     }
     fs::rename(&part, &dest)?;
-    println!(
-        "{} installed ({:.1} GB). Start it with: sudo systemctl start tripppin-llm",
-        tier.model,
-        tier.download_gb()
-    );
     Ok(())
 }
 
-fn download(url: &str, part: &Path, total: u64, name: &str) -> Result<()> {
+fn download(url: &str, part: &Path, total: u64, on_progress: &mut dyn FnMut(u64, u64, f64)) -> Result<()> {
     let have = fs::metadata(part).map_or(0, |m| m.len());
     if have >= total {
         return Ok(());
@@ -133,7 +169,6 @@ fn download(url: &str, part: &Path, total: u64, name: &str) -> Result<()> {
     let mut buf = vec![0u8; 1 << 20];
     let (start, mut last) = (Instant::now(), Instant::now() - Duration::from_secs(1));
     let start_bytes = done;
-    let tty = io::stderr().is_terminal();
     loop {
         let n = reader.read(&mut buf)?;
         if n == 0 {
@@ -141,21 +176,13 @@ fn download(url: &str, part: &Path, total: u64, name: &str) -> Result<()> {
         }
         file.write_all(&buf[..n])?;
         done += n as u64;
-        if tty && last.elapsed() >= Duration::from_millis(250) {
+        if last.elapsed() >= Duration::from_millis(250) {
             last = Instant::now();
-            let rate = (done - start_bytes) as f64 / start.elapsed().as_secs_f64().max(0.001) / 1e6;
-            eprint!(
-                "\r\x1b[2Kdownloading {name}  {:.2} / {:.2} GB  {:>3.0}%  {rate:.0} MB/s",
-                done as f64 / 1e9,
-                total as f64 / 1e9,
-                100.0 * done as f64 / total as f64
-            );
+            on_progress(done, total, (done - start_bytes) as f64 / start.elapsed().as_secs_f64().max(0.001));
         }
     }
     file.sync_all()?;
-    if tty {
-        eprintln!();
-    }
+    on_progress(done, total, 0.0);
     if done != total {
         bail!("download stopped at {done} of {total} bytes; run the command again to resume");
     }

@@ -4,8 +4,6 @@
 //! with memory, `/terminal` opens a normal shell, and `!command` runs one command
 //! exactly as typed.
 
-use crate::agent;
-use crate::model::Message;
 use anyhow::Result;
 use reedline::{
     DefaultHinter, FileBackedHistory, Prompt, PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus, Reedline,
@@ -16,10 +14,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use trip::agent;
+use trip::model::Message;
+use trip::term::{ACCENT, DIM, RESET};
 
-pub(crate) const ACCENT: &str = "\x1b[38;2;87;217;154m";
-pub(crate) const DIM: &str = "\x1b[2m";
-pub(crate) const RESET: &str = "\x1b[0m";
 const HELP: &str = "\
   type anything     ask, or tell it what to do; it can run commands
   /chat             start a conversation with memory (/exit to leave it)
@@ -173,7 +171,7 @@ pub fn run() -> Result<()> {
 /// Works on one request with the agent, which streams its answer and shows each step.
 /// Returns whether it finished.
 fn respond(history: &mut Vec<Message>, cancel: &AtomicBool) -> bool {
-    match agent::run(history, cancel) {
+    match agent::run(history, cancel, &mut agent::Terminal) {
         Ok(done) => {
             if let Some(stats) = done.stats {
                 println!("{DIM}{stats}{RESET}");

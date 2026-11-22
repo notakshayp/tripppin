@@ -7,17 +7,17 @@
 # a new one, and that PR runs the full image pipeline before it can merge.
 
 # ---- Rust tools -------------------------------------------------------------
-FROM quay.io/fedora/fedora:45@sha256:f236063d5a7a15e76ff034f2be5fa6f7a8922fcb655093ad972a1f196b14a007 AS build
-RUN dnf -y install --setopt=install_weak_deps=False cargo rust gcc && dnf clean all
+FROM quay.io/fedora/fedora:45@sha256:6d8462b7b0474af891c3e84e680df7bdfb487cf37ccb6239b5e05444d1b92cbd AS build
+RUN dnf -y install --setopt=install_weak_deps=False cargo rust gcc gtk4-devel gtk4-layer-shell-devel && dnf clean all
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rustfmt.toml ./
 COPY crates crates
 COPY models models
-RUN cargo build --release --locked -p trip
+RUN cargo build --release --locked -p trip -p tripppin-ui
 
 # ---- llama.cpp ------------------------------------------------------------
 # Pinned release, Vulkan backend (falls back to the CPU when there's no GPU).
-FROM quay.io/fedora/fedora:45@sha256:f236063d5a7a15e76ff034f2be5fa6f7a8922fcb655093ad972a1f196b14a007 AS llama
+FROM quay.io/fedora/fedora:45@sha256:6d8462b7b0474af891c3e84e680df7bdfb487cf37ccb6239b5e05444d1b92cbd AS llama
 ARG LLAMA_CPP_TAG=v1.0.0
 RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ vulkan-headers vulkan-loader-devel glslc spirv-headers-devel && dnf clean all
 RUN git clone --depth 1 --branch "$LLAMA_CPP_TAG" https://github.com/ggml-org/llama.cpp /src/llama.cpp
@@ -28,7 +28,7 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NAT
     && cmake --build build --target llama-server -j"$(nproc)"
 
 # ---- The OS -----------------------------------------------------------------
-FROM quay.io/fedora/fedora-bootc:45@sha256:813fd13fb01363e76310c5e764ddcba8e275a0259255f49b5717a9925e74b177
+FROM quay.io/fedora/fedora-bootc:45@sha256:f387c5f622d2f095e23b1587c97a4d4659231df6c8a649329839a9336a99c5e4
 
 LABEL org.opencontainers.image.title="tripppin" \
       org.opencontainers.image.description="A Linux with an AI built in." \
@@ -49,6 +49,7 @@ RUN dnf -y remove toolbox && dnf clean all
 RUN cp -n /usr/share/dnf5/repos.d/*.repo /etc/yum.repos.d/
 
 COPY --from=build /src/target/release/trip /usr/bin/trip
+COPY --from=build /src/target/release/tripppin-ui /usr/bin/tripppin-ui
 COPY --from=llama /src/llama.cpp/build/bin/llama-server /usr/bin/llama-server
 COPY --from=llama /src/llama.cpp/LICENSE /usr/share/licenses/llama.cpp/LICENSE
 
@@ -79,6 +80,17 @@ RUN dnf -y install --setopt=install_weak_deps=False kmscon kmscon-pango dejavu-s
          "https://raw.githubusercontent.com/google/fonts/${DM_MONO_REV}/ofl/dmmono/OFL.txt" \
     && fc-cache -f
 
+# The desktop: niri (a Wayland compositor) with every window floating, styled end
+# to end. waybar, fuzzel, mako, foot and swaybg are configured in os/files; the
+# orb, login and lock screens are ours (tripppin-ui). Inter is the interface font.
+RUN dnf -y install --setopt=install_weak_deps=False \
+      niri xwayland-satellite waybar fuzzel mako swaybg swayidle foot \
+      greetd gtk4 gtk4-layer-shell libadwaita adwaita-icon-theme adwaita-cursor-theme \
+      rsms-inter-fonts mesa-dri-drivers pipewire wireplumber pipewire-pulseaudio pipewire-alsa \
+      xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome xdg-user-dirs \
+      dconf polkit libnotify wl-clipboard brightnessctl playerctl \
+    && dnf clean all
+
 COPY os/files/ /
 
 # Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still
@@ -92,7 +104,10 @@ RUN sed -i \
 # The login banner: the logo in text, then the system name and terminal.
 RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } > /etc/issue
 
-RUN systemctl enable tripppin-llm.service kmsconvt@tty1.service
+# The desktop starts on tty1 through greetd; other consoles (Ctrl+Alt+F2…) are kmscon.
+RUN systemctl enable tripppin-llm.service greetd.service kmsconvt@.service \
+    && systemctl set-default graphical.target \
+    && dconf update
 
 # Fails the build if the image breaks bootc's rules (e.g. content in /var it can't manage).
 RUN bootc container lint
