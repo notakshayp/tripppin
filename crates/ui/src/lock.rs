@@ -85,7 +85,7 @@ fn build(app: &gtk::Application) {
         dot.add_css_class("ask-orb");
         dot.set_size_request(22, 22);
         let notice_text = label("", &[]);
-        notice.append(&common::spark(14, false));
+        notice.append(&common::logo(13));
         notice.append(&notice_text);
         notice.set_visible(false);
         let form = gtk::Box::new(gtk::Orientation::Vertical, 12);

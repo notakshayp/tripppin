@@ -252,7 +252,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     corner.set_keyboard_mode(KeyboardMode::None);
     let button = gtk::Button::new();
     button.add_css_class("orb");
-    button.set_child(Some(&common::spark(28, false)));
+    button.set_child(Some(&common::logo(26)));
     button.set_tooltip_text(Some("ask tripppin (super + space)"));
     button.set_margin_end(36);
     button.set_margin_bottom(30);
@@ -305,7 +305,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     pill_orb.set_valign(gtk::Align::Center);
     pill_orb.set_hexpand(false);
     pill_orb.set_size_request(52, 52);
-    let s = common::spark(24, false);
+    let s = common::logo(24);
     s.set_valign(gtk::Align::Center);
     pill_orb.set_center_widget(Some(&s));
     let entry = gtk::Entry::new();

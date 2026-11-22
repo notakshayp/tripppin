@@ -45,7 +45,7 @@ fn build(app: &gtk::Application, tier: Tier) {
     let orb = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     orb.add_css_class("ask-orb");
     orb.set_size_request(48, 48);
-    let s = common::spark(22, false);
+    let s = common::logo(19);
     s.set_hexpand(true);
     s.set_halign(gtk::Align::Center);
     s.set_valign(gtk::Align::Center);

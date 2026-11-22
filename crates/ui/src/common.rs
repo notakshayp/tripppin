@@ -4,6 +4,7 @@ use gtk::prelude::*;
 use gtk::{cairo, gdk, glib};
 use std::path::PathBuf;
 
+pub const INK: (f64, f64, f64) = (0.949, 0.961, 0.937);
 pub const GREEN: (f64, f64, f64) = (0.341, 0.851, 0.604);
 
 /// Loads the Tripppin stylesheet for the whole app.
@@ -61,37 +62,20 @@ fn draw_mark(cr: &cairo::Context, x: f64, y: f64, w: f64, ring: (f64, f64, f64, 
     cr.restore().ok();
 }
 
-/// Just the spark, `size` px square, optionally turned (degrees) and in a lighter green.
-pub fn spark(size: i32, bright: bool) -> gtk::DrawingArea {
+/// The full mark, paper ring and green spark, `width` px wide (and 175/146 as tall).
+pub fn logo(width: i32) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
-    area.set_content_width(size);
-    area.set_content_height(size);
+    area.set_content_width(width);
+    area.set_content_height((f64::from(width) * 175.0 / 146.0).round() as i32);
     area.set_can_target(false);
-    area.set_draw_func(move |_, cr, w, _| {
-        let s = f64::from(w) / 80.0;
-        cr.scale(s, s);
-        cr.translate(-60.0, -10.0);
-        let pts = [
-            (100.00, 14.00),
-            (106.11, 43.89),
-            (136.00, 50.00),
-            (106.11, 56.11),
-            (100.00, 86.00),
-            (93.89, 56.11),
-            (64.00, 50.00),
-            (93.89, 43.89),
-        ];
-        cr.move_to(pts[0].0, pts[0].1);
-        for p in &pts[1..] {
-            cr.line_to(p.0, p.1);
-        }
-        cr.close_path();
-        if bright {
-            cr.set_source_rgb(0.784, 1.0, 0.886);
-        } else {
-            cr.set_source_rgb(GREEN.0, GREEN.1, GREEN.2);
-        }
-        cr.fill().ok();
+    // Always the asked-for size, centred, however much room the parent gives it.
+    area.set_halign(gtk::Align::Center);
+    area.set_valign(gtk::Align::Center);
+    let size = f64::from(width);
+    area.set_draw_func(move |_, cr, w, h| {
+        let height = size * 175.0 / 146.0;
+        let (x, y) = ((f64::from(w) - size) / 2.0, (f64::from(h) - height) / 2.0);
+        draw_mark(cr, x, y, size, (INK.0, INK.1, INK.2, 1.0), (GREEN.0, GREEN.1, GREEN.2, 1.0));
     });
     area
 }

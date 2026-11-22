@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Dev loop for the desktop screens: build tripppin-ui for ARM in a Fedora container,
-# copy it into the UTM test VM over a temporary /usr overlay, and restart the login screen.
+# copy it into the UTM test VM over a writable /usr overlay, and restart it.
 # Needs: a podman machine, the VM at $VM (default 192.168.64.3), the test login file.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -15,6 +15,8 @@ podman run --rm --platform linux/arm64 -v "$PWD:/src" -v cargo-home:/root/.cargo
   cp /root/.cargo/target-linux/release/tripppin-ui /src/out/tripppin-ui'
 scp -q "${SSH_OPTS[@]}" out/tripppin-ui "tripppin@$VM:/var/tmp/tripppin-ui"
 ssh "${SSH_OPTS[@]}" "tripppin@$VM" "echo '$PASS' | sudo -S -p '' sh -c '
+  # /usr is the read-only image: a writable overlay (until reboot) takes the test build.
+  # Never use dnf install --transient on the VM: it leaves the overlay read-only.
   bootc usr-overlay >/dev/null 2>&1 || true
   install -m 755 /var/tmp/tripppin-ui /usr/bin/tripppin-ui
   # Someone logged in: restart just the orb in their session. Otherwise, the login screen.
