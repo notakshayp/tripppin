@@ -14,7 +14,25 @@ mod orb;
 
 use gtk::glib::ExitCode;
 
+/// Virtual machines often have a GPU without 3D, where GTK's OpenGL renderer aborts on
+/// start. There, run again with the software renderer (set before GTK starts, by re-exec,
+/// since changing our own environment needs unsafe code).
+#[cfg(unix)]
+fn use_software_rendering_in_vms() {
+    use std::os::unix::process::CommandExt;
+    if std::env::var_os("GSK_RENDERER").is_some() {
+        return;
+    }
+    let in_vm =
+        std::process::Command::new("systemd-detect-virt").args(["--vm", "--quiet"]).status().is_ok_and(|s| s.success());
+    if in_vm && let Ok(exe) = std::env::current_exe() {
+        let err = std::process::Command::new(exe).args(std::env::args_os().skip(1)).env("GSK_RENDERER", "cairo").exec();
+        eprintln!("couldn't restart with software rendering: {err}");
+    }
+}
+
 fn main() -> ExitCode {
+    use_software_rendering_in_vms();
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("orb") => orb::run(),

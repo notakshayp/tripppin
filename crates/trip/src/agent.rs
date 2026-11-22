@@ -260,6 +260,10 @@ pub trait Ui {
     fn output(&mut self, line: &str);
     /// Something the person should know that isn't the answer.
     fn note(&mut self, text: &str);
+    /// The step that just ran finished, well or not. Not called while a job keeps running.
+    fn step_done(&mut self, _ok: bool) {}
+    /// The model is working out its next move (no output to show yet).
+    fn thinking(&mut self) {}
 }
 
 /// Progress printed to the terminal, the way the AI shell shows it.
@@ -350,7 +354,13 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool, ui: &mut dyn Ui) -> 
 Don't repeat it. Try a different approach, or tell the person what's blocking you."
                     )
                 }
-                Ok(action) => perform(&action, cancel, ui),
+                Ok(action) => {
+                    let result = perform(&action, cancel, ui);
+                    if let Some(ok) = outcome(&result) {
+                        ui.step_done(ok);
+                    }
+                    result
+                }
                 Err(problem) => {
                     broken = true;
                     ui.note(&format!("bad {} call: {problem}", if call.name.is_empty() { "tool" } else { &call.name }));
@@ -376,7 +386,21 @@ Don't repeat it. Try a different approach, or tell the person what's blocking yo
 }
 
 /// One model turn, streamed to the terminal.
+/// Whether a tool result means the step worked: `None` while its job is still running.
+fn outcome(result: &str) -> Option<bool> {
+    if result.contains("is still running") {
+        None
+    } else if result.starts_with("Error") || result.contains("was stopped") || result.contains("ended by a signal") {
+        Some(false)
+    } else if let Some(rest) = result.split("exit code ").nth(1) {
+        Some(rest.starts_with("0 ") || rest.starts_with("0."))
+    } else {
+        Some(true)
+    }
+}
+
 fn ask(history: &[Message], tools: &Value, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<model::Reply> {
+    ui.thinking();
     model::stream(history, Some(tools), cancel, |piece| ui.text(piece))
 }
 
@@ -575,6 +599,18 @@ mod tests {
         assert!(err("job_wait", "{}").contains("needs a \"job\" field"));
         assert!(err("job_stop", r#"{"job": 0}"#).contains("job number"));
         assert!(err("exec", r#"{"command": "ls", "background": 1}"#).contains("true or false"));
+    }
+
+    #[test]
+    fn tells_success_from_failure() {
+        assert_eq!(outcome("Job 1 finished with exit code 0 after 2 s. Output:\nok"), Some(true));
+        assert_eq!(
+            outcome("Job 1 finished with exit code 1 after 0 s. Output:\nsudo: a password is required"),
+            Some(false)
+        );
+        assert_eq!(outcome("Job 2 is still running (61 s so far)."), None);
+        assert_eq!(outcome("Error: can't read /x"), Some(false));
+        assert_eq!(outcome("Wrote 5 bytes to a."), Some(true));
     }
 
     #[test]

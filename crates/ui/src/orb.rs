@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Instant;
 use trip::agent::{self, Ui};
 use trip::model::Message;
 
@@ -23,6 +24,8 @@ enum Event {
     Step(String, String),
     Output(String),
     Note(String),
+    StepDone(bool),
+    Thinking,
     Done(Result<(), String>),
 }
 
@@ -42,6 +45,12 @@ impl Ui for Sender {
     fn note(&mut self, text: &str) {
         let _ = self.0.send_blocking(Event::Note(text.to_string()));
     }
+    fn step_done(&mut self, ok: bool) {
+        let _ = self.0.send_blocking(Event::StepDone(ok));
+    }
+    fn thinking(&mut self) {
+        let _ = self.0.send_blocking(Event::Thinking);
+    }
 }
 
 /// Turns a step into words: "installing org.videolan.VLC", "checking disk space".
@@ -53,8 +62,17 @@ pub fn describe(label: &str, detail: &str) -> String {
             other => other.to_string(),
         };
     }
-    let cmd = detail.trim_start_matches("sudo ").trim();
-    let words: Vec<&str> = cmd.split_whitespace().collect();
+    // Look past `sudo` and its options to the command itself.
+    let mut words: Vec<&str> = detail.split_whitespace().collect();
+    if words.first() == Some(&"sudo") {
+        words.remove(0);
+        while words.first().is_some_and(|w| w.starts_with('-')) {
+            words.remove(0);
+        }
+        if words.is_empty() {
+            return "asking for a password".into();
+        }
+    }
     let arg = |i: usize| words.iter().skip(i).find(|w| !w.starts_with('-')).copied().unwrap_or("");
     match (words.first().copied().unwrap_or(""), words.get(1).copied().unwrap_or("")) {
         ("flatpak", "install") => format!("installing {}", words.last().copied().unwrap_or("an app")),
@@ -78,6 +96,38 @@ pub fn describe(label: &str, detail: &str) -> String {
     }
 }
 
+/// The model writes light Markdown; show **bold** and `code` properly instead of the marks.
+pub fn markup(text: &str) -> String {
+    let mut out = String::new();
+    let (mut bold, mut code) = (false, false);
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '*' if chars.peek() == Some(&'*') && !code => {
+                chars.next();
+                out.push_str(if bold { "</b>" } else { "<b>" });
+                bold = !bold;
+            }
+            '`' => {
+                out.push_str(if code { "</span>" } else { "<span font_family=\"DM Mono\">" });
+                code = !code;
+            }
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            _ => out.push(c),
+        }
+    }
+    // Close anything a half-streamed answer left open, so the markup stays valid.
+    if code {
+        out.push_str("</span>");
+    }
+    if bold {
+        out.push_str("</b>");
+    }
+    out
+}
+
 fn short(path: &str) -> String {
     path.rsplit('/').find(|s| !s.is_empty()).unwrap_or(path).to_string()
 }
@@ -85,6 +135,7 @@ fn short(path: &str) -> String {
 /// One row in the working card.
 struct StepRow {
     root: gtk::Box,
+    done: std::cell::Cell<bool>,
     mark: gtk::Stack,
     title: gtk::Label,
     detail: gtk::Label,
@@ -119,10 +170,13 @@ impl StepRow {
         let root = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         root.append(&mark);
         root.append(&text);
-        StepRow { root, mark, title, detail }
+        StepRow { root, done: std::cell::Cell::new(false), mark, title, detail }
     }
 
     fn finish(&self, ok: bool) {
+        if self.done.replace(true) {
+            return;
+        }
         self.mark.set_visible_child_name(if ok { "done" } else { "failed" });
         self.title.remove_css_class("running");
     }
@@ -131,16 +185,22 @@ impl StepRow {
 struct State {
     cancel: Arc<AtomicBool>,
     busy: bool,
+    started: Option<Instant>,
+    phase: &'static str,
     answer: String,
     steps: Vec<StepRow>,
 }
 
 struct Orb {
     button: gtk::Button,
+    model: gtk::Label,
     ask: gtk::Window,
     entry: gtk::Entry,
     card: gtk::Window,
     asked: gtk::Label,
+    status: gtk::Label,
+    scroller: gtk::ScrolledWindow,
+    inner: gtk::Box,
     steps_box: gtk::Box,
     answer: gtk::Label,
     stop: gtk::Button,
@@ -240,14 +300,14 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     column.set_size_request(700, -1);
     let pill = gtk::Box::new(gtk::Orientation::Horizontal, 16);
     pill.add_css_class("ask-pill");
-    let pill_orb = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    let pill_orb = gtk::CenterBox::new();
     pill_orb.add_css_class("ask-orb");
     pill_orb.set_valign(gtk::Align::Center);
+    pill_orb.set_hexpand(false);
+    pill_orb.set_size_request(52, 52);
     let s = common::spark(24, false);
-    s.set_hexpand(true);
-    s.set_halign(gtk::Align::Center);
     s.set_valign(gtk::Align::Center);
-    pill_orb.append(&s);
+    pill_orb.set_center_widget(Some(&s));
     let entry = gtk::Entry::new();
     entry.add_css_class("ask");
     entry.set_hexpand(true);
@@ -280,7 +340,8 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let keys = label("enter to send · esc to close", &["hint"]);
     keys.set_hexpand(true);
     footer.append(&keys);
-    footer.append(&label(&model_line(), &["hint"]));
+    let model = label(&model_line(), &["hint"]);
+    footer.append(&model);
     column.append(&pill);
     column.append(&chips);
     column.append(&footer);
@@ -314,7 +375,13 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     body.set_margin_end(0);
     body.set_margin_bottom(0);
     let you = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    you.append(&label("you asked", &["caption"]));
+    let top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    let caption = label("you asked", &["caption"]);
+    caption.set_hexpand(true);
+    let status = label("", &["caption", "live"]);
+    top.append(&caption);
+    top.append(&status);
+    you.append(&top);
     let asked = label("", &["asked"]);
     asked.set_wrap(true);
     asked.set_max_width_chars(44);
@@ -338,24 +405,38 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     stop.add_css_class("stop");
     foot.append(&terminal);
     foot.append(&stop);
+    // Steps and the answer scroll once they outgrow the card; the newest stays in view.
+    let inner = gtk::Box::new(gtk::Orientation::Vertical, 14);
+    inner.append(&steps_box);
+    inner.append(&answer);
+    let scroller = gtk::ScrolledWindow::new();
+    scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    scroller.set_propagate_natural_height(true);
+    scroller.set_max_content_height(380);
+    scroller.set_child(Some(&inner));
     body.append(&you);
-    body.append(&steps_box);
-    body.append(&answer);
+    body.append(&scroller);
     body.append(&foot);
     card.set_child(Some(&body));
 
     let orb = Rc::new(Orb {
         button,
+        model,
         ask,
         entry,
         card,
         asked,
+        status,
+        scroller,
+        inner,
         steps_box,
         answer,
         stop,
         state: RefCell::new(State {
             cancel: Arc::new(AtomicBool::new(false)),
             busy: false,
+            started: None,
+            phase: "",
             answer: String::new(),
             steps: Vec::new(),
         }),
@@ -421,6 +502,8 @@ impl Orb {
         } else {
             self.card.set_visible(false);
             self.entry.set_text("");
+            // The model may have arrived since the orb started (first boot downloads it).
+            self.model.set_text(&model_line());
             self.ask.present();
             self.entry.grab_focus();
         }
@@ -446,6 +529,7 @@ impl Orb {
         while let Some(child) = self.steps_box.first_child() {
             self.steps_box.remove(&child);
         }
+        self.scroller.set_min_content_height(0);
         self.asked.set_text(&text);
         self.answer.set_text("");
         self.answer.set_visible(false);
@@ -454,6 +538,8 @@ impl Orb {
         {
             let mut st = self.state.borrow_mut();
             st.busy = true;
+            st.started = Some(Instant::now());
+            st.phase = "thinking";
             st.answer.clear();
             st.steps.clear();
             st.cancel = cancel.clone();
@@ -461,6 +547,16 @@ impl Orb {
         self.button.add_css_class("working");
         write_status("● working");
         self.card.present();
+        self.tick();
+        // A live status with a running clock, so it's clear the orb is still at it.
+        let weak = Rc::downgrade(self);
+        glib::timeout_add_seconds_local(1, move || match weak.upgrade() {
+            Some(orb) if orb.state.borrow().busy => {
+                orb.tick();
+                glib::ControlFlow::Continue
+            }
+            _ => glib::ControlFlow::Break,
+        });
 
         let (tx, rx) = async_channel::unbounded::<Event>();
         std::thread::spawn(move || {
@@ -481,16 +577,53 @@ impl Orb {
         });
     }
 
+    fn elapsed(&self) -> String {
+        let secs = self.state.borrow().started.map_or(0, |t| t.elapsed().as_secs());
+        format!("{}:{:02}", secs / 60, secs % 60)
+    }
+
+    fn tick(&self) {
+        let phase = self.state.borrow().phase;
+        self.status.set_text(&format!("● {phase} · {}", self.elapsed()));
+    }
+
+    /// Grows the list with its content up to `MAX_LIST`, then it scrolls; keeps the newest in view.
+    /// (A layer-shell window doesn't grow on its own when its content does.)
+    fn scroll_to_end(&self) {
+        // Room for three or four steps from the start, so the list reads as a list.
+        const MIN_LIST: i32 = 200;
+        const MAX_LIST: i32 = 380;
+        let (scroller, inner) = (self.scroller.clone(), self.inner.clone());
+        glib::idle_add_local_once(move || {
+            let width = scroller.width().max(396);
+            let (_, natural, _, _) = inner.measure(gtk::Orientation::Vertical, width);
+            scroller.set_min_content_height(natural.clamp(MIN_LIST, MAX_LIST));
+            glib::idle_add_local_once(move || {
+                let adj = scroller.vadjustment();
+                adj.set_value(adj.upper() - adj.page_size());
+            });
+        });
+    }
+
     fn apply(&self, event: Event) {
         let mut st = self.state.borrow_mut();
         match event {
             Event::Text(piece) => {
+                st.phase = "answering";
                 st.answer.push_str(&piece);
+                self.scroll_to_end();
                 let shown = st.answer.trim().to_string();
-                self.answer.set_text(&shown);
+                self.answer.set_markup(&markup(&shown));
                 self.answer.set_visible(!shown.is_empty());
             }
+            Event::Thinking => st.phase = "thinking",
+            Event::StepDone(ok) => {
+                if let Some(last) = st.steps.last() {
+                    last.finish(ok);
+                }
+            }
             Event::Step(kind, detail) => {
+                st.phase = "working";
                 if let Some(last) = st.steps.last() {
                     last.finish(true);
                 }
@@ -500,12 +633,15 @@ impl Orb {
                 let row = StepRow::new(&describe(&kind, &detail), &detail);
                 self.steps_box.append(&row.root);
                 st.steps.push(row);
+                self.scroll_to_end();
             }
             Event::Output(line) => {
+                // Progress bars redraw with carriage returns; show the latest state of the line.
+                let line = line.rsplit('\r').find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string();
                 if let Some(last) = st.steps.last()
-                    && !line.trim().is_empty()
+                    && !line.is_empty()
                 {
-                    last.detail.set_text(line.trim());
+                    last.detail.set_text(&line);
                 }
             }
             Event::Note(text) => {
@@ -522,6 +658,10 @@ impl Orb {
                 if let Some(last) = st.steps.last() {
                     last.finish(ok);
                 }
+                let took = st.started.map_or(0, |t| t.elapsed().as_secs());
+                let verb = if ok { "done in" } else { "stopped after" };
+                self.status.set_text(&format!("{verb} {}:{:02}", took / 60, took % 60));
+                self.scroll_to_end();
                 if let Err(e) = result {
                     let msg = if e == "stopped" { "stopped.".to_string() } else { e };
                     self.answer.set_text(&msg);
@@ -539,7 +679,14 @@ impl Orb {
 
 #[cfg(test)]
 mod tests {
-    use super::describe;
+    use super::{describe, markup};
+
+    #[test]
+    fn renders_light_markdown() {
+        assert_eq!(markup("**Disk:** 40 GB"), "<b>Disk:</b> 40 GB");
+        assert_eq!(markup("run `df -h`"), "run <span font_family=\"DM Mono\">df -h</span>");
+        assert_eq!(markup("a < b & **half"), "a &lt; b &amp; <b>half</b>");
+    }
 
     #[test]
     fn steps_read_like_words() {
@@ -550,5 +697,7 @@ mod tests {
         assert_eq!(describe("exec", "python3 primes.py"), "running python3");
         assert_eq!(describe("read", "/etc/os-release"), "reading os-release");
         assert_eq!(describe("waiting on job 2", "sleep 9"), "waiting on job 2");
+        assert_eq!(describe("exec", "sudo -v"), "asking for a password");
+        assert_eq!(describe("exec", "sudo -n dnf install -y vlc"), "installing vlc");
     }
 }

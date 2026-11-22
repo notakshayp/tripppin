@@ -109,6 +109,7 @@ fn build(app: &gtk::Application) {
     }
     let power = gtk::MenuButton::new();
     power.set_label("power");
+    power.set_always_show_arrow(false);
     power.add_css_class("status");
     let menu = gtk::gio::Menu::new();
     menu.append(Some("shut down"), Some("app.poweroff"));
