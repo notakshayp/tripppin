@@ -717,6 +717,34 @@ picture.wall-pic {
     border-radius: 10px;
 }
 
+.row-value {
+    font-family: "DM Mono", monospace;
+    font-size: 14px;
+    color: #f2f5ef;
+}
+
+button.segment {
+    min-height: 48px;
+    border-radius: 14px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+    box-shadow: none;
+    color: #c9d4ce;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+button.segment:hover {
+    border-color: #3d4a45;
+}
+
+button.segment.selected {
+    background: #1f6b45;
+    border-color: #57d99a;
+    color: #f2f5ef;
+    font-weight: 600;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

@@ -17,6 +17,7 @@ mod lock;
 mod nm;
 mod orb;
 mod osd;
+mod power;
 mod settings;
 mod snd;
 

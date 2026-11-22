@@ -58,8 +58,9 @@ spawn-at-startup "waybar"
 spawn-at-startup "swaync"
 spawn-at-startup "tripppin-ui" "orb"
 spawn-at-startup "tripppin-ui" "first-boot"
-// Lock after five idle minutes and before the laptop sleeps.
-spawn-at-startup "swayidle" "-w" "timeout" "300" "tripppin-ui lock" "before-sleep" "tripppin-ui lock"
+// When the computer is left alone: the person's timings (Settings → Power), else ours
+// (lock after 5 minutes, screen off after 10, sleep after 30; always lock before sleeping).
+spawn-at-startup "sh" "-c" "f=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/idle; [ -f \"$f\" ] || f=/usr/share/tripppin/idle; exec swayidle -w -C \"$f\""
 
 window-rule {
     geometry-corner-radius 16

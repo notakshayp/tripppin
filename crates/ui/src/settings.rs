@@ -6,6 +6,7 @@ use crate::bt;
 use crate::common::label;
 use crate::display;
 use crate::nm;
+use crate::power;
 use crate::snd;
 use gtk::prelude::*;
 use gtk::{gio, glib};
@@ -13,12 +14,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 5] = [
+const SECTIONS: [(&str, &str); 6] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
     ("display", "display"),
     ("appearance", "appearance"),
+    ("power", "power & battery"),
 ];
 
 pub fn run() -> glib::ExitCode {
@@ -69,6 +71,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&sound_page(), Some("sound"));
     stack.add_named(&display_page(), Some("display"));
     stack.add_named(&appearance_page(), Some("appearance"));
+    stack.add_named(&power_page(), Some("power"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -1237,5 +1240,134 @@ fn appearance_page() -> gtk::ScrolledWindow {
     });
     look.append(&setting_row("reduce motion", &motion));
     body.append(&look);
+    scroll
+}
+
+fn minutes(m: u32) -> String {
+    match m {
+        0 => "never".to_string(),
+        1 => "1 minute".to_string(),
+        m => format!("{m} minutes"),
+    }
+}
+
+fn power_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("power & battery");
+    let battery_caption = caption("battery");
+    let battery = gtk::ListBox::new();
+    battery.add_css_class("list-card");
+    battery.set_selection_mode(gtk::SelectionMode::None);
+    let modes_caption = caption("power mode");
+    let modes = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    modes.set_homogeneous(true);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    body.append(&battery_caption);
+    body.append(&battery);
+    body.append(&modes_caption);
+    body.append(&modes);
+    body.append(&caption("when you're away"));
+    let idle_list = gtk::ListBox::new();
+    idle_list.add_css_class("list-card");
+    idle_list.set_selection_mode(gtk::SelectionMode::None);
+    let idle = power::idle();
+    let names: Vec<String> = power::IDLE_CHOICES.iter().map(|m| minutes(*m)).collect();
+    let pick = |now: u32| power::IDLE_CHOICES.iter().position(|m| *m == now).unwrap_or(2);
+    let lock = dropdown(&names, pick(idle.lock));
+    let screen = dropdown(&names, pick(idle.screen_off));
+    let sleep = dropdown(&names, pick(idle.sleep));
+    idle_list.append(&setting_row("lock the screen after", &lock));
+    idle_list.append(&setting_row("turn the screen off after", &screen));
+    idle_list.append(&setting_row("sleep after", &sleep));
+    let save = {
+        let (lock, screen, sleep, error) = (lock.clone(), screen.clone(), sleep.clone(), error.clone());
+        Rc::new(move || {
+            let pick = |d: &gtk::DropDown| power::IDLE_CHOICES[d.selected() as usize];
+            let idle = power::Idle { lock: pick(&lock), screen_off: pick(&screen), sleep: pick(&sleep) };
+            if let Err(e) = power::set_idle(&idle) {
+                error.set_text(&format!("couldn't save: {e}"));
+                error.set_visible(true);
+            }
+        })
+    };
+    for d in [&lock, &screen, &sleep] {
+        let save = save.clone();
+        d.connect_selected_notify(move |_| save());
+    }
+    body.append(&idle_list);
+    body.append(&error);
+
+    let load = {
+        let (battery, battery_caption, modes, modes_caption, status, error) = (
+            battery.clone(),
+            battery_caption.clone(),
+            modes.clone(),
+            modes_caption.clone(),
+            status.clone(),
+            error.clone(),
+        );
+        move || {
+            let (battery, battery_caption, modes, modes_caption, status, error) = (
+                battery.clone(),
+                battery_caption.clone(),
+                modes.clone(),
+                modes_caption.clone(),
+                status.clone(),
+                error.clone(),
+            );
+            background(
+                || (power::battery(), power::modes()),
+                move |(bat, mode)| {
+                    clear(&battery);
+                    battery.set_visible(bat.is_some());
+                    battery_caption.set_visible(bat.is_some());
+                    match &bat {
+                        Some(b) => {
+                            status.set_text(&power::summary(b));
+                            battery.append(&setting_row("charge", &label(&format!("{}%", b.percent), &["row-value"])));
+                            battery.append(&setting_row("state", &label(&b.state.replace('-', " "), &["row-value"])));
+                            if let Some(h) = b.health {
+                                battery.append(&setting_row("health", &label(&format!("{h}% of new"), &["row-value"])));
+                            }
+                        }
+                        None => status.set_text("no battery · on mains power"),
+                    }
+                    while let Some(child) = modes.first_child() {
+                        modes.remove(&child);
+                    }
+                    modes.set_visible(mode.is_some());
+                    modes_caption.set_visible(mode.is_some());
+                    let Some((now, offered)) = mode else { return };
+                    let buttons: Rc<RefCell<Vec<gtk::Button>>> = Rc::new(RefCell::new(Vec::new()));
+                    for (id, word) in power::MODES {
+                        if !offered.iter().any(|o| o == id) {
+                            continue;
+                        }
+                        let b = gtk::Button::with_label(word);
+                        b.add_css_class("segment");
+                        if now == id {
+                            b.add_css_class("selected");
+                        }
+                        let (buttons2, error) = (buttons.clone(), error.clone());
+                        b.connect_clicked(move |b| match power::set_mode(id) {
+                            Ok(()) => {
+                                for x in buttons2.borrow().iter() {
+                                    x.remove_css_class("selected");
+                                }
+                                b.add_css_class("selected");
+                            }
+                            Err(e) => {
+                                error.set_text(&format!("couldn't change the power mode: {e}"));
+                                error.set_visible(true);
+                            }
+                        });
+                        buttons.borrow_mut().push(b.clone());
+                        modes.append(&b);
+                    }
+                },
+            );
+        }
+    };
+    scroll.connect_map(move |_| load());
     scroll
 }

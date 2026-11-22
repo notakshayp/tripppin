@@ -86,7 +86,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] Sound: output and input device, volume, mic level and test, per-app volume, alert sound; advanced → pavucontrol (devices, volume, mute, per-app built; mic test and alert sound to do; real devices checked on hardware)
 - [~] Display: resolution, scale, refresh rate, rotation, brightness, night light, arrangement → wdisplays (built; mode changes and brightness checked on hardware)
 - [~] Appearance: wallpaper (ours and your own), dark/light/auto, accent, text size, reduce motion (wallpapers, your own, text size, reduce motion done; light mode and accent to do)
-- [ ] Power & battery: health, time left, power mode, dim/off/sleep timing, lid action, low-battery behaviour
+- [~] Power & battery: health, time left, power mode, dim/off/sleep timing, lid action, low-battery behaviour (battery, mode, lock/screen-off/sleep timing built; lid action and low-battery to do; battery and mode checked on hardware)
 - [ ] AI: the model in use, switch or download, cloud key or own server, what it may do alone, history
 - [ ] Apps: installed apps, update, remove, default apps (browser, mail, files, music, video)
 - [ ] Notifications: do not disturb, schedule, per-app settings, lock-screen notifications
