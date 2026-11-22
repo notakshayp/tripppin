@@ -4,6 +4,7 @@
 //! - `greeter`: the login screen, run by greetd.
 //! - `lock`: the lock screen.
 //! - `first-boot`: fetches the model the first time someone logs in.
+//! - `osd`: the volume, mic and brightness pop-ups.
 
 mod common;
 mod firstboot;
@@ -11,6 +12,7 @@ mod greetd;
 mod greeter;
 mod lock;
 mod orb;
+mod osd;
 
 use gtk::glib::ExitCode;
 
@@ -39,8 +41,9 @@ fn main() -> ExitCode {
         Some("greeter") => greeter::run(),
         Some("lock") => lock::run(),
         Some("first-boot") => firstboot::run(),
+        Some("osd") => osd::run(),
         _ => {
-            eprintln!("usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot");
+            eprintln!("usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness");
             ExitCode::from(2)
         }
     }

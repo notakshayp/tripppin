@@ -1,0 +1,165 @@
+//! Volume, brightness and mic pop-ups: a small ink pill near the bottom of the screen with a
+//! green bar, shown when a key changes the level and gone two seconds later. niri runs the
+//! change itself (wpctl, brightnessctl) and then `tripppin-ui osd <kind>`; a second call while
+//! the pill is up updates it instead of opening another.
+
+use crate::common::label;
+use gtk::prelude::*;
+use gtk::{gio, glib};
+use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
+use std::cell::{Cell, RefCell};
+use std::process::Command;
+use std::rc::Rc;
+
+const SHOW_FOR_MS: u32 = 1800;
+
+/// What a pop-up shows: a word, a level from 0 to 1 and whether it's muted.
+#[derive(Debug, PartialEq)]
+pub struct Level {
+    pub name: &'static str,
+    pub value: f64,
+    pub muted: bool,
+}
+
+/// `wpctl get-volume` prints "Volume: 0.40" or "Volume: 0.40 [MUTED]".
+pub fn parse_wpctl(out: &str) -> Option<(f64, bool)> {
+    let rest = out.trim().strip_prefix("Volume:")?.trim();
+    let value: f64 = rest.split_whitespace().next()?.parse().ok()?;
+    Some((value, rest.contains("[MUTED]")))
+}
+
+/// `brightnessctl -m` prints "device,class,current,percent%,max".
+pub fn parse_brightnessctl(out: &str) -> Option<f64> {
+    let line = out.lines().next()?;
+    let mut fields = line.split(',');
+    let current: f64 = fields.nth(2)?.parse().ok()?;
+    let max: f64 = fields.nth(1)?.parse().ok()?;
+    (max > 0.0).then(|| current / max)
+}
+
+fn read(kind: &str) -> Option<Level> {
+    let run = |cmd: &str, args: &[&str]| -> Option<String> {
+        let out = Command::new(cmd).args(args).output().ok()?;
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    };
+    match kind {
+        "volume" => {
+            let (value, muted) = parse_wpctl(&run("wpctl", &["get-volume", "@DEFAULT_AUDIO_SINK@"])?)?;
+            Some(Level { name: "vol", value, muted })
+        }
+        "mic" => {
+            let (value, muted) = parse_wpctl(&run("wpctl", &["get-volume", "@DEFAULT_AUDIO_SOURCE@"])?)?;
+            Some(Level { name: "mic", value, muted })
+        }
+        "brightness" => {
+            Some(Level { name: "light", value: parse_brightnessctl(&run("brightnessctl", &["-m"])?)?, muted: false })
+        }
+        _ => None,
+    }
+}
+
+struct Osd {
+    window: gtk::Window,
+    name: gtk::Label,
+    bar: gtk::ProgressBar,
+    value: gtk::Label,
+    /// Bumped on every update; a hide timer only acts if nothing came after it.
+    generation: Cell<u64>,
+}
+
+impl Osd {
+    fn show(self: &Rc<Self>, app: &gtk::Application, level: &Level) {
+        self.name.set_text(if level.muted { "muted" } else { level.name });
+        self.bar.set_fraction(level.value.clamp(0.0, 1.0));
+        self.value.set_text(&format!("{:.0}", (level.value * 100.0).round()));
+        if level.muted {
+            self.bar.add_css_class("muted");
+        } else {
+            self.bar.remove_css_class("muted");
+        }
+        self.window.present();
+        let generation = self.generation.get() + 1;
+        self.generation.set(generation);
+        let (osd, app) = (self.clone(), app.clone());
+        glib::timeout_add_local_once(std::time::Duration::from_millis(u64::from(SHOW_FOR_MS)), move || {
+            if osd.generation.get() == generation {
+                osd.window.set_visible(false);
+                app.quit();
+            }
+        });
+    }
+}
+
+pub fn run() -> glib::ExitCode {
+    let app = gtk::Application::builder()
+        .application_id("in.trippp.Osd")
+        .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
+        .build();
+    let osd: Rc<RefCell<Option<Rc<Osd>>>> = Rc::new(RefCell::new(None));
+    app.connect_command_line(move |app, cmd| {
+        let kind = cmd.arguments().iter().rev().find_map(|a| a.to_str().map(str::to_string)).unwrap_or_default();
+        let Some(level) = read(&kind) else { return glib::ExitCode::FAILURE };
+        let mut slot = osd.borrow_mut();
+        let o = slot.get_or_insert_with(|| build(app)).clone();
+        drop(slot);
+        o.show(app, &level);
+        glib::ExitCode::SUCCESS
+    });
+    // `tripppin-ui osd <kind>`: drop the "osd" word for GTK's own argument parsing.
+    let args: Vec<String> = std::env::args().take(1).chain(std::env::args().skip(2)).collect();
+    app.run_with_args(&args)
+}
+
+fn build(app: &gtk::Application) -> Rc<Osd> {
+    crate::common::load_css();
+    let window = gtk::Window::builder().application(app).decorated(false).build();
+    window.add_css_class("tripppin");
+    window.add_css_class("clear");
+    window.init_layer_shell();
+    window.set_namespace(Some("tripppin-osd"));
+    window.set_layer(Layer::Overlay);
+    window.set_anchor(Edge::Bottom, true);
+    window.set_margin(Edge::Bottom, 96);
+    window.set_keyboard_mode(KeyboardMode::None);
+    window.set_exclusive_zone(-1);
+    let pill = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    pill.add_css_class("osd");
+    pill.set_margin_top(24);
+    pill.set_margin_bottom(24);
+    pill.set_margin_start(24);
+    pill.set_margin_end(24);
+    let name = label("vol", &["osd-name"]);
+    name.set_width_chars(5);
+    let bar = gtk::ProgressBar::new();
+    bar.add_css_class("osd-bar");
+    bar.set_hexpand(true);
+    bar.set_valign(gtk::Align::Center);
+    let value = label("0", &["osd-value"]);
+    value.set_width_chars(3);
+    value.set_xalign(1.0);
+    pill.append(&name);
+    pill.append(&bar);
+    pill.append(&value);
+    window.set_child(Some(&pill));
+    // Never takes clicks: the pop-up is information, not a control.
+    window.connect_map(|w| {
+        if let Some(surface) = w.surface() {
+            surface.set_input_region(Some(&gtk::cairo::Region::create()));
+        }
+    });
+    Rc::new(Osd { window, name, bar, value, generation: Cell::new(0) })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_volume_and_brightness() {
+        assert_eq!(parse_wpctl("Volume: 0.40\n"), Some((0.40, false)));
+        assert_eq!(parse_wpctl("Volume: 0.75 [MUTED]\n"), Some((0.75, true)));
+        assert_eq!(parse_wpctl("nothing"), None);
+        assert_eq!(parse_brightnessctl("amdgpu_bl1,backlight,128,50%,255\n"), Some(128.0 / 255.0));
+        assert_eq!(parse_brightnessctl("x,backlight,0,0%,0"), None);
+    }
+}

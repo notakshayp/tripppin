@@ -51,7 +51,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [x] Notifications: our cards top right
 - [ ] Calendar pop-up from the clock, with upcoming events
 - [x] Power menu (wlogout): lock, log out, sleep, restart, shut down
-- [ ] Volume, brightness, keyboard-light, caps-lock and mic-mute pop-ups (ours)
+- [~] Volume, brightness, keyboard-light, caps-lock and mic-mute pop-ups (ours): volume, mute, mic and brightness done; keyboard light and caps lock to do
 - [x] Launcher (fuzzel): apps
 - [ ] Launcher: settings pages, files, calculator, "ask tripppin" handing over to the orb
 - [ ] Window switcher (Alt+Tab) with previews; overview of all windows and workspaces

@@ -370,6 +370,45 @@ entry.pw-center {
     caret-color: #57d99a;
 }
 
+/* ---- volume and brightness pop-ups ------------------------------------- */
+
+.osd {
+    min-width: 300px;
+    min-height: 56px;
+    padding: 0 22px;
+    border-radius: 28px;
+    background: rgba(20, 27, 25, 0.96);
+    border: 1px solid #2f3d38;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+.osd-name,
+.osd-value {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #9fb0a8;
+}
+
+.osd-value {
+    color: #f2f5ef;
+}
+
+progressbar.osd-bar trough {
+    min-height: 6px;
+    border-radius: 3px;
+    background: #1d2825;
+}
+
+progressbar.osd-bar progress {
+    min-height: 6px;
+    border-radius: 3px;
+    background: #57d99a;
+}
+
+progressbar.osd-bar.muted progress {
+    background: #5c6b65;
+}
+
 /* ---- first boot --------------------------------------------------------- */
 
 .fb-card {

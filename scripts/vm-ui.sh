@@ -22,7 +22,7 @@ ssh "${SSH_OPTS[@]}" "tripppin@$VM" "echo '$PASS' | sudo -S -p '' sh -c '
   # Someone logged in: restart just the orb in their session. Otherwise, the login screen.
   sock=\$(ls /run/user/1000/niri*.sock 2>/dev/null | head -1)
   if [ -n \"\$sock\" ]; then
-    pkill -f \"tripppin-ui orb\" || true
+    pkill -f \"^(/usr/bin/)?tripppin-ui orb\" || true
     sudo -u \$(id -nu 1000) XDG_RUNTIME_DIR=/run/user/1000 NIRI_SOCKET=\$sock niri msg action spawn -- tripppin-ui orb
   else
     systemctl restart greetd
