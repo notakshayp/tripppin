@@ -74,7 +74,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [ ] Ask about the screen or a selected file ("summarise this pdf")
 - [ ] History of past requests; continue a conversation
 - [ ] Permission prompts before risky steps (M4)
-- [ ] The "super + space" hint shows only until the orb has been used once (it draws over windows near the corner)
+- [x] The "super + space" hint shows only until the orb has been used once (it draws over windows near the corner)
 
 ## Settings (ours, one window with a sidebar)
 

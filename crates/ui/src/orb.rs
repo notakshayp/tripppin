@@ -193,6 +193,7 @@ struct State {
 
 struct Orb {
     button: gtk::Button,
+    hint: gtk::Label,
     model: gtk::Label,
     ask: gtk::Window,
     entry: gtk::Entry,
@@ -261,6 +262,12 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let hint = label("super + space", &["orb-hint"]);
     hint.set_valign(gtk::Align::End);
     hint.set_margin_bottom(50);
+    // The hint teaches the shortcut; once the orb has been opened it fades out for good.
+    // (Faded, not removed: removing it would leave the corner window at its old width and
+    // move the orb. It takes no clicks either way.)
+    if used_file().exists() {
+        hint.set_opacity(0.0);
+    }
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     row.append(&hint);
     row.append(&button);
@@ -421,6 +428,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
 
     let orb = Rc::new(Orb {
         button,
+        hint: hint.clone(),
         model,
         ask,
         entry,
@@ -485,6 +493,15 @@ fn model_line() -> String {
     }
 }
 
+/// Exists once the person has opened the orb.
+fn used_file() -> std::path::PathBuf {
+    std::env::var_os("XDG_STATE_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/state")))
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join("tripppin/orb-used")
+}
+
 fn write_status(text: &str) {
     let _ = std::fs::write(common::runtime_dir().join("orb-status"), text);
 }
@@ -506,6 +523,14 @@ impl Orb {
             self.model.set_text(&model_line());
             self.ask.present();
             self.entry.grab_focus();
+            if self.hint.opacity() > 0.0 {
+                self.hint.set_opacity(0.0);
+                let file = used_file();
+                if let Some(dir) = file.parent() {
+                    let _ = std::fs::create_dir_all(dir);
+                }
+                let _ = std::fs::write(file, "");
+            }
         }
     }
 
