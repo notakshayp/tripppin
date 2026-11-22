@@ -663,6 +663,40 @@ scale.level slider {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
+dropdown.choice > button {
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 12px;
+    background: #0f1513;
+    border: 1px solid #2a3632;
+    box-shadow: none;
+    color: #f2f5ef;
+    font-size: 14px;
+}
+
+dropdown.choice > button:hover {
+    border-color: #57d99a;
+}
+
+dropdown.choice popover > contents {
+    padding: 6px;
+    border-radius: 14px;
+    background: #141b19;
+    border: 1px solid #2f3d38;
+}
+
+dropdown.choice popover listview > row {
+    min-height: 34px;
+    padding: 0 10px;
+    border-radius: 10px;
+    color: #d9e1dd;
+}
+
+dropdown.choice popover listview > row:selected {
+    background: rgba(87, 217, 154, 0.14);
+    color: #f2f5ef;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

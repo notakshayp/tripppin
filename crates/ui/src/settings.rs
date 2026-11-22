@@ -4,6 +4,7 @@
 
 use crate::bt;
 use crate::common::label;
+use crate::display;
 use crate::nm;
 use crate::snd;
 use gtk::prelude::*;
@@ -12,7 +13,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 3] = [("wifi", "wi-fi"), ("bluetooth", "bluetooth"), ("sound", "sound")];
+const SECTIONS: [(&str, &str); 4] =
+    [("wifi", "wi-fi"), ("bluetooth", "bluetooth"), ("sound", "sound"), ("display", "display")];
 
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder()
@@ -60,6 +62,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&wifi_page(), Some("wifi"));
     stack.add_named(&bluetooth_page(), Some("bluetooth"));
     stack.add_named(&sound_page(), Some("sound"));
+    stack.add_named(&display_page(), Some("display"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
@@ -961,4 +964,138 @@ fn sound_page() -> gtk::ScrolledWindow {
     *reload.borrow_mut() = Some(load.clone());
     scroll.connect_map(move |_| load(false));
     scroll
+}
+
+/// A row with a word on the left and a control on the right.
+fn setting_row(name: &str, control: &impl IsA<gtk::Widget>) -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    row.add_css_class("net-row");
+    let word = label(name, &["row-title"]);
+    word.set_hexpand(true);
+    row.append(&word);
+    control.as_ref().set_valign(gtk::Align::Center);
+    row.append(control);
+    row
+}
+
+fn dropdown(items: &[String], selected: usize) -> gtk::DropDown {
+    let strs: Vec<&str> = items.iter().map(String::as_str).collect();
+    let d = gtk::DropDown::from_strings(&strs);
+    d.add_css_class("choice");
+    d.set_selected(selected.min(items.len().saturating_sub(1)) as u32);
+    d
+}
+
+fn display_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("display");
+    let screens = gtk::Box::new(gtk::Orientation::Vertical, 22);
+    let light = gtk::ListBox::new();
+    light.add_css_class("list-card");
+    light.set_selection_mode(gtk::SelectionMode::None);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    let arrange = gtk::Button::with_label("arrange screens");
+    arrange.add_css_class("link");
+    arrange.set_halign(gtk::Align::Start);
+    arrange.connect_clicked(|_| {
+        let _ = std::process::Command::new("wdisplays").spawn();
+    });
+    body.append(&screens);
+    body.append(&caption("light"));
+    body.append(&light);
+    body.append(&error);
+    body.append(&arrange);
+
+    let load: Rc<dyn Fn()> = {
+        let (screens, light, status, error) = (screens.clone(), light.clone(), status.clone(), error.clone());
+        Rc::new(move || {
+            let (screens, light, status, error) = (screens.clone(), light.clone(), status.clone(), error.clone());
+            background(
+                || (display::outputs(), display::brightness(), display::night_light()),
+                move |(outs, bright, night)| {
+                    while let Some(child) = screens.first_child() {
+                        screens.remove(&child);
+                    }
+                    match outs.first() {
+                        Some(o) => {
+                            let mode =
+                                o.current.and_then(|i| o.modes.get(i)).map(display::Mode::label).unwrap_or_default();
+                            status.set_text(&format!("{} · {mode} · scale {:.0}%", o.title, o.scale * 100.0));
+                        }
+                        None => status.set_text("no screen found"),
+                    }
+                    for o in &outs {
+                        screens.append(&screen_card(o, &error));
+                    }
+                    clear(&light);
+                    if let Some(b) = bright {
+                        light.append(&level_row(
+                            "brightness",
+                            (b * 100.0).round() as u32,
+                            display::set_brightness,
+                            None,
+                        ));
+                    }
+                    let night_switch = gtk::Switch::new();
+                    night_switch.set_active(night);
+                    night_switch.connect_state_set(|_, on| {
+                        display::set_night_light(on);
+                        glib::Propagation::Proceed
+                    });
+                    light.append(&setting_row("night light: warmer colours after sunset", &night_switch));
+                },
+            );
+        })
+    };
+    scroll.connect_map(move |_| load());
+    scroll
+}
+
+fn screen_card(o: &display::Output, error: &gtk::Label) -> gtk::Box {
+    let card = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    card.append(&caption(&o.title));
+    let list = gtk::ListBox::new();
+    list.add_css_class("list-card");
+    list.set_selection_mode(gtk::SelectionMode::None);
+    let mode_names: Vec<String> =
+        o.modes.iter().map(|m| format!("{}{}", m.label(), if m.preferred { " · best" } else { "" })).collect();
+    let modes = dropdown(&mode_names, o.current.unwrap_or(0));
+    let scale_names: Vec<String> = display::SCALES.iter().map(|s| format!("{:.0}%", s * 100.0)).collect();
+    let scale_now = display::SCALES.iter().position(|s| (s - o.scale).abs() < 0.01).unwrap_or(0);
+    let scales = dropdown(&scale_names, scale_now);
+    let rot_names: Vec<String> = display::ROTATIONS.iter().map(|r| r.0.to_string()).collect();
+    let rot_now = display::ROTATIONS
+        .iter()
+        .position(|r| o.transform == r.1 || (o.transform == "normal" && r.1 == "normal"))
+        .unwrap_or(0);
+    let rotations = dropdown(&rot_names, rot_now);
+    list.append(&setting_row("resolution", &modes));
+    list.append(&setting_row("scale", &scales));
+    list.append(&setting_row("rotation", &rotations));
+    card.append(&list);
+    let apply = {
+        let (o, modes, scales, rotations, error) =
+            (o.clone(), modes.clone(), scales.clone(), rotations.clone(), error.clone());
+        Rc::new(move || {
+            let Some(mode) = o.modes.get(modes.selected() as usize).cloned() else { return };
+            let scale = display::SCALES[scales.selected() as usize];
+            let transform = display::ROTATIONS[rotations.selected() as usize].1;
+            let (o, error) = (o.clone(), error.clone());
+            background(
+                move || display::apply(&o, &mode, scale, transform),
+                move |r| match r {
+                    Ok(()) => error.set_visible(false),
+                    Err(e) => {
+                        error.set_text(&format!("couldn't change the screen: {e}"));
+                        error.set_visible(true);
+                    }
+                },
+            );
+        })
+    };
+    for d in [&modes, &scales, &rotations] {
+        let apply = apply.clone();
+        d.connect_selected_notify(move |_| apply());
+    }
+    card
 }

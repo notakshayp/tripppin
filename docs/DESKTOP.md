@@ -83,7 +83,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [ ] Network details: IP, DNS, proxy, VPN (WireGuard, OpenVPN), Ethernet; advanced → nm-connection-editor
 - [~] Bluetooth: on/off, devices, pair, connect, battery levels; advanced → blueman (built; the VM has no Bluetooth, so pairing is checked on real hardware)
 - [~] Sound: output and input device, volume, mic level and test, per-app volume, alert sound; advanced → pavucontrol (devices, volume, mute, per-app built; mic test and alert sound to do; real devices checked on hardware)
-- [ ] Display: resolution, scale, refresh rate, rotation, brightness, night light, arrangement → wdisplays
+- [~] Display: resolution, scale, refresh rate, rotation, brightness, night light, arrangement → wdisplays (built; mode changes and brightness checked on hardware)
 - [ ] Appearance: wallpaper (ours and your own), dark/light/auto, accent, text size, reduce motion
 - [ ] Power & battery: health, time left, power mode, dim/off/sleep timing, lid action, low-battery behaviour
 - [ ] AI: the model in use, switch or download, cloud key or own server, what it may do alone, history

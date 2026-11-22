@@ -9,6 +9,7 @@
 
 mod bt;
 mod common;
+mod display;
 mod firstboot;
 mod greetd;
 mod greeter;
