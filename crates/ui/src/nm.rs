@@ -185,9 +185,98 @@ pub fn hotspot() -> Result<(String, String), String> {
     Ok((ssid, psk))
 }
 
+/// A connected device and its addresses.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Link {
+    pub device: String,
+    /// ethernet, wifi, wireguard, vpn…
+    pub kind: String,
+    pub connection: String,
+    pub hardware: String,
+    pub ipv4: Vec<String>,
+    pub gateway: String,
+    pub dns: Vec<String>,
+    pub ipv6: Vec<String>,
+}
+
+/// Parses `nmcli -t -f GENERAL.HWADDR,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.ADDRESS device show <dev>`.
+pub fn parse_details(out: &str, link: &mut Link) {
+    for line in out.lines() {
+        let Some((key, value)) = line.split_once(':') else { continue };
+        let value = value.replace("\\:", ":");
+        let key = key.split('[').next().unwrap_or(key);
+        match key {
+            "GENERAL.HWADDR" => link.hardware = value.to_lowercase(),
+            "IP4.ADDRESS" => link.ipv4.push(value),
+            "IP4.GATEWAY" => link.gateway = value,
+            "IP4.DNS" => link.dns.push(value),
+            // Link-local addresses (fe80::) aren't worth showing.
+            "IP6.ADDRESS" if !value.starts_with("fe80") => link.ipv6.push(value),
+            _ => {}
+        }
+    }
+}
+
+/// The devices that are connected, with their addresses (not the loopback).
+pub fn links() -> Vec<Link> {
+    let list = nmcli(&["-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device"]).unwrap_or_default();
+    list.lines()
+        .map(split_terse)
+        .filter(|f| f.len() >= 4 && f[2] == "connected" && f[1] != "loopback")
+        .map(|f| {
+            let mut link =
+                Link { device: f[0].clone(), kind: f[1].clone(), connection: f[3].clone(), ..Link::default() };
+            let fields = "GENERAL.HWADDR,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.ADDRESS";
+            parse_details(&nmcli(&["-t", "-f", fields, "device", "show", &f[0]]).unwrap_or_default(), &mut link);
+            link
+        })
+        .collect()
+}
+
+/// Saved VPNs: (name, type, active).
+pub fn parse_vpns(out: &str) -> Vec<(String, String, bool)> {
+    out.lines()
+        .map(split_terse)
+        .filter(|f| f.len() >= 3 && (f[1] == "vpn" || f[1] == "wireguard"))
+        .map(|f| (f[0].clone(), f[1].clone(), f[2] == "yes"))
+        .collect()
+}
+
+pub fn vpns() -> Vec<(String, String, bool)> {
+    parse_vpns(&nmcli(&["-t", "-f", "NAME,TYPE,ACTIVE", "connection", "show"]).unwrap_or_default())
+}
+
+pub fn vpn_up(name: &str, up: bool) -> Result<(), String> {
+    nmcli(&["connection", if up { "up" } else { "down" }, "id", name]).map(|_| ())
+}
+
+/// Imports a WireGuard .conf or an OpenVPN .ovpn file as a new VPN.
+pub fn import_vpn(path: &str) -> Result<(), String> {
+    let kind = if path.ends_with(".conf") { "wireguard" } else { "openvpn" };
+    nmcli(&["connection", "import", "type", kind, "file", path]).map(|_| ())
+}
+
+pub fn remove_connection(name: &str) -> Result<(), String> {
+    nmcli(&["connection", "delete", "id", name]).map(|_| ())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_details_and_vpns() {
+        let out = "GENERAL.HWADDR:86\\:E4\\:1C\\:22\\:F4\\:CB\nIP4.ADDRESS[1]:192.168.64.3/24\nIP4.GATEWAY:192.168.64.1\nIP4.DNS[1]:192.168.64.1\nIP6.ADDRESS[1]:fd94\\:a55\\:\\:1/64\nIP6.ADDRESS[2]:fe80\\:\\:1/64\n";
+        let mut l = Link::default();
+        parse_details(out, &mut l);
+        assert_eq!(l.hardware, "86:e4:1c:22:f4:cb");
+        assert_eq!(l.ipv4, vec!["192.168.64.3/24"]);
+        assert_eq!(l.gateway, "192.168.64.1");
+        assert_eq!(l.dns, vec!["192.168.64.1"]);
+        assert_eq!(l.ipv6, vec!["fd94:a55::1/64"]);
+        let vpns = parse_vpns("Wired connection 1:802-3-ethernet:yes\nwork:vpn:no\nhome wg:wireguard:yes\n");
+        assert_eq!(vpns, vec![("work".into(), "vpn".into(), false), ("home wg".into(), "wireguard".into(), true)]);
+    }
 
     #[test]
     fn splits_escaped_fields() {

@@ -22,8 +22,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 19] = [
+const SECTIONS: [(&str, &str); 20] = [
     ("wifi", "wi-fi"),
+    ("network", "network & vpn"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
     ("display", "display"),
@@ -92,6 +93,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.set_transition_type(gtk::StackTransitionType::Crossfade);
     stack.set_hexpand(true);
     stack.add_named(&wifi_page(), Some("wifi"));
+    stack.add_named(&network_page(), Some("network"));
     stack.add_named(&bluetooth_page(), Some("bluetooth"));
     stack.add_named(&sound_page(), Some("sound"));
     stack.add_named(&display_page(), Some("display"));
@@ -3468,5 +3470,242 @@ fn accessibility_page() -> gtk::ScrolledWindow {
     moving.append(&setting_row("do things by asking", &label("super + space, then say it in words", &["row-sub"])));
     body.append(&moving);
     body.append(&error);
+    scroll
+}
+
+const PROXY_MODES: [(&str, &str); 3] =
+    [("none", "no proxy"), ("auto", "automatic (a pac address)"), ("manual", "one proxy for everything")];
+
+fn network_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, right) = page("network & vpn");
+    let advanced = gtk::Button::with_label("advanced");
+    advanced.add_css_class("link");
+    advanced.add_css_class("accent");
+    advanced.connect_clicked(|_| {
+        let _ = std::process::Command::new("nm-connection-editor").spawn();
+    });
+    right.append(&advanced);
+    let links = gtk::Box::new(gtk::Orientation::Vertical, 22);
+    body.append(&links);
+    body.append(&caption("vpn"));
+    let vpns = card();
+    body.append(&vpns);
+    body.append(&caption("proxy"));
+    let proxy = card();
+    body.append(&proxy);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    body.append(&error);
+
+    // Proxy settings live in GNOME's settings, which GTK apps, Flatpaks and browsers read.
+    let mode_now = privacy::gsettings_get("org.gnome.system.proxy", "mode").trim_matches('\'').to_string();
+    let names: Vec<String> = PROXY_MODES.iter().map(|m| m.1.to_string()).collect();
+    let mode = dropdown(&names, PROXY_MODES.iter().position(|m| m.0 == mode_now).unwrap_or(0));
+    let address = gtk::Entry::new();
+    address.add_css_class("field");
+    address.set_width_chars(26);
+    let fill_address = {
+        let address = address.clone();
+        move |m: &str| {
+            let (text, hint) = match m {
+                "auto" => (
+                    privacy::gsettings_get("org.gnome.system.proxy", "autoconfig-url").trim_matches('\'').to_string(),
+                    "https://…/proxy.pac",
+                ),
+                "manual" => {
+                    let host =
+                        privacy::gsettings_get("org.gnome.system.proxy.http", "host").trim_matches('\'').to_string();
+                    let port = privacy::gsettings_get("org.gnome.system.proxy.http", "port");
+                    (if host.is_empty() { String::new() } else { format!("{host}:{port}") }, "host:port")
+                }
+                _ => (String::new(), ""),
+            };
+            address.set_text(&text);
+            address.set_placeholder_text(Some(hint));
+            address.set_visible(m != "none");
+        }
+    };
+    fill_address(&mode_now);
+    {
+        let fill_address = fill_address.clone();
+        mode.connect_selected_notify(move |d| {
+            let m = PROXY_MODES[d.selected() as usize].0;
+            privacy::gsettings_set("org.gnome.system.proxy", "mode", m);
+            fill_address(m);
+        });
+    }
+    {
+        let (mode, error) = (mode.clone(), error.clone());
+        address.connect_activate(move |e| {
+            let text = e.text().trim().to_string();
+            match PROXY_MODES[mode.selected() as usize].0 {
+                "auto" => privacy::gsettings_set("org.gnome.system.proxy", "autoconfig-url", &text),
+                "manual" => {
+                    let Some((host, port)) = text.rsplit_once(':').filter(|(_, p)| p.parse::<u16>().is_ok()) else {
+                        error.set_text("write it as host:port, like proxy.example.com:8080");
+                        error.set_visible(true);
+                        return;
+                    };
+                    for schema in ["org.gnome.system.proxy.http", "org.gnome.system.proxy.https"] {
+                        privacy::gsettings_set(schema, "host", host);
+                        privacy::gsettings_set(schema, "port", port);
+                    }
+                }
+                _ => {}
+            }
+            error.set_visible(false);
+        });
+    }
+    proxy.append(&setting_row("proxy", &mode));
+    proxy.append(&setting_row("address (press enter to save)", &address));
+
+    let load: LoadSlot = Rc::new(RefCell::new(None));
+    {
+        let slot = load.clone();
+        *load.borrow_mut() = Some(Rc::new(move || {
+            let (slot, links, vpns, status, error) =
+                (slot.clone(), links.clone(), vpns.clone(), status.clone(), error.clone());
+            background(
+                || (nm::links(), nm::vpns()),
+                move |(found, saved)| {
+                    let reload = {
+                        let slot = slot.clone();
+                        move || {
+                            if let Some(f) = slot.borrow().clone() {
+                                f();
+                            }
+                        }
+                    };
+                    while let Some(c) = links.first_child() {
+                        links.remove(&c);
+                    }
+                    status.set_text(&match found.first() {
+                        Some(l) => format!(
+                            "connected · {} · {}",
+                            l.connection.to_lowercase(),
+                            l.ipv4.first().map(|a| a.split('/').next().unwrap_or(a)).unwrap_or("no address")
+                        ),
+                        None => "not connected".to_string(),
+                    });
+                    for l in &found {
+                        let what = match l.kind.as_str() {
+                            "ethernet" => "cable",
+                            "wifi" => "wi-fi",
+                            "wireguard" | "vpn" | "tun" => "vpn",
+                            other => other,
+                        };
+                        links.append(&caption(&format!("{what} · {}", l.connection.to_lowercase())));
+                        let c = card();
+                        let value = |v: &str| label(v, &["row-value"]);
+                        if !l.ipv4.is_empty() {
+                            c.append(&setting_row("address", &value(&l.ipv4.join(", "))));
+                        }
+                        if !l.gateway.is_empty() {
+                            c.append(&setting_row("router", &value(&l.gateway)));
+                        }
+                        if !l.dns.is_empty() {
+                            c.append(&setting_row("dns", &value(&l.dns.join(", "))));
+                        }
+                        if !l.ipv6.is_empty() {
+                            c.append(&setting_row("ipv6", &value(&l.ipv6.join(", "))));
+                        }
+                        if !l.hardware.is_empty() {
+                            c.append(&setting_row("hardware address", &value(&l.hardware)));
+                        }
+                        links.append(&c);
+                    }
+                    clear(&vpns);
+                    for (name, _kind, active) in saved {
+                        let controls = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+                        let remove = gtk::Button::with_label("remove");
+                        remove.add_css_class("link");
+                        let toggle = gtk::Switch::new();
+                        toggle.set_active(active);
+                        {
+                            let (name, error, reload) = (name.clone(), error.clone(), reload.clone());
+                            toggle.connect_state_set(move |_, on| {
+                                let (name, error, reload) = (name.clone(), error.clone(), reload.clone());
+                                background(
+                                    move || nm::vpn_up(&name, on),
+                                    move |r| {
+                                        if let Err(e) = r {
+                                            error.set_text(&format!("couldn't change the vpn: {e}"));
+                                            error.set_visible(true);
+                                        }
+                                        reload();
+                                    },
+                                );
+                                glib::Propagation::Proceed
+                            });
+                        }
+                        {
+                            let (name, error, reload) = (name.clone(), error.clone(), reload.clone());
+                            remove.connect_clicked(move |b| {
+                                if b.label().as_deref() != Some("sure? remove") {
+                                    b.set_label("sure? remove");
+                                    b.add_css_class("danger");
+                                    return;
+                                }
+                                if let Err(e) = nm::remove_connection(&name) {
+                                    error.set_text(&format!("couldn't remove it: {e}"));
+                                    error.set_visible(true);
+                                }
+                                reload();
+                            });
+                        }
+                        controls.append(&remove);
+                        controls.append(&toggle);
+                        vpns.append(&setting_row(&name.to_lowercase(), &controls));
+                    }
+                    let add = gtk::Button::with_label("add from a file (wireguard .conf or openvpn .ovpn)");
+                    add.add_css_class("link");
+                    add.add_css_class("accent");
+                    {
+                        let (error, reload) = (error.clone(), reload.clone());
+                        add.connect_clicked(move |b| {
+                            let filter = gtk::FileFilter::new();
+                            filter.add_pattern("*.conf");
+                            filter.add_pattern("*.ovpn");
+                            filter.set_name(Some("vpn settings"));
+                            let filters = gio::ListStore::new::<gtk::FileFilter>();
+                            filters.append(&filter);
+                            let dialog = gtk::FileDialog::builder()
+                                .title("choose a vpn file")
+                                .filters(&filters)
+                                .modal(true)
+                                .build();
+                            let (error, reload) = (error.clone(), reload.clone());
+                            dialog.open(
+                                b.root().and_downcast::<gtk::Window>().as_ref(),
+                                gio::Cancellable::NONE,
+                                move |r| {
+                                    if let Ok(f) = r
+                                        && let Some(path) = f.path()
+                                    {
+                                        match nm::import_vpn(&path.to_string_lossy()) {
+                                            Ok(()) => reload(),
+                                            Err(e) => {
+                                                error.set_text(&format!("couldn't add that vpn: {e}"));
+                                                error.set_visible(true);
+                                            }
+                                        }
+                                    }
+                                },
+                            );
+                        });
+                    }
+                    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                    row.add_css_class("net-row");
+                    row.append(&add);
+                    vpns.append(&row);
+                },
+            );
+        }));
+    }
+    scroll.connect_map(move |_| {
+        if let Some(f) = load.borrow().clone() {
+            f();
+        }
+    });
     scroll
 }

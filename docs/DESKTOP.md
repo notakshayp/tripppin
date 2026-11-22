@@ -81,7 +81,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 Simple sections are ours; deep ones open the themed specialist tool.
 
 - [~] Wi-Fi: nearby networks, connect with a password, forget, hidden network, hotspot, airplane mode (built; the VM has no Wi-Fi card, so connecting is checked on real hardware)
-- [ ] Network details: IP, DNS, proxy, VPN (WireGuard, OpenVPN), Ethernet; advanced → nm-connection-editor
+- [x] Network details: IP, DNS, proxy, VPN (WireGuard, OpenVPN), Ethernet; advanced → nm-connection-editor (checked in the VM: cable details, a WireGuard file imported and connected; OpenVPN plugin in the image)
 - [~] Bluetooth: on/off, devices, pair, connect, battery levels; advanced → blueman (built; the VM has no Bluetooth, so pairing is checked on real hardware)
 - [~] Sound: output and input device, volume, mic level and test, per-app volume, alert sound; advanced → pavucontrol (devices, volume, mute, per-app built; mic test and alert sound to do; real devices checked on hardware)
 - [~] Display: resolution, scale, refresh rate, rotation, brightness, night light, arrangement → wdisplays (built; mode changes and brightness checked on hardware)
