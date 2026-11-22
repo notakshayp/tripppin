@@ -370,6 +370,236 @@ entry.pw-center {
     caret-color: #57d99a;
 }
 
+/* ---- settings ----------------------------------------------------------- */
+
+window.settings {
+    background: #0d1211;
+}
+
+headerbar.bare {
+    min-height: 0;
+    padding: 8px 10px 0;
+    background: #0d1211;
+    border: none;
+    box-shadow: none;
+}
+
+.sidebar {
+    padding: 22px 14px;
+    background: #0b100f;
+    border-right: 1px solid #1d2825;
+}
+
+entry.search,
+searchentry.search {
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 12px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+    box-shadow: none;
+    color: #f2f5ef;
+    font-size: 14px;
+}
+
+list.nav {
+    background: transparent;
+}
+
+list.nav > row {
+    min-height: 40px;
+    padding: 0 12px;
+    margin-bottom: 2px;
+    border-radius: 12px;
+    background: transparent;
+    outline: none;
+}
+
+list.nav > row:hover {
+    background: rgba(242, 245, 239, 0.04);
+}
+
+list.nav > row:selected {
+    background: rgba(87, 217, 154, 0.12);
+}
+
+.dot {
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 9999px;
+    background: #2a3632;
+}
+
+list.nav > row:selected .dot {
+    background: #57d99a;
+}
+
+.nav-title {
+    font-size: 15px;
+    color: #c9d4ce;
+}
+
+list.nav > row:selected .nav-title {
+    color: #f2f5ef;
+    font-weight: 600;
+}
+
+.page {
+    padding: 30px 36px;
+}
+
+.page-title {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1.2px;
+}
+
+.page-sub {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #8a9a93;
+}
+
+switch {
+    min-width: 48px;
+    min-height: 26px;
+    border-radius: 9999px;
+    border: none;
+    background: #1d2825;
+}
+
+switch:checked {
+    background: #1f6b45;
+}
+
+switch > slider {
+    min-width: 22px;
+    min-height: 22px;
+    margin: 2px;
+    border-radius: 9999px;
+    background: #f2f5ef;
+    border: none;
+    box-shadow: none;
+}
+
+list.list-card {
+    border-radius: 16px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+}
+
+list.list-card > row {
+    border-bottom: 1px solid #1d2825;
+    background: transparent;
+    outline: none;
+}
+
+list.list-card > row:last-child {
+    border-bottom: none;
+}
+
+.net-row {
+    min-height: 56px;
+    padding: 0 18px;
+}
+
+.net-row.connected {
+    background: rgba(87, 217, 154, 0.07);
+}
+
+.row-title {
+    font-size: 16px;
+    color: #d9e1dd;
+}
+
+.row-title-strong {
+    font-size: 16px;
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+.row-title.muted {
+    color: #9fb0a8;
+}
+
+.row-sub {
+    font-family: "DM Mono", monospace;
+    font-size: 12px;
+    color: #6b7a74;
+}
+
+.row-sub.on {
+    color: #57d99a;
+}
+
+.lock {
+    font-size: 9px;
+    color: #6b7a74;
+}
+
+button.link.accent {
+    color: #57d99a;
+}
+
+.ask-password {
+    padding: 16px 18px;
+    background: #0f1513;
+    border-top: 1px solid #1d2825;
+}
+
+entry.field,
+passwordentry.field {
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    background: #0b100f;
+    border: 1px solid #2a3632;
+    box-shadow: none;
+    color: #f2f5ef;
+    font-size: 16px;
+}
+
+entry.field:focus-within,
+passwordentry.field:focus-within {
+    border-color: #57d99a;
+}
+
+button.pill {
+    min-height: 44px;
+    padding: 0 22px;
+    border-radius: 22px;
+    border: none;
+    box-shadow: none;
+    background: #57d99a;
+    color: #0d1211;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+button.small-card {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+    box-shadow: none;
+}
+
+button.small-card:hover {
+    border-color: #57d99a;
+}
+
+.card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+.card-sub {
+    font-size: 13px;
+    font-weight: 400;
+    color: #8a9a93;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

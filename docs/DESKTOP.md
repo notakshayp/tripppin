@@ -79,7 +79,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 
 Simple sections are ours; deep ones open the themed specialist tool.
 
-- [ ] Wi-Fi: nearby networks, connect with a password, forget, hidden network, hotspot, airplane mode
+- [~] Wi-Fi: nearby networks, connect with a password, forget, hidden network, hotspot, airplane mode (built; the VM has no Wi-Fi card, so connecting is checked on real hardware)
 - [ ] Network details: IP, DNS, proxy, VPN (WireGuard, OpenVPN), Ethernet; advanced → nm-connection-editor
 - [ ] Bluetooth: on/off, devices, pair, connect, battery levels; advanced → blueman
 - [ ] Sound: output and input device, volume, mic level and test, per-app volume, alert sound; advanced → pavucontrol

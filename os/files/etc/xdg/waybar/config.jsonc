@@ -23,6 +23,8 @@
             "org\\.mozilla\\.firefox|firefox": "firefox",
             "org\\.videolan\\.VLC": "vlc",
             "org\\.gnome\\.Nautilus": "files",
+            "in\\.trippp\\.Settings": "settings",
+            "in\\.trippp\\.FirstBoot": "welcome",
             "^(?:[a-z]+\\.)+([A-Za-z]+)$": "$1"
         }
     },
