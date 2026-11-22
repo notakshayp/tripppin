@@ -22,6 +22,7 @@ mod orb;
 mod osd;
 mod pointer;
 mod power;
+mod privacy;
 mod region;
 mod settings;
 mod snd;

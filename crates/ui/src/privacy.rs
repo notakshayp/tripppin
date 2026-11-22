@@ -1,0 +1,113 @@
+//! Privacy and accessibility switches: GNOME settings that GTK apps and the portals honour,
+//! Flatpak's camera permissions, the firewall, the screen reader and the cursor size.
+
+use std::path::PathBuf;
+use std::process::Command;
+
+pub fn gsettings_get(schema: &str, key: &str) -> String {
+    Command::new("gsettings")
+        .args(["get", schema, key])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
+pub fn gsettings_set(schema: &str, key: &str, value: &str) {
+    let _ = Command::new("gsettings").args(["set", schema, key, value]).status();
+}
+
+pub fn flag(schema: &str, key: &str) -> bool {
+    gsettings_get(schema, key) == "true"
+}
+
+pub fn set_flag(schema: &str, key: &str, on: bool) {
+    gsettings_set(schema, key, if on { "true" } else { "false" });
+}
+
+fn home() -> PathBuf {
+    std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/tmp"))
+}
+
+pub fn clear_recent() -> std::io::Result<()> {
+    match std::fs::remove_file(home().join(".local/share/recently-used.xbel")) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+        _ => Ok(()),
+    }
+}
+
+/// (app id, allowed) from `flatpak permissions devices`: lines of table, object, app, value.
+pub fn parse_camera(out: &str) -> Vec<(String, bool)> {
+    out.lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split_whitespace().collect();
+            (f.len() >= 4 && f[0] == "devices" && f[1] == "camera").then(|| (f[2].to_string(), f[3] == "yes"))
+        })
+        .collect()
+}
+
+pub fn camera_apps() -> Vec<(String, bool)> {
+    Command::new("flatpak")
+        .args(["permissions", "devices"])
+        .output()
+        .map(|o| parse_camera(&String::from_utf8_lossy(&o.stdout)))
+        .unwrap_or_default()
+}
+
+pub fn set_camera(app: &str, allowed: bool) {
+    let _ = Command::new("flatpak")
+        .args(["permission-set", "devices", "camera", app, if allowed { "yes" } else { "no" }])
+        .status();
+}
+
+/// Some(on) when firewalld is installed.
+pub fn firewall() -> Option<bool> {
+    let out = Command::new("firewall-cmd").arg("--state").output().ok()?;
+    Some(String::from_utf8_lossy(&out.stdout).trim() == "running")
+}
+
+/// Screen reader: Orca, when installed.
+pub fn has_orca() -> bool {
+    std::path::Path::new("/usr/bin/orca").exists()
+}
+
+pub fn set_screen_reader(on: bool) {
+    set_flag("org.gnome.desktop.a11y.applications", "screen-reader-enabled", on);
+    if on {
+        let _ = Command::new("setsid").args(["-f", "orca", "--replace"]).status();
+    } else {
+        let _ = Command::new("pkill").args(["-x", "orca"]).status();
+    }
+}
+
+pub const CURSOR_SIZES: [(u32, &str); 4] = [(24, "normal"), (32, "large"), (48, "larger"), (64, "largest")];
+
+pub fn cursor_size() -> u32 {
+    gsettings_get("org.gnome.desktop.interface", "cursor-size").parse().unwrap_or(24)
+}
+
+/// Sets the cursor size for apps (GTK) and for niri, which draws it over everything else.
+pub fn set_cursor_size(size: u32) -> std::io::Result<()> {
+    gsettings_set("org.gnome.desktop.interface", "cursor-size", &size.to_string());
+    let dir =
+        std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|| home().join(".config")).join("niri");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(
+        dir.join("tripppin-cursor.kdl"),
+        format!("// Cursor size, written by tripppin settings.\ncursor {{\n    xcursor-size {size}\n}}\n"),
+    )?;
+    crate::display::include_in_niri("tripppin-cursor.kdl")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_camera_permissions() {
+        let out = "devices camera org.gnome.Snapshot yes 0x00\ndevices camera com.discordapp.Discord no 0x00\nnotifications notification x yes\n";
+        assert_eq!(
+            parse_camera(out),
+            vec![("org.gnome.Snapshot".into(), true), ("com.discordapp.Discord".into(), false)]
+        );
+    }
+}

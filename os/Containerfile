@@ -98,6 +98,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       google-noto-sans-devanagari-vf-fonts google-noto-sans-bengali-vf-fonts google-noto-sans-tamil-vf-fonts \
       google-noto-sans-telugu-vf-fonts google-noto-sans-kannada-vf-fonts google-noto-sans-malayalam-vf-fonts \
       google-noto-sans-gujarati-vf-fonts google-noto-sans-gurmukhi-vf-fonts \
+      firewalld orca espeak-ng speech-dispatcher speech-dispatcher-espeak-ng \
     && dnf clean all
 
 COPY os/files/ /
@@ -114,7 +115,7 @@ RUN sed -i \
 RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } > /etc/issue
 
 # The desktop starts on tty1 through greetd; other consoles (Ctrl+Alt+F2…) are kmscon.
-RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service \
+RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service firewalld.service \
     && systemctl set-default graphical.target \
     && dconf update
 

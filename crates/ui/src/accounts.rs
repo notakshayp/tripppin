@@ -113,7 +113,7 @@ pub fn set_picture(p: &Person, file: &str) -> Result<(), String> {
 }
 
 /// Runs `args` as root, with `password` for sudo and `input` on the command's stdin.
-fn as_admin(password: &str, args: &[&str], input: &str) -> Result<(), String> {
+pub fn as_admin(password: &str, args: &[&str], input: &str) -> Result<(), String> {
     let mut child = Command::new("sudo")
         .args(["-k", "-S", "-p", ""])
         .args(args)

@@ -96,8 +96,8 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] Accounts: name, picture, password, auto-login, add a person (all built; name checked in the VM; password, auto-login and adding a person run through sudo with your password and are checked on the laptop)
 - [~] Date & time: time zone (automatic), 24-hour, date format (zone, automatic time, 12/24-hour built and checked; picking the zone from location to do; date format follows region formats)
 - [~] Language & region (language and region formats built; the choices appear once the next image brings the langpacks and Indian-script fonts; our own screens are English only)
-- [ ] Privacy: location, camera and microphone access, recent files, lock-screen content, firewall
-- [ ] Accessibility: screen reader (orca), larger text, high contrast, zoom, sticky keys, reduce motion
+- [~] Privacy: location, camera and microphone access, recent files, lock-screen content, firewall (built; the firewall comes with the next image; per-app microphone control is not possible with PipeWire's sound access today)
+- [~] Accessibility: screen reader (orca), larger text, high contrast, zoom, sticky keys, reduce motion (screen reader with the next image; larger text, high contrast, pointer size, reduce motion built; niri has no zoom or sticky keys yet)
 - [~] Storage: what's using space, clean up, external drives (usage and clean-up checked in the VM; ejecting a USB drive checked on hardware)
 - [x] Updates: check, install (one click), automatic, roll back to the previous version (daily download, never a surprise restart: the version starts at the next restart, which the page offers; checked in the VM)
 - [~] About: device name, hardware, Tripppin version, licences, bill of materials (name, hardware, storage, version, licence built; a browsable bill of materials waits for CI to publish an SBOM)

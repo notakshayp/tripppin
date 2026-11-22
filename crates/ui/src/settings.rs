@@ -11,6 +11,7 @@ use crate::keyboard;
 use crate::nm;
 use crate::pointer;
 use crate::power;
+use crate::privacy;
 use crate::region;
 use crate::snd;
 use crate::storage;
@@ -21,7 +22,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 17] = [
+const SECTIONS: [(&str, &str); 19] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -36,6 +37,8 @@ const SECTIONS: [(&str, &str); 17] = [
     ("time", "date & time"),
     ("language", "language & region"),
     ("accounts", "accounts"),
+    ("privacy", "privacy"),
+    ("accessibility", "accessibility"),
     ("storage", "storage"),
     ("updates", "updates"),
     ("about", "about"),
@@ -102,6 +105,8 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&time_page(), Some("time"));
     stack.add_named(&language_page(), Some("language"));
     stack.add_named(&accounts_page(), Some("accounts"));
+    stack.add_named(&privacy_page(), Some("privacy"));
+    stack.add_named(&accessibility_page(), Some("accessibility"));
     stack.add_named(&storage_page(), Some("storage"));
     stack.add_named(&updates_page(), Some("updates"));
     stack.add_named(&about_page(), Some("about"));
@@ -3258,5 +3263,210 @@ fn accounts_page() -> gtk::ScrolledWindow {
             f();
         }
     });
+    scroll
+}
+
+fn gsettings_switch(schema: &'static str, key: &'static str) -> gtk::Switch {
+    let s = gtk::Switch::new();
+    s.set_active(privacy::flag(schema, key));
+    s.connect_state_set(move |_, on| {
+        privacy::set_flag(schema, key, on);
+        glib::Propagation::Proceed
+    });
+    s
+}
+
+fn card() -> gtk::ListBox {
+    let l = gtk::ListBox::new();
+    l.add_css_class("list-card");
+    l.set_selection_mode(gtk::SelectionMode::None);
+    l
+}
+
+fn privacy_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("privacy");
+    status.set_text("what apps and the system may see");
+    let error = label("", &["error"]);
+    error.set_visible(false);
+
+    let general = card();
+    general.append(&setting_row(
+        "location: apps may ask where you are",
+        &gsettings_switch("org.gnome.system.location", "enabled"),
+    ));
+    let recent = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    let clear_recent = gtk::Button::with_label("clear");
+    clear_recent.add_css_class("link");
+    clear_recent.add_css_class("accent");
+    {
+        let error = error.clone();
+        clear_recent.connect_clicked(move |b| match privacy::clear_recent() {
+            Ok(()) => b.set_label("cleared"),
+            Err(e) => {
+                error.set_text(&format!("couldn't clear it: {e}"));
+                error.set_visible(true);
+            }
+        });
+    }
+    recent.append(&clear_recent);
+    recent.append(&gsettings_switch("org.gnome.desktop.privacy", "remember-recent-files"));
+    general.append(&setting_row("remember recently opened files", &recent));
+    general.append(&setting_row("the lock screen", &label("shows the time, never notifications", &["row-sub"])));
+    body.append(&general);
+
+    body.append(&caption("camera"));
+    let camera = card();
+    body.append(&camera);
+    let mic_note = label("apps that play sound can also use the microphone.", &["row-sub"]);
+    mic_note.set_wrap(true);
+    mic_note.set_xalign(0.0);
+    body.append(&mic_note);
+
+    body.append(&caption("firewall"));
+    let firewall = card();
+    body.append(&firewall);
+    let fw_forms = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    body.append(&fw_forms);
+    body.append(&error);
+
+    let load: LoadSlot = Rc::new(RefCell::new(None));
+    {
+        let slot = load.clone();
+        *load.borrow_mut() = Some(Rc::new(move || {
+            let (slot, camera, firewall, fw_forms, error) =
+                (slot.clone(), camera.clone(), firewall.clone(), fw_forms.clone(), error.clone());
+            background(
+                || (privacy::camera_apps(), privacy::firewall(), apps::installed()),
+                move |(cams, fw, installed)| {
+                    clear(&camera);
+                    if cams.is_empty() {
+                        camera.append(&setting_row("no app has asked for the camera yet", &label("", &["row-sub"])));
+                    }
+                    for (id, allowed) in cams {
+                        let name =
+                            installed.iter().find(|a| a.id == id).map(|a| a.name.to_lowercase()).unwrap_or(id.clone());
+                        let s = gtk::Switch::new();
+                        s.set_active(allowed);
+                        s.connect_state_set(move |_, on| {
+                            privacy::set_camera(&id, on);
+                            glib::Propagation::Proceed
+                        });
+                        camera.append(&setting_row(&name, &s));
+                    }
+                    clear(&firewall);
+                    while let Some(c) = fw_forms.first_child() {
+                        fw_forms.remove(&c);
+                    }
+                    let Some(on) = fw else {
+                        firewall.append(&setting_row("firewall", &label("comes with the next update", &["row-sub"])));
+                        return;
+                    };
+                    let toggle = gtk::Button::with_label(if on { "turn off" } else { "turn on" });
+                    toggle.add_css_class("link");
+                    toggle.add_css_class("accent");
+                    let reload = {
+                        let slot = slot.clone();
+                        move || {
+                            if let Some(f) = slot.borrow().clone() {
+                                f();
+                            }
+                        }
+                    };
+                    let (form, _) = admin_form(
+                        &[],
+                        if on { "turn the firewall off" } else { "turn the firewall on" },
+                        &error,
+                        move |v| {
+                            let how = if on { "disable" } else { "enable" };
+                            accounts::as_admin(&v[0], &["systemctl", how, "--now", "firewalld.service"], "")
+                        },
+                        reload,
+                    );
+                    form.set_visible(false);
+                    {
+                        let f = form.clone();
+                        toggle.connect_clicked(move |_| f.set_visible(!f.is_visible()));
+                    }
+                    firewall.append(&setting_row(
+                        if on { "on · blocks connections nobody asked for" } else { "off" },
+                        &toggle,
+                    ));
+                    fw_forms.append(&form);
+                },
+            );
+        }));
+    }
+    scroll.connect_map(move |_| {
+        if let Some(f) = load.borrow().clone() {
+            f();
+        }
+    });
+    scroll
+}
+
+fn accessibility_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("accessibility");
+    status.set_text("seeing, moving and typing");
+    let error = label("", &["error"]);
+    error.set_visible(false);
+
+    body.append(&caption("seeing"));
+    let seeing = card();
+    if privacy::has_orca() {
+        let reader = gtk::Switch::new();
+        reader.set_active(privacy::flag("org.gnome.desktop.a11y.applications", "screen-reader-enabled"));
+        reader.connect_state_set(|_, on| {
+            privacy::set_screen_reader(on);
+            glib::Propagation::Proceed
+        });
+        seeing.append(&setting_row("screen reader: reads the screen aloud", &reader));
+    } else {
+        seeing.append(&setting_row("screen reader", &label("comes with the next update", &["row-sub"])));
+    }
+    let large = gtk::Switch::new();
+    large.set_active(
+        privacy::gsettings_get("org.gnome.desktop.interface", "text-scaling-factor").parse::<f64>().unwrap_or(1.0)
+            > 1.05,
+    );
+    large.connect_state_set(|_, on| {
+        privacy::gsettings_set("org.gnome.desktop.interface", "text-scaling-factor", if on { "1.25" } else { "1.0" });
+        glib::Propagation::Proceed
+    });
+    seeing.append(&setting_row("larger text", &large));
+    seeing
+        .append(&setting_row("high contrast", &gsettings_switch("org.gnome.desktop.a11y.interface", "high-contrast")));
+    let names: Vec<String> = privacy::CURSOR_SIZES.iter().map(|c| c.1.to_string()).collect();
+    let now = privacy::CURSOR_SIZES.iter().position(|c| c.0 == privacy::cursor_size()).unwrap_or(0);
+    let cursor = dropdown(&names, now);
+    {
+        let error = error.clone();
+        cursor.connect_selected_notify(move |d| {
+            if let Err(e) = privacy::set_cursor_size(privacy::CURSOR_SIZES[d.selected() as usize].0) {
+                error.set_text(&format!("couldn't save: {e}"));
+                error.set_visible(true);
+            }
+        });
+    }
+    seeing.append(&setting_row("pointer size", &cursor));
+    seeing.append(&setting_row("zoom in on part of the screen", &label("not available yet", &["row-sub"])));
+    body.append(&seeing);
+
+    body.append(&caption("moving and typing"));
+    let moving = card();
+    let motion = gtk::Switch::new();
+    motion.set_active(display::reduce_motion());
+    motion.connect_state_set(|_, on| {
+        let _ = display::set_reduce_motion(on);
+        gsettings_set("enable-animations", if on { "false" } else { "true" });
+        glib::Propagation::Proceed
+    });
+    moving.append(&setting_row("reduce motion", &motion));
+    moving.append(&setting_row(
+        "sticky keys: press shortcuts one key at a time",
+        &label("not available yet", &["row-sub"]),
+    ));
+    moving.append(&setting_row("do things by asking", &label("super + space, then say it in words", &["row-sub"])));
+    body.append(&moving);
+    body.append(&error);
     scroll
 }
