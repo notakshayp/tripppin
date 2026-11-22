@@ -749,6 +749,21 @@ button.link.danger {
     color: #ff8a7a;
 }
 
+levelbar.usage > trough {
+    min-height: 12px;
+    border-radius: 6px;
+    background: #1b2421;
+}
+
+levelbar.usage > trough > block.filled {
+    border-radius: 6px;
+    background: #57d99a;
+}
+
+levelbar.usage > trough > block.empty {
+    background: transparent;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

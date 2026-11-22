@@ -98,7 +98,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] Language & region (language and region formats built; the choices appear once the next image brings the langpacks and Indian-script fonts; our own screens are English only)
 - [ ] Privacy: location, camera and microphone access, recent files, lock-screen content, firewall
 - [ ] Accessibility: screen reader (orca), larger text, high contrast, zoom, sticky keys, reduce motion
-- [ ] Storage: what's using space, clean up, external drives
+- [~] Storage: what's using space, clean up, external drives (usage and clean-up checked in the VM; ejecting a USB drive checked on hardware)
 - [x] Updates: check, install (one click), automatic, roll back to the previous version (daily download, never a surprise restart: the version starts at the next restart, which the page offers; checked in the VM)
 - [~] About: device name, hardware, Tripppin version, licences, bill of materials (name, hardware, storage, version, licence built; a browsable bill of materials waits for CI to publish an SBOM)
 

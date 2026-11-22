@@ -12,6 +12,7 @@ use crate::pointer;
 use crate::power;
 use crate::region;
 use crate::snd;
+use crate::storage;
 use crate::system;
 use gtk::prelude::*;
 use gtk::{gio, glib};
@@ -19,7 +20,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 15] = [
+const SECTIONS: [(&str, &str); 16] = [
     ("wifi", "wi-fi"),
     ("bluetooth", "bluetooth"),
     ("sound", "sound"),
@@ -33,6 +34,7 @@ const SECTIONS: [(&str, &str); 15] = [
     ("pointer", "mouse & touchpad"),
     ("time", "date & time"),
     ("language", "language & region"),
+    ("storage", "storage"),
     ("updates", "updates"),
     ("about", "about"),
 ];
@@ -97,6 +99,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.add_named(&pointer_page(), Some("pointer"));
     stack.add_named(&time_page(), Some("time"));
     stack.add_named(&language_page(), Some("language"));
+    stack.add_named(&storage_page(), Some("storage"));
     stack.add_named(&updates_page(), Some("updates"));
     stack.add_named(&about_page(), Some("about"));
 
@@ -2798,6 +2801,134 @@ fn about_page() -> gtk::ScrolledWindow {
                 software.append(&setting_row("website", &site));
             },
         );
+    });
+    scroll
+}
+
+fn size(bytes: u64) -> String {
+    if bytes >= 1_000_000_000 {
+        format!("{:.1} gb", bytes as f64 / 1e9)
+    } else {
+        format!("{:.0} mb", bytes as f64 / 1e6)
+    }
+}
+
+fn storage_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("storage");
+    let bar = gtk::LevelBar::new();
+    bar.add_css_class("usage");
+    bar.set_min_value(0.0);
+    bar.set_max_value(1.0);
+    body.append(&bar);
+    let parts = gtk::ListBox::new();
+    parts.add_css_class("list-card");
+    parts.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&parts);
+    body.append(&caption("clean up"));
+    let clean = gtk::ListBox::new();
+    clean.add_css_class("list-card");
+    clean.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&clean);
+    body.append(&caption("external drives"));
+    let drives = gtk::ListBox::new();
+    drives.add_css_class("list-card");
+    drives.set_selection_mode(gtk::SelectionMode::None);
+    body.append(&drives);
+    let error = label("", &["error"]);
+    error.set_visible(false);
+    body.append(&error);
+
+    let load: LoadSlot = Rc::new(RefCell::new(None));
+    {
+        let slot = load.clone();
+        *load.borrow_mut() = Some(Rc::new(move || {
+            let (slot, bar, parts, clean, drives, status, error) = (
+                slot.clone(),
+                bar.clone(),
+                parts.clone(),
+                clean.clone(),
+                drives.clone(),
+                status.clone(),
+                error.clone(),
+            );
+            status.set_text("measuring…");
+            background(
+                || (storage::usage(), storage::drives()),
+                move |(u, found)| {
+                    let reload = {
+                        let slot = slot.clone();
+                        move || {
+                            if let Some(f) = slot.borrow().clone() {
+                                f();
+                            }
+                        }
+                    };
+                    status.set_text(&format!("{} free of {}", size(u.total.saturating_sub(u.used)), size(u.total)));
+                    bar.set_value(if u.total > 0 { u.used as f64 / u.total as f64 } else { 0.0 });
+                    clear(&parts);
+                    for (what, bytes) in &u.parts {
+                        parts.append(&setting_row(what, &label(&size(*bytes), &["row-value"])));
+                    }
+                    clear(&clean);
+                    let action = |title: &str, word: &str, work: fn() -> Result<(), String>| {
+                        let b = gtk::Button::with_label(word);
+                        b.add_css_class("link");
+                        b.add_css_class("accent");
+                        let (error, reload) = (error.clone(), reload.clone());
+                        b.connect_clicked(move |b| {
+                            b.set_sensitive(false);
+                            let (error, reload) = (error.clone(), reload.clone());
+                            background(work, move |r| {
+                                if let Err(e) = r {
+                                    error.set_text(&format!("couldn't clean up: {e}"));
+                                    error.set_visible(true);
+                                }
+                                reload();
+                            });
+                        });
+                        setting_row(title, &b)
+                    };
+                    clean.append(&action(&format!("trash · {}", size(u.trash)), "empty", || {
+                        storage::empty_trash().map_err(|e| e.to_string())
+                    }));
+                    clean.append(&action(&format!("caches · {}", size(u.cache)), "clear", || {
+                        storage::clear_cache().map_err(|e| e.to_string())
+                    }));
+                    clean.append(&action("app parts nothing uses any more", "remove", storage::remove_unused));
+                    clear(&drives);
+                    if found.is_empty() {
+                        drives.append(&setting_row("none plugged in", &label("", &["row-sub"])));
+                    }
+                    for d in found {
+                        let eject = gtk::Button::with_label("eject");
+                        eject.add_css_class("link");
+                        eject.add_css_class("accent");
+                        let title = format!("{} · {}", d.name, size(d.size));
+                        let (error, reload) = (error.clone(), reload.clone());
+                        eject.connect_clicked(move |b| {
+                            b.set_sensitive(false);
+                            let (d, error, reload) = (d.clone(), error.clone(), reload.clone());
+                            background(
+                                move || storage::eject(&d),
+                                move |r| {
+                                    if let Err(e) = r {
+                                        error.set_text(&format!("couldn't eject it: {e}"));
+                                        error.set_visible(true);
+                                    }
+                                    reload();
+                                },
+                            );
+                        });
+                        drives.append(&setting_row(&title, &eject));
+                    }
+                },
+            );
+        }));
+    }
+    scroll.connect_map(move |_| {
+        if let Some(f) = load.borrow().clone() {
+            f();
+        }
     });
     scroll
 }
