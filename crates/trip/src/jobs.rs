@@ -5,7 +5,6 @@
 //! Every job's full output goes to a log file; the model is shown the newest lines, so a chatty
 //! command can't fill its memory.
 
-use crate::shell::{DIM, RESET};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -32,12 +31,12 @@ struct Job {
     command: String,
     child: Child,
     output: Arc<Mutex<Output>>,
-    /// Whether output is echoed to the terminal right now (while someone is waiting on it).
-    echo: Arc<AtomicBool>,
     started: Instant,
     log: Option<PathBuf>,
     /// How many lines the model has already been shown.
     seen: usize,
+    /// How many lines have been passed on live, while someone waited.
+    live: usize,
     status: Option<ExitStatus>,
     stopped: bool,
 }
@@ -73,7 +72,6 @@ pub fn start(command: &str, foreground: bool) -> Result<usize, String> {
     let log = log_dir().map(|d| d.join(format!("{}-{id}.log", std::process::id())));
     let file = log.as_ref().and_then(|p| File::create(p).ok()).map(|f| Arc::new(Mutex::new(f)));
     let output = Arc::new(Mutex::new(Output { total: 0, tail: VecDeque::new() }));
-    let echo = Arc::new(AtomicBool::new(foreground));
     let streams: Vec<Box<dyn Read + Send>> = [
         child.stdout.take().map(|s| Box::new(s) as Box<dyn Read + Send>),
         child.stderr.take().map(|s| Box::new(s) as Box<dyn Read + Send>),
@@ -82,16 +80,13 @@ pub fn start(command: &str, foreground: bool) -> Result<usize, String> {
     .flatten()
     .collect();
     for stream in streams {
-        let (output, echo, file) = (output.clone(), echo.clone(), file.clone());
+        let (output, file) = (output.clone(), file.clone());
         std::thread::spawn(move || {
             let mut reader = BufReader::new(stream);
             let mut buf = Vec::new();
             while reader.read_until(b'\n', &mut buf).is_ok_and(|n| n > 0) {
                 let line = String::from_utf8_lossy(&buf).trim_end_matches(['\n', '\r']).to_string();
                 buf.clear();
-                if echo.load(Ordering::Relaxed) {
-                    println!("{DIM}  │ {line}{RESET}");
-                }
                 if let Some(f) = &file
                     && let Ok(mut f) = f.lock()
                 {
@@ -111,26 +106,26 @@ pub fn start(command: &str, foreground: bool) -> Result<usize, String> {
         command: command.to_string(),
         child,
         output,
-        echo,
         started: Instant::now(),
         log,
         seen: 0,
+        live: 0,
         status: None,
         stopped: false,
     });
     Ok(id)
 }
 
-/// Waits up to `limit` for job `id` to finish, showing its output live, then reports to the model.
-/// Ctrl-C (`cancel`) stops the job.
-pub fn wait(id: usize, limit: Duration, cancel: &AtomicBool) -> String {
+/// Waits up to `limit` for job `id` to finish, passing new output lines to `on_line` as they
+/// arrive, then reports to the model. Ctrl-C (`cancel`) stops the job.
+pub fn wait(id: usize, limit: Duration, cancel: &AtomicBool, on_line: &mut dyn FnMut(&str)) -> String {
     let mut list = jobs().lock().unwrap_or_else(|e| e.into_inner());
     let Some(index) = list.iter().position(|j| j.id == id) else { return no_such_job(&list, id) };
     let job = &mut list[index];
     if job.status.is_none() {
-        job.echo.store(true, Ordering::Relaxed);
         let start = Instant::now();
         loop {
+            pass_on(job, on_line);
             if let Ok(Some(status)) = job.child.try_wait() {
                 job.status = Some(status);
                 break;
@@ -147,7 +142,7 @@ pub fn wait(id: usize, limit: Duration, cancel: &AtomicBool) -> String {
         if job.status.is_some() {
             settle(job);
         }
-        job.echo.store(false, Ordering::Relaxed);
+        pass_on(job, on_line);
     }
     report(job)
 }
@@ -176,9 +171,17 @@ pub fn stop(id: usize) -> String {
     report(job)
 }
 
-/// Tells the person a job is carrying on without them watching.
-pub fn note_backgrounded(id: usize) {
-    println!("{DIM}  still running; carrying on in the background as job {id}{RESET}");
+/// Passes on the lines that arrived since the last call. A very chatty command may have
+/// rolled some out of memory already; those stay in the log file.
+fn pass_on(job: &mut Job, on_line: &mut dyn FnMut(&str)) {
+    let out = job.output.lock().unwrap_or_else(|e| e.into_inner());
+    let new = out.total - job.live.min(out.total);
+    let lines: Vec<String> = out.tail.iter().skip(out.tail.len() - new.min(out.tail.len())).cloned().collect();
+    job.live = out.total;
+    drop(out);
+    for line in &lines {
+        on_line(line);
+    }
 }
 
 fn no_such_job(list: &[Job], id: usize) -> String {
@@ -276,7 +279,7 @@ mod tests {
     fn short_commands_finish_in_one_go() {
         let cancel = AtomicBool::new(false);
         let id = start("echo one; echo two >&2; exit 4", false).unwrap();
-        let r = wait(id, Duration::from_secs(10), &cancel);
+        let r = wait(id, Duration::from_secs(10), &cancel, &mut |_| {});
         assert!(r.starts_with(&format!("Job {id} finished with exit code 4")), "{r}");
         assert!(r.contains("one") && r.contains("two"), "{r}");
         assert!(output(id).contains("No new output"), "already shown");
@@ -286,10 +289,10 @@ mod tests {
     fn long_commands_keep_running_and_can_be_waited_on() {
         let cancel = AtomicBool::new(false);
         let id = start("echo started; sleep 2; echo done", false).unwrap();
-        let first = wait(id, Duration::from_millis(400), &cancel);
+        let first = wait(id, Duration::from_millis(400), &cancel, &mut |_| {});
         assert!(first.contains("still running") && first.contains("started"), "{first}");
         assert!(!finished(id));
-        let second = wait(id, Duration::from_secs(10), &cancel);
+        let second = wait(id, Duration::from_secs(10), &cancel, &mut |_| {});
         assert!(second.contains("exit code 0") && second.contains("done") && !second.contains("started"), "{second}");
     }
 
@@ -297,7 +300,7 @@ mod tests {
     fn chatty_commands_show_only_the_newest_lines() {
         let cancel = AtomicBool::new(false);
         let id = start("seq 1 500", false).unwrap();
-        let r = wait(id, Duration::from_secs(10), &cancel);
+        let r = wait(id, Duration::from_secs(10), &cancel, &mut |_| {});
         assert!(r.contains("500 new lines") && r.contains("\n500") && !r.contains("\n400\n"), "{r}");
     }
 
@@ -305,7 +308,7 @@ mod tests {
     fn jobs_can_be_stopped() {
         let cancel = AtomicBool::new(false);
         let id = start("sleep 30", false).unwrap();
-        assert!(wait(id, Duration::from_millis(200), &cancel).contains("still running"));
+        assert!(wait(id, Duration::from_millis(200), &cancel, &mut |_| {}).contains("still running"));
         assert!(stop(id).contains("was stopped"));
         assert!(output(99_999).contains("no job 99999"));
     }

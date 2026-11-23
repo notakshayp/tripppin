@@ -39,7 +39,10 @@ jobs:
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          # Headroom for the scans of a large image: the runner died of memory without it.
+          sudo fallocate -l 8G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 && sudo swapon /swapfile2
           df -h /
+          free -h
 
       - name: Build image
         run: sudo podman build -f os/Containerfile -t localhost/tripppin:ci .
@@ -63,6 +66,8 @@ jobs:
           sudo podman run --rm localhost/tripppin:ci test -f /etc/profile.d/tripppin-shell.sh
           sudo podman run --rm localhost/tripppin:ci rpm -q NetworkManager-wifi wpa_supplicant iwlwifi-mvm-firmware
           sudo podman run --rm localhost/tripppin:ci flatpak remotes --system
+          # GTK 4 apps abort at start without the OpenGL/EGL libraries (libepoxy loads them at runtime).
+          sudo podman run --rm localhost/tripppin:ci sh -c 'ls /usr/lib*/libEGL.so.1 /usr/lib*/libGL.so.1 /usr/lib*/libGLESv2.so.2'
           sudo podman run --rm localhost/tripppin:ci sh -c 'systemctl is-enabled kmsconvt@tty1.service && fc-match "DM Mono" | grep -q DMMono'
 
       - name: Export image for scanning
@@ -71,8 +76,14 @@ jobs:
           sudo podman save --format docker-archive -o image.tar localhost/tripppin:ci
           sudo chmod 644 image.tar
 
+      # Everything in the image comes from Fedora packages (plus our binaries), so the bill of
+      # materials is the RPM database: walking every file (icon themes alone are tens of thousands)
+      # took the runner down.
       - name: Bill of materials (SPDX)
         uses: anchore/sbom-action@v0
+        env:
+          SYFT_DEFAULT_CATALOGERS: rpm
+          SYFT_PARALLELISM: "2"
         with:
           image: docker-archive:image.tar
           format: spdx-json
@@ -82,7 +93,8 @@ jobs:
       - name: Vulnerability scan
         uses: anchore/scan-action@v6
         with:
-          image: docker-archive:image.tar
+          # Scan the bill of materials rather than cataloguing the whole image a second time.
+          sbom: tripppin-${{ matrix.arch }}.spdx.json
           # Fail on critical issues that already have a fix: those mean we're shipping something stale.
           severity-cutoff: critical
           only-fixed: true

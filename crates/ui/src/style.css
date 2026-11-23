@@ -1,0 +1,1096 @@
+/* The Tripppin screens, from the design mockup. Ink, paper, forest green; Inter and DM Mono. */
+
+window.tripppin,
+.tripppin {
+    font-family: Inter, sans-serif;
+    color: #f2f5ef;
+}
+
+window.clear {
+    background: transparent;
+}
+
+.mono {
+    font-family: "DM Mono", monospace;
+}
+
+/* ---- the orb ------------------------------------------------------------ */
+
+button.orb {
+    min-width: 64px;
+    min-height: 64px;
+    padding: 0;
+    border-radius: 9999px;
+    border: 1px solid #2a3632;
+    background-image: radial-gradient(circle at 50% 38%, #1f6b45 0%, #102019 60%, #0d1211 100%);
+    box-shadow: 0 0 0 6px rgba(87, 217, 154, 0.06), 0 0 34px rgba(87, 217, 154, 0.35), 0 12px 30px rgba(0, 0, 0, 0.5);
+    transition: box-shadow 400ms ease, border-color 400ms ease;
+}
+
+button.orb.working {
+    border: 2px solid #57d99a;
+    background-image: radial-gradient(circle at 50% 38%, #2a8a5c 0%, #123526 60%, #0d1211 100%);
+    box-shadow: 0 0 0 8px rgba(87, 217, 154, 0.10), 0 0 50px rgba(87, 217, 154, 0.55);
+}
+
+.orb-hint {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #5c6b65;
+}
+
+.backdrop {
+    background: rgba(5, 8, 7, 0.45);
+}
+
+.ask-pill {
+    min-height: 76px;
+    padding: 0 12px;
+    border-radius: 38px;
+    background: #141b19;
+    border: 1px solid #2f3d38;
+    box-shadow: 0 0 0 1px rgba(87, 217, 154, 0.15), 0 0 60px rgba(87, 217, 154, 0.18), 0 30px 70px rgba(0, 0, 0, 0.6);
+}
+
+.ask-orb {
+    min-width: 52px;
+    min-height: 52px;
+    border-radius: 9999px;
+    background-image: radial-gradient(circle at 50% 38%, #1f6b45 0%, #102019 60%, #0d1211 100%);
+    box-shadow: 0 0 24px rgba(87, 217, 154, 0.45);
+}
+
+entry.ask {
+    background: transparent;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    font-size: 21px;
+    font-weight: 500;
+    color: #f2f5ef;
+    caret-color: #57d99a;
+}
+
+entry.ask > text > placeholder {
+    color: #6b7a74;
+}
+
+button.send {
+    min-width: 48px;
+    min-height: 48px;
+    padding: 0;
+    border-radius: 9999px;
+    border: none;
+    box-shadow: none;
+    background: #57d99a;
+    color: #0d1211;
+}
+
+button.chip {
+    min-height: 36px;
+    padding: 0 16px;
+    border-radius: 18px;
+    border: 1px solid #2a3632;
+    background: rgba(20, 27, 25, 0.9);
+    box-shadow: none;
+    color: #c9d4ce;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+button.chip:hover {
+    border-color: #57d99a;
+    color: #f2f5ef;
+}
+
+.hint {
+    font-family: "DM Mono", monospace;
+    font-size: 12px;
+    color: #6b7a74;
+}
+
+.card {
+    padding: 22px;
+    border-radius: 22px;
+    background: #141b19;
+    border: 1px solid #2f3d38;
+    box-shadow: 0 0 50px rgba(87, 217, 154, 0.12), 0 30px 70px rgba(0, 0, 0, 0.6);
+}
+
+.caption {
+    font-family: "DM Mono", monospace;
+    font-size: 12px;
+    color: #8a9a93;
+}
+
+.caption.live {
+    color: #57d99a;
+}
+
+.asked {
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.step-title {
+    font-size: 14px;
+    color: #c9d4ce;
+}
+
+.step-title.running {
+    color: #f2f5ef;
+    font-weight: 600;
+}
+
+.step-detail {
+    font-family: "DM Mono", monospace;
+    font-size: 12px;
+    color: #6b7a74;
+}
+
+.tick {
+    min-width: 18px;
+    min-height: 18px;
+    border-radius: 9999px;
+    background: #1f6b45;
+    color: #f2f5ef;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.tick.failed {
+    background: #5a3a22;
+    color: #f4d6bd;
+}
+
+spinner {
+    color: #57d99a;
+}
+
+.answer {
+    font-size: 15px;
+    color: #f2f5ef;
+}
+
+.card-foot {
+    padding-top: 12px;
+    border-top: 1px solid #222d2a;
+}
+
+button.stop {
+    min-height: 36px;
+    padding: 0 18px;
+    border-radius: 18px;
+    background: #2a1d14;
+    border: 1px solid #5a3a22;
+    box-shadow: none;
+    color: #f4d6bd;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+button.link {
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    color: #9fb0a8;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+button.link:hover {
+    color: #57d99a;
+}
+
+button.primary {
+    min-height: 52px;
+    padding: 0 30px;
+    border-radius: 26px;
+    border: none;
+    box-shadow: none;
+    background: #57d99a;
+    color: #0d1211;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+button.secondary {
+    min-height: 46px;
+    padding: 0 24px;
+    border-radius: 23px;
+    border: none;
+    box-shadow: none;
+    background: #1d2825;
+    color: #f2f5ef;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+progressbar trough {
+    min-height: 8px;
+    border-radius: 4px;
+    border: none;
+    background: #1d2825;
+}
+
+progressbar progress {
+    min-height: 8px;
+    border-radius: 4px;
+    border: none;
+    background: #57d99a;
+}
+
+/* ---- login and lock ----------------------------------------------------- */
+
+.screen {
+    background: #0b100f;
+}
+
+.screen.lock {
+    background: #070b0a;
+}
+
+.clock-big {
+    font-size: 120px;
+    font-weight: 800;
+    letter-spacing: -6px;
+}
+
+.clock-huge {
+    font-size: 150px;
+    font-weight: 800;
+    letter-spacing: -8px;
+}
+
+.date {
+    font-size: 22px;
+    font-weight: 500;
+    color: #b7c3bd;
+}
+
+.avatar {
+    min-width: 52px;
+    min-height: 52px;
+    border-radius: 9999px;
+    background: #1f6b45;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.who {
+    font-size: 19px;
+    font-weight: 600;
+}
+
+.pw-pill {
+    min-height: 54px;
+    padding: 0 6px 0 22px;
+    border-radius: 27px;
+    border: 1px solid #2a3632;
+    background: rgba(242, 245, 239, 0.06);
+}
+
+entry.pw {
+    background: transparent;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    font-size: 17px;
+    color: #f2f5ef;
+    caret-color: #57d99a;
+}
+
+button.go {
+    min-width: 42px;
+    min-height: 42px;
+    padding: 0;
+    border-radius: 9999px;
+    border: none;
+    box-shadow: none;
+    background: #57d99a;
+    color: #0d1211;
+}
+
+.status {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #8a9a93;
+}
+
+button.status,
+menubutton.status > button {
+    padding: 0;
+    min-height: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #8a9a93;
+}
+
+menubutton.status > button:hover {
+    color: #57d99a;
+}
+
+menubutton.status popover > contents {
+    padding: 6px;
+    border-radius: 14px;
+    background: #141b19;
+    border: 1px solid #2f3d38;
+    color: #f2f5ef;
+    font-family: Inter, sans-serif;
+}
+
+.error {
+    font-size: 14px;
+    color: #f0a868;
+}
+
+.notice {
+    padding: 12px 18px;
+    border-radius: 16px;
+    background: rgba(20, 27, 25, 0.8);
+    border: 1px solid #222d2a;
+    font-size: 15px;
+    color: #c9d4ce;
+}
+
+entry.pw-center {
+    min-width: 300px;
+    min-height: 50px;
+    border-radius: 25px;
+    border: 1px solid #2a3632;
+    background: rgba(242, 245, 239, 0.06);
+    box-shadow: none;
+    outline: none;
+    font-size: 17px;
+    color: #f2f5ef;
+    caret-color: #57d99a;
+}
+
+/* ---- settings ----------------------------------------------------------- */
+
+window.settings {
+    background: #0d1211;
+}
+
+headerbar.bare {
+    min-height: 0;
+    padding: 8px 10px 0;
+    background: #0d1211;
+    border: none;
+    box-shadow: none;
+}
+
+.sidebar {
+    padding: 22px 14px;
+    background: #0b100f;
+    border-right: 1px solid #1d2825;
+}
+
+entry.search,
+searchentry.search {
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 12px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+    box-shadow: none;
+    color: #f2f5ef;
+    font-size: 14px;
+}
+
+list.nav {
+    background: transparent;
+}
+
+list.nav > row {
+    min-height: 40px;
+    padding: 0 12px;
+    margin-bottom: 2px;
+    border-radius: 12px;
+    background: transparent;
+    outline: none;
+}
+
+list.nav > row:hover {
+    background: rgba(242, 245, 239, 0.04);
+}
+
+list.nav > row:selected {
+    background: rgba(87, 217, 154, 0.12);
+}
+
+.dot {
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 9999px;
+    background: #2a3632;
+}
+
+list.nav > row:selected .dot {
+    background: #57d99a;
+}
+
+.nav-title {
+    font-size: 15px;
+    color: #c9d4ce;
+}
+
+list.nav > row:selected .nav-title {
+    color: #f2f5ef;
+    font-weight: 600;
+}
+
+.page {
+    padding: 30px 36px;
+}
+
+.page-title {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1.2px;
+}
+
+.page-sub {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #8a9a93;
+}
+
+switch {
+    min-width: 48px;
+    min-height: 26px;
+    border-radius: 9999px;
+    border: none;
+    background: #1d2825;
+}
+
+switch:checked {
+    background: #1f6b45;
+}
+
+switch > slider {
+    min-width: 22px;
+    min-height: 22px;
+    margin: 2px;
+    border-radius: 9999px;
+    background: #f2f5ef;
+    border: none;
+    box-shadow: none;
+}
+
+list.list-card {
+    border-radius: 16px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+}
+
+list.list-card > row {
+    border-bottom: 1px solid #1d2825;
+    background: transparent;
+    outline: none;
+}
+
+list.list-card > row:last-child {
+    border-bottom: none;
+}
+
+.net-row {
+    min-height: 56px;
+    padding: 0 18px;
+}
+
+.net-row.connected {
+    background: rgba(87, 217, 154, 0.07);
+}
+
+.row-title {
+    font-size: 16px;
+    color: #d9e1dd;
+}
+
+.row-title-strong {
+    font-size: 16px;
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+.row-title.muted {
+    color: #9fb0a8;
+}
+
+.row-sub {
+    font-family: "DM Mono", monospace;
+    font-size: 12px;
+    color: #6b7a74;
+}
+
+.row-sub.on {
+    color: #57d99a;
+}
+
+.lock {
+    font-size: 9px;
+    color: #6b7a74;
+}
+
+button.link.accent {
+    color: #57d99a;
+}
+
+.ask-password {
+    padding: 16px 18px;
+    background: #0f1513;
+    border-top: 1px solid #1d2825;
+}
+
+entry.field,
+passwordentry.field {
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    background: #0b100f;
+    border: 1px solid #2a3632;
+    box-shadow: none;
+    color: #f2f5ef;
+    font-size: 16px;
+}
+
+entry.field:focus-within,
+passwordentry.field:focus-within {
+    border-color: #57d99a;
+}
+
+button.pill {
+    min-height: 44px;
+    padding: 0 22px;
+    border-radius: 22px;
+    border: none;
+    box-shadow: none;
+    background: #57d99a;
+    color: #0d1211;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+button.small-card {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+    box-shadow: none;
+}
+
+button.small-card:hover {
+    border-color: #57d99a;
+}
+
+.card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+.card-sub {
+    font-size: 13px;
+    font-weight: 400;
+    color: #8a9a93;
+}
+
+.dev-row {
+    min-height: 64px;
+}
+
+.dev-icon {
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 10px;
+    background: #1d2825;
+}
+
+.dev-icon.on {
+    background: #1f6b45;
+}
+
+.dev-letter {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f2f5ef;
+}
+
+.caption {
+    margin-bottom: -12px;
+}
+
+.dot.on {
+    background: #57d99a;
+}
+
+.level-name,
+.level-value {
+    font-family: "DM Mono", monospace;
+    font-size: 12px;
+    color: #8a9a93;
+}
+
+.level-value {
+    color: #f2f5ef;
+}
+
+scale.level trough {
+    min-height: 6px;
+    border-radius: 3px;
+    background: #1d2825;
+    border: none;
+}
+
+scale.level highlight {
+    border-radius: 3px;
+    background: #57d99a;
+    border: none;
+}
+
+scale.level slider {
+    min-width: 18px;
+    min-height: 18px;
+    margin: -6px;
+    border-radius: 9999px;
+    background: #f2f5ef;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+dropdown.choice > button {
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 12px;
+    background: #0f1513;
+    border: 1px solid #2a3632;
+    box-shadow: none;
+    color: #f2f5ef;
+    font-size: 14px;
+}
+
+dropdown.choice > button:hover {
+    border-color: #57d99a;
+}
+
+dropdown.choice popover > contents {
+    padding: 6px;
+    border-radius: 14px;
+    background: #141b19;
+    border: 1px solid #2f3d38;
+}
+
+dropdown.choice popover listview > row {
+    min-height: 34px;
+    padding: 0 10px;
+    border-radius: 10px;
+    color: #d9e1dd;
+}
+
+dropdown.choice popover listview > row:selected {
+    background: rgba(87, 217, 154, 0.14);
+    color: #f2f5ef;
+}
+
+button.wall-tile {
+    padding: 8px;
+    border-radius: 16px;
+    background: #141b19;
+    border: 2px solid #222d2a;
+    box-shadow: none;
+}
+
+button.wall-tile:hover {
+    border-color: #3d4a45;
+}
+
+button.wall-tile.selected {
+    border-color: #57d99a;
+}
+
+picture.wall-pic {
+    border-radius: 10px;
+}
+
+.row-value {
+    font-family: "DM Mono", monospace;
+    font-size: 14px;
+    color: #f2f5ef;
+}
+
+button.segment {
+    min-height: 48px;
+    border-radius: 14px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+    box-shadow: none;
+    color: #c9d4ce;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+button.segment:hover {
+    border-color: #3d4a45;
+}
+
+button.segment.selected {
+    background: #1f6b45;
+    border-color: #57d99a;
+    color: #f2f5ef;
+    font-weight: 600;
+}
+
+button.link.danger {
+    color: #ff8a7a;
+}
+
+levelbar.usage > trough {
+    min-height: 12px;
+    border-radius: 6px;
+    background: #1b2421;
+}
+
+levelbar.usage > trough > block.filled {
+    border-radius: 6px;
+    background: #57d99a;
+}
+
+levelbar.usage > trough > block.empty {
+    background: transparent;
+}
+
+frame.avatar-pic {
+    border-radius: 9999px;
+    border: none;
+}
+
+.inline-form {
+    padding: 18px;
+    border-radius: 16px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+}
+
+.inline-form checkbutton {
+    color: #c9d4ce;
+}
+
+/* ---- calendar from the clock ------------------------------------------ */
+
+.calendar-card {
+    padding: 22px 22px 18px;
+    border-radius: 20px;
+    background: #101614;
+    border: 1px solid #2a3632;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+    min-width: 320px;
+}
+
+.calendar-day {
+    font-size: 26px;
+    font-weight: 700;
+    color: #f2f5ef;
+    letter-spacing: -0.5px;
+}
+
+.calendar-date {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #8fa39b;
+    margin-top: -10px;
+}
+
+calendar.month {
+    background: transparent;
+    border: none;
+    color: #d9e1dd;
+    font-size: 14px;
+}
+
+calendar.month > header {
+    border: none;
+    background: transparent;
+}
+
+calendar.month > header > button {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #8fa39b;
+}
+
+calendar.month > header > label.month,
+calendar.month > header > label.year {
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+calendar.month > grid > label.day-name {
+    font-family: "DM Mono", monospace;
+    font-size: 11px;
+    color: #6b7d76;
+}
+
+calendar.month > grid > label.day-number {
+    padding: 6px;
+    border-radius: 9999px;
+}
+
+calendar.month > grid > label.day-number.other-month {
+    color: #3d4a45;
+}
+
+calendar.month > grid > label.today {
+    background: #1f6b45;
+    color: #f2f5ef;
+    font-weight: 700;
+}
+
+calendar.month > grid > label.day-number:selected {
+    background: #57d99a;
+    color: #0d1211;
+    font-weight: 700;
+}
+
+/* ---- shortcuts cheat sheet -------------------------------------------- */
+
+.keys-card {
+    padding: 34px 40px 28px;
+    border-radius: 24px;
+    background: #101614;
+    border: 1px solid #2a3632;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+.keys-title {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    color: #f2f5ef;
+}
+
+.keys-combo {
+    font-family: "DM Mono", monospace;
+    font-size: 14px;
+    color: #57d99a;
+}
+
+.keys-what {
+    font-size: 14px;
+    color: #c9d4ce;
+}
+
+/* ---- alt + tab --------------------------------------------------------- */
+
+.switch-strip {
+    padding: 18px;
+    border-radius: 24px;
+    background: #101614;
+    border: 1px solid #2a3632;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+.switch-card {
+    padding: 18px 16px 14px;
+    min-width: 128px;
+    border-radius: 16px;
+    border: 2px solid transparent;
+}
+
+.switch-card.selected {
+    background: rgba(87, 217, 154, 0.10);
+    border-color: #57d99a;
+}
+
+.switch-title {
+    font-size: 13px;
+    color: #c9d4ce;
+}
+
+/* ---- login: people and warnings --------------------------------------- */
+
+button.person {
+    padding: 8px 14px 8px 8px;
+    border-radius: 9999px;
+    background: rgba(20, 27, 25, 0.8);
+    border: 1px solid #2a3632;
+    box-shadow: none;
+}
+
+button.person.selected {
+    border-color: #57d99a;
+    background: rgba(31, 107, 69, 0.35);
+}
+
+.avatar.small {
+    min-width: 30px;
+    min-height: 30px;
+    font-size: 14px;
+    color: #f2f5ef;
+}
+
+.who-small {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+.caps-warning {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #e8c26e;
+}
+
+/* ---- lock: what's playing --------------------------------------------- */
+
+.media-card {
+    padding: 14px 16px 14px 22px;
+    min-width: 380px;
+    border-radius: 18px;
+    background: rgba(20, 27, 25, 0.85);
+    border: 1px solid #2a3632;
+}
+
+.media-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+button.media-button {
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 9999px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #c9d4ce;
+    font-size: 14px;
+}
+
+button.media-button:hover {
+    background: rgba(87, 217, 154, 0.14);
+    color: #f2f5ef;
+}
+
+/* ---- welcome & tips ---------------------------------------------------- */
+
+.welcome-body {
+    padding: 8px 48px 36px;
+}
+
+.welcome-title {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: #f2f5ef;
+}
+
+.welcome-words {
+    font-size: 17px;
+    line-height: 1.4;
+    color: #c9d4ce;
+}
+
+.welcome-dot {
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 9999px;
+    background: #2a3632;
+}
+
+.welcome-dot.on {
+    min-width: 22px;
+    background: #57d99a;
+}
+
+/* ---- volume and brightness pop-ups ------------------------------------- */
+
+.osd {
+    min-width: 300px;
+    min-height: 56px;
+    padding: 0 22px;
+    border-radius: 28px;
+    background: rgba(20, 27, 25, 0.96);
+    border: 1px solid #2f3d38;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+.osd-name,
+.osd-value {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #9fb0a8;
+}
+
+.osd-value {
+    color: #f2f5ef;
+}
+
+progressbar.osd-bar trough {
+    min-height: 6px;
+    border-radius: 3px;
+    background: #1d2825;
+}
+
+progressbar.osd-bar progress {
+    min-height: 6px;
+    border-radius: 3px;
+    background: #57d99a;
+}
+
+progressbar.osd-bar.muted progress {
+    background: #5c6b65;
+}
+
+/* ---- first boot --------------------------------------------------------- */
+
+.fb-card {
+    padding: 40px;
+    border-radius: 24px;
+    background: #141b19;
+    border: 1px solid #2a3632;
+}
+
+window.fb {
+    background: transparent;
+}
+
+.fb-title {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1.2px;
+}
+
+.body {
+    font-size: 17px;
+    color: #c9d4ce;
+}
+
+.stat {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #0f1513;
+    border: 1px solid #222d2a;
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.progress-note {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #9fb0a8;
+}
+
+/* The screen fading before it locks. */
+window.dim {
+    background: #000000;
+}

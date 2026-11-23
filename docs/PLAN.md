@@ -9,7 +9,7 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 | Base | Fedora bootc 45, image-based. The whole OS is one signed OCI image; machines update atomically and roll back on failed boots. |
 | Language | Rust for everything we write (edition 2024, MSRV 1.85). |
 | Model engine | llama.cpp server as a supervised child process; Vulkan by default, NVIDIA image variant later. |
-| Desktop | Hyprland, packaged and pinned by us (Fedora no longer ships it). Fallback: Sway. |
+| Desktop | niri (packaged by Fedora) with lightweight parts restyled to our design (waybar, SwayNotificationCenter, fuzzel, foot), and our own screens in Rust (orb, login, lock, Settings). Hyprland was the first plan; COSMIC was tried and dropped as too generic. |
 | Shell | Plain text goes to the model. `!cmd` runs a raw command; `/term` opens a classic shell. |
 | Safety | Code is the boundary (taint labels, policy engine, sandbox); an AI verifier checks intent on top. YOLO keeps two exceptions. |
 | Minimum | 16 GB memory for local AI; below that, a cloud key or the user's own server. |
@@ -28,7 +28,7 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 | M2 | Model service | `trip ask "hello"` answers locally | **next** |
 | M3 | AI shell + harness (ISO 2) | Sentences in the terminal do things | |
 | M4 | Safety | Booby-trapped pages get refused | |
-| M5 | Desktop + orb (ISO 3) | Branded Hyprland desktop with the orb | |
+| M5 | Desktop + orb (ISO 3) | Branded desktop with the orb | **in review** |
 | M6 | Update loop + channels | Overnight updates, bad build rolls back | |
 | M7 | Agents + bring your own model | Background jobs, cloud keys, own server | |
 | M8 | Installer | Five-minute install, our own UI | |
@@ -89,10 +89,18 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 
 ## M5: Desktop + orb
 
-- [ ] Hyprland packaging: build RPMs in our CI (mock) or a COPR; hyprland, aquamarine, hyprutils, hyprlang, hyprcursor, hyprgraphics, hyprwayland-scanner, xdg-desktop-portal-hyprland
-- [ ] Desktop session: greetd + a minimal greeter, PipeWire, NetworkManager, fonts (Inter), Flatpak with Flathub
-- [ ] Plymouth boot splash with the power spark, wallpaper, default Hyprland config (floating-first)
-- [ ] The orb overlay
+The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
+
+- [x] Desktop session: niri (floating-first, our focus ring), greetd with our login screen, PipeWire, NetworkManager, Inter and DM Mono, Flatpak with Flathub
+- [x] Plymouth boot splash with the power spark, wallpapers, a hidden boot menu
+- [x] The orb overlay: ask, live steps, the result; the logo in the corner
+- [x] Shell: bar, quick settings and notifications, launcher (with every Settings page), Alt + Tab, snapping, lock screen, pop-ups, calendar, shortcuts sheet, clipboard history, emoji, screenshots and recording, password prompts
+- [x] Settings, ours: Wi-Fi, network and VPN, Bluetooth, sound, display, appearance, power, AI, notifications, apps (with Flathub search), keyboard, mouse and touchpad, printers, date and time, language, accounts, privacy, accessibility, storage, updates (download only, never a surprise restart), about
+- [x] Every app in our style: GTK 3 and 4 colours, a Tripppin icon theme (green folders), Qt through qt6ct, Flatpak overrides, a text colour scheme
+- [x] Apps: Thunar, Text Editor, Loupe, Papers, Calculator, Celluloid, File Roller, System Monitor, Disks; Firefox on first boot
+- [x] Behaviour: USB automount, low battery, updates staged with rollback (greenboot), crash notices, the model freed first when memory runs low, a welcome tour
+- [ ] Checked on the laptop: Wi-Fi, Bluetooth, sound devices, brightness, battery, the boot splash, a real USB stick and printer
+- [ ] Later: light mode, sounds, voice input, on-screen keyboard (see DESKTOP.md)
 
 ## M8: Installer (later: after the OS is solid)
 

@@ -1,0 +1,125 @@
+// The tripppin bar: a floating pill. Left: logo, workspaces, the focused app.
+// Centre: the date. Right: what the orb is doing, network, volume, battery.
+{
+    "layer": "top",
+    "position": "top",
+    "height": 38,
+    "margin-top": 10,
+    "margin-left": 12,
+    "margin-right": 12,
+    "spacing": 0,
+    "modules-left": ["image#logo", "niri/workspaces", "niri/window"],
+    "modules-center": ["custom/clock"],
+    "modules-right": ["custom/recording", "privacy", "custom/orb", "niri/language", "network", "bluetooth", "pulseaudio", "battery", "tray", "custom/notifications", "custom/power"],
+
+    "image#logo": { "path": "/usr/share/tripppin/logo-bar.png", "size": 18 },
+    "niri/workspaces": { "format": "{icon}", "format-icons": { "default": "", "active": "" } },
+    "niri/window": {
+        "format": "{app_id}",
+        "max-length": 32,
+        "rewrite": {
+            "foot": "terminal",
+            "swappy": "screenshot",
+            "in\\.trippp\\.Welcome": "welcome",
+            "polkit-mate-authentication-agent-1": "password",
+            "footclient": "terminal",
+            "org\\.mozilla\\.firefox|firefox": "firefox",
+            "org\\.videolan\\.VLC": "vlc",
+            "org\\.gnome\\.Nautilus": "files",
+            "in\\.trippp\\.Settings": "settings",
+            "in\\.trippp\\.FirstBoot": "welcome",
+            "in\\.trippp\\.Orb": "tripppin",
+            "org\\.gnome\\.TextEditor": "text editor",
+            "org\\.gnome\\.Calculator": "calculator",
+            "org\\.pulseaudio\\.pavucontrol": "sound",
+            "blueman-manager": "bluetooth",
+            "nm-connection-editor": "network"
+        }
+    },
+    "custom/clock": {
+        "exec": "f=%H:%M; [ \"$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/clock 2>/dev/null)\" = 12 ] && f='%-I:%M %p'; date \"+%a %d %b · $f\" | tr '[:upper:]' '[:lower:]'",
+        "interval": 15,
+        "tooltip": false,
+        "on-click": "tripppin-ui calendar"
+    },
+    "custom/recording": {
+        "exec": "pgrep -x wf-recorder >/dev/null && echo '● rec' || echo ''",
+        "interval": 1,
+        "tooltip": false,
+        "on-click": "pkill -INT -x wf-recorder"
+    },
+    "custom/orb": {
+        "exec": "cat \"$XDG_RUNTIME_DIR/tripppin/orb-status\" 2>/dev/null",
+        "interval": 1,
+        "tooltip": false,
+        "on-click": "tripppin-ui orb --toggle"
+    },
+    // Mic or screen sharing in use: a dot, so it's never a surprise.
+    "privacy": {
+        "icon-size": 12,
+        "icon-spacing": 6,
+        "modules": [
+            { "type": "audio-in", "tooltip": true },
+            { "type": "screenshare", "tooltip": true }
+        ]
+    },
+    // The keyboard layout, for people with more than one (Settings → Keyboard).
+    "niri/language": {
+        "format": "{short}",
+        "on-click": "tripppin-ui settings keyboard"
+    },
+    "bluetooth": {
+        "format": "bt",
+        "format-disabled": "",
+        "format-off": "",
+        "format-no-controller": "",
+        "format-connected": "bt {num_connections}",
+        "tooltip-format-connected": "{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}",
+        "on-click": "tripppin-ui settings bluetooth"
+    },
+    // Apps that live in the background (chat apps, sync tools) keep their icons here.
+    "tray": {
+        "icon-size": 15,
+        "spacing": 8
+    },
+    "network": {
+        "format-wifi": "{essid}",
+        "format-ethernet": "wired",
+        "format-disconnected": "offline",
+        "tooltip": false,
+        "on-click": "swaync-client -t -sw"
+    },
+    "pulseaudio": {
+        "format": "vol {volume}",
+        "format-muted": "muted",
+        "tooltip": false,
+        "on-click": "swaync-client -t -sw",
+        "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+    },
+    "custom/notifications": {
+        "exec": "swaync-client -swb",
+        "return-type": "json",
+        "format": "{icon}",
+        "format-icons": {
+            "notification": "●", "none": "○",
+            "dnd-notification": "◐", "dnd-none": "◌",
+            "inhibited-notification": "●", "inhibited-none": "○",
+            "dnd-inhibited-notification": "◐", "dnd-inhibited-none": "◌"
+        },
+        "tooltip": false,
+        "escape": true,
+        "on-click": "swaync-client -t -sw",
+        "on-click-right": "swaync-client -d -sw"
+    },
+    "custom/power": {
+        "format": "⏻",
+        "tooltip": false,
+        "on-click": "tripppin-power"
+    },
+    "battery": {
+        "format": "{capacity}%",
+        "format-charging": "{capacity}% +",
+        "tooltip": false
+    }
+}

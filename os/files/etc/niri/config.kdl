@@ -1,0 +1,5 @@
+// What niri reads when a person has no config of their own. Settings writes
+// ~/.config/niri/config.kdl, which includes desktop.kdl and the person's own copy of the
+// pointer settings instead (niri flags can be added by a later include, never removed).
+include "desktop.kdl"
+include "pointer.kdl"

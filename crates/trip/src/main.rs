@@ -3,11 +3,10 @@ use clap::{Parser, Subcommand};
 use hwdetect::{Catalog, Hardware, Tier};
 use serde::Serialize;
 
-mod agent;
-mod jobs;
 mod logo;
-mod model;
 mod shell;
+
+use trip::{agent, model};
 
 #[derive(Parser)]
 #[command(name = "trip", version, about = "Tripppin: tell your computer what you want.")]

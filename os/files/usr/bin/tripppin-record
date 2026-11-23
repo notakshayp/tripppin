@@ -1,0 +1,20 @@
+#!/bin/sh
+# Screen recording (Super + Shift + R): starts recording the screen, or stops the one
+# running and says where it went. With "area", asks for a part of the screen first. The bar
+# shows "● rec" while it runs; clicking that stops it too.
+if pgrep -x wf-recorder >/dev/null; then
+    pkill -INT -x wf-recorder
+    exit 0
+fi
+dir="${XDG_VIDEOS_DIR:-$HOME/Videos}/Recordings"
+mkdir -p "$dir"
+file="$dir/$(date '+%Y-%m-%d %H-%M-%S').mp4"
+if [ "$1" = area ]; then
+    geometry=$(slurp -b 0d121199 -c 57d99aff -s 57d99a22 -w 2) || exit 0
+    wf-recorder -g "$geometry" -f "$file" &
+else
+    wf-recorder -f "$file" &
+fi
+pid=$!
+wait "$pid"
+notify-send -a recording "recording saved" "$(basename "$file") in videos/recordings"

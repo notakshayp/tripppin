@@ -1,0 +1,12 @@
+#!/bin/sh
+# Emoji and symbols (Super + .): search by name, pick one, and it's typed where you were
+# and left on the clipboard. The names come from Unicode's own list (unicode-emoji).
+if pkill -x fuzzel; then exit 0; fi
+list=/usr/share/unicode/emoji/emoji-test.txt
+pick=$(grep '; fully-qualified' "$list" | sed 's/^[^#]*# \([^ ]*\) E[0-9.]* \(.*\)$/\1  \2/' \
+    | fuzzel --dmenu --prompt "emoji  " --placeholder "smile, heart, flag india…" --lines 10 --width 46) || exit 0
+emoji=${pick%%  *}
+printf '%s' "$emoji" | wl-copy
+# Give the menu a moment to close so the keystrokes reach the window underneath.
+sleep 0.15
+wtype "$emoji"

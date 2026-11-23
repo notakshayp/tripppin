@@ -26,10 +26,12 @@ Then answer briefly and plainly, in a few short lines.
 
 About this system:
 - The core system (/usr) is a read-only image; updates replace it whole. /etc, /var and the home folder are writable.
-- Install apps with: sudo flatpak install -y flathub <app id> (find the id with: flatpak search <name>).
-- `sudo dnf install` changes don't last; for a command-line tool, use `sudo dnf install --transient -y <package>` \
-and say it lasts until the next reboot.
-- sudo may ask the person for their password in the terminal; that's fine.
+- For free disk space, check /var (df -h /var): / is the read-only system image and always looks full.
+- To install any app (vlc, firefox, spotify, gimp…): flatpak search <name>, then flatpak install -y flathub <app id>. \
+No sudo; it works as is. Open apps with: flatpak run <app id>. Never use dnf to install apps: it doesn't work here.
+- Only for a command-line tool with no Flatpak: sudo dnf install --transient -y <package>, which lasts until reboot.
+- You may be running with no terminal to type a password into, so sudo can fail. If a command fails with \
+\"a password is required\", don't retry it: tell the person the exact command to run in the terminal.
 - Use non-interactive flags (-y, --noconfirm) and avoid commands that open an editor or a pager.
 - There is no graphical desktop yet: Tripppin is text-only for now, so windowed (GUI) apps can't be shown. \
 If asked for a GUI, a desktop or a windowed app, say that plainly instead of trying to install one.
@@ -53,10 +55,109 @@ fn installed(dir: &Path, tier: &Tier) -> bool {
     fs::metadata(dir.join(&tier.file)).is_ok_and(|m| m.len() == tier.size_bytes)
 }
 
-/// The tier to use: the recommended one if it's installed, otherwise the best installed one.
+/// The tier to use: the one chosen in Settings if it's installed, else the recommended one if
+/// it's installed, otherwise the best installed one.
 pub fn active_tier<'a>(catalog: &'a Catalog, dir: &Path) -> Option<&'a Tier> {
+    let chosen = fs::read_to_string(dir.join("chosen")).unwrap_or_default();
+    let chosen = catalog.tiers.iter().find(|t| t.id == chosen.trim());
     let recommended = hwdetect::detect().ok().and_then(|hw| catalog.recommend(&hw));
-    recommended.filter(|t| installed(dir, t)).or_else(|| catalog.tiers.iter().find(|t| installed(dir, t)))
+    chosen
+        .filter(|t| installed(dir, t))
+        .or(recommended.filter(|t| installed(dir, t)))
+        .or_else(|| catalog.tiers.iter().find(|t| installed(dir, t)))
+}
+
+/// Remembers which local model to run (`tripppin-llm` picks it up when it restarts).
+pub fn choose(tier: &Tier) -> Result<()> {
+    let dir = models_dir();
+    fs::write(dir.join("chosen"), &tier.id).with_context(|| format!("can't write to {}", dir.display()))
+}
+
+/// Another server to talk to instead of the local model: any OpenAI-style chat API (a cloud
+/// provider with a key, or the person's own llama.cpp / Ollama box). Kept in
+/// ~/.config/tripppin/ai, readable only by its owner.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Endpoint {
+    /// Base URL ending before /chat/completions, e.g. https://api.example.com/v1
+    pub url: String,
+    pub model: String,
+    pub key: String,
+}
+
+fn endpoint_file() -> PathBuf {
+    std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("tripppin/ai")
+}
+
+pub fn parse_endpoint(text: &str) -> Option<Endpoint> {
+    let mut e = Endpoint::default();
+    for line in text.lines() {
+        let Some((k, v)) = line.split_once('=') else { continue };
+        let v = v.trim().to_string();
+        match k.trim() {
+            "url" => e.url = v.trim_end_matches('/').to_string(),
+            "model" => e.model = v,
+            "key" => e.key = v,
+            _ => {}
+        }
+    }
+    (!e.url.is_empty()).then_some(e)
+}
+
+/// The other server, when one is set; `None` means the model on this computer.
+pub fn endpoint() -> Option<Endpoint> {
+    parse_endpoint(&fs::read_to_string(endpoint_file()).ok()?)
+}
+
+/// Saves (or, with `None`, forgets) the other server.
+pub fn set_endpoint(e: Option<&Endpoint>) -> Result<()> {
+    let file = endpoint_file();
+    let Some(e) = e else {
+        return match fs::remove_file(&file) {
+            Err(err) if err.kind() != io::ErrorKind::NotFound => Err(err.into()),
+            _ => Ok(()),
+        };
+    };
+    if let Some(dir) = file.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let text = format!(
+        "# Where the AI runs. Written by tripppin settings.\nurl={}\nmodel={}\nkey={}\n",
+        e.url, e.model, e.key
+    );
+    let mut opts = OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    opts.open(&file)?.write_all(text.as_bytes())?;
+    Ok(())
+}
+
+/// Asks the other server for one word, to check the address, model and key work.
+pub fn test_endpoint(e: &Endpoint) -> Result<()> {
+    let body = serde_json::json!({
+        "model": e.model,
+        "messages": [{ "role": "user", "content": "say ok" }],
+        "max_tokens": 5
+    });
+    let mut req = http().post(&format!("{}/chat/completions", e.url)).config().http_status_as_error(false).build();
+    req = req.header("Content-Type", "application/json");
+    if !e.key.is_empty() {
+        req = req.header("Authorization", &format!("Bearer {}", e.key));
+    }
+    let mut resp = req.send(body.to_string()).with_context(|| format!("couldn't reach {}", e.url))?;
+    match resp.status().as_u16() {
+        200 => Ok(()),
+        401 | 403 => bail!("the server turned the key down"),
+        404 => bail!("nothing answered at {}/chat/completions; check the address and model", e.url),
+        status => {
+            let text = resp.body_mut().read_to_string().unwrap_or_default();
+            Err(server_error(status, &text))
+        }
+    }
 }
 
 pub fn list() -> Result<()> {
@@ -87,16 +188,57 @@ pub fn pull(tier_id: Option<&str>) -> Result<()> {
             )?
         }
     };
+    if installed(&models_dir(), tier) {
+        println!("{} is already installed.", tier.model);
+        return Ok(());
+    }
+    let tty = io::stderr().is_terminal();
+    let name = tier.model.clone();
+    pull_tier(tier, &mut |done, total, rate| {
+        if tty {
+            eprint!(
+                "\r\x1b[2Kdownloading {name}  {:.2} / {:.2} GB  {:>3.0}%  {:.0} MB/s",
+                done as f64 / 1e9,
+                total as f64 / 1e9,
+                100.0 * done as f64 / total as f64,
+                rate / 1e6
+            );
+        }
+    })?;
+    if tty {
+        eprintln!();
+    }
+    println!(
+        "{} installed ({:.1} GB). Start it with: sudo systemctl start tripppin-llm",
+        tier.model,
+        tier.download_gb()
+    );
+    Ok(())
+}
+
+/// The tier this machine should use, from its hardware.
+pub fn recommended() -> Result<Tier> {
+    let catalog = Catalog::builtin()?;
+    let hw = hwdetect::detect()?;
+    catalog.recommend(&hw).cloned().context("this machine has under 16 GB of memory, so there's no local model for it")
+}
+
+/// Whether the given tier's model is downloaded.
+pub fn is_installed(tier: &Tier) -> bool {
+    installed(&models_dir(), tier)
+}
+
+/// Downloads `tier`'s model (resuming), checks its checksum and moves it into place.
+/// `on_progress` gets bytes done, bytes in all and the rate in bytes per second, a few times a second.
+pub fn pull_tier(tier: &Tier, on_progress: &mut dyn FnMut(u64, u64, f64)) -> Result<()> {
     let dir = models_dir();
     fs::create_dir_all(&dir).with_context(|| format!("can't create {}. Try again with sudo.", dir.display()))?;
     let dest = dir.join(&tier.file);
     if installed(&dir, tier) {
-        println!("{} is already installed.", tier.model);
         return Ok(());
     }
     let part = dir.join(format!("{}.part", tier.file));
-    download(&tier.url, &part, tier.size_bytes, &tier.model)?;
-    eprintln!("checking the file…");
+    download(&tier.url, &part, tier.size_bytes, on_progress)?;
     let actual = sha256_file(&part)?;
     if actual != tier.sha256 {
         fs::remove_file(&part).ok();
@@ -107,15 +249,10 @@ pub fn pull(tier_id: Option<&str>) -> Result<()> {
         );
     }
     fs::rename(&part, &dest)?;
-    println!(
-        "{} installed ({:.1} GB). Start it with: sudo systemctl start tripppin-llm",
-        tier.model,
-        tier.download_gb()
-    );
     Ok(())
 }
 
-fn download(url: &str, part: &Path, total: u64, name: &str) -> Result<()> {
+fn download(url: &str, part: &Path, total: u64, on_progress: &mut dyn FnMut(u64, u64, f64)) -> Result<()> {
     let have = fs::metadata(part).map_or(0, |m| m.len());
     if have >= total {
         return Ok(());
@@ -133,7 +270,6 @@ fn download(url: &str, part: &Path, total: u64, name: &str) -> Result<()> {
     let mut buf = vec![0u8; 1 << 20];
     let (start, mut last) = (Instant::now(), Instant::now() - Duration::from_secs(1));
     let start_bytes = done;
-    let tty = io::stderr().is_terminal();
     loop {
         let n = reader.read(&mut buf)?;
         if n == 0 {
@@ -141,21 +277,13 @@ fn download(url: &str, part: &Path, total: u64, name: &str) -> Result<()> {
         }
         file.write_all(&buf[..n])?;
         done += n as u64;
-        if tty && last.elapsed() >= Duration::from_millis(250) {
+        if last.elapsed() >= Duration::from_millis(250) {
             last = Instant::now();
-            let rate = (done - start_bytes) as f64 / start.elapsed().as_secs_f64().max(0.001) / 1e6;
-            eprint!(
-                "\r\x1b[2Kdownloading {name}  {:.2} / {:.2} GB  {:>3.0}%  {rate:.0} MB/s",
-                done as f64 / 1e9,
-                total as f64 / 1e9,
-                100.0 * done as f64 / total as f64
-            );
+            on_progress(done, total, (done - start_bytes) as f64 / start.elapsed().as_secs_f64().max(0.001));
         }
     }
     file.sync_all()?;
-    if tty {
-        eprintln!();
-    }
+    on_progress(done, total, 0.0);
     if done != total {
         bail!("download stopped at {done} of {total} bytes; run the command again to resume");
     }
@@ -307,6 +435,7 @@ pub fn stream(
     mut on_text: impl FnMut(&str),
 ) -> Result<Reply> {
     let msgs: Vec<_> = messages.iter().map(|m| &m.0).collect();
+    let remote = endpoint();
     let mut body = serde_json::json!({
         "model": "tripppin",
         "stream": true,
@@ -326,12 +455,27 @@ pub fn stream(
     if let Some(tools) = tools {
         body["tools"] = tools.clone();
     }
-    let url = format!("http://127.0.0.1:{PORT}/v1/chat/completions");
+    let url = match &remote {
+        // Other servers get the plain OpenAI request; llama.cpp's extra knobs can be refused.
+        Some(e) => {
+            if let Some(map) = body.as_object_mut() {
+                for k in ["chat_template_kwargs", "top_k", "min_p"] {
+                    map.remove(k);
+                }
+            }
+            body["model"] = e.model.clone().into();
+            format!("{}/chat/completions", e.url)
+        }
+        None => format!("http://127.0.0.1:{PORT}/v1/chat/completions"),
+    };
     let start = Instant::now();
-    let request = http().post(&url).config().http_status_as_error(false).build();
+    let mut request = http().post(&url).config().http_status_as_error(false).build();
+    if let Some(e) = remote.as_ref().filter(|e| !e.key.is_empty()) {
+        request = request.header("Authorization", &format!("Bearer {}", e.key));
+    }
     let mut resp = match request.header("Content-Type", "application/json").send(body.to_string()) {
         Ok(r) => r,
-        Err(ureq::Error::Io(_)) | Err(ureq::Error::ConnectionFailed) => return Err(unavailable()),
+        Err(ureq::Error::Io(_)) | Err(ureq::Error::ConnectionFailed) if remote.is_none() => return Err(unavailable()),
         Err(e) => return Err(e).context("couldn't reach the model"),
     };
     match resp.status().as_u16() {
@@ -406,6 +550,9 @@ fn server_error(status: u16, body: &str) -> anyhow::Error {
 
 /// How many tokens the running model can hold, from llama.cpp's /props. 8192 if it can't say.
 pub fn context_tokens() -> usize {
+    if endpoint().is_some() {
+        return 32768;
+    }
     let url = format!("http://127.0.0.1:{PORT}/props");
     http()
         .get(&url)
@@ -467,6 +614,13 @@ fn merge_tool_calls(chunk: &serde_json::Value, calls: &mut Vec<ToolCall>) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_an_endpoint() {
+        let e = parse_endpoint("# x\nurl=https://api.example.com/v1/\nmodel=big\nkey=sk-1\n").unwrap();
+        assert_eq!(e, Endpoint { url: "https://api.example.com/v1".into(), model: "big".into(), key: "sk-1".into() });
+        assert!(parse_endpoint("model=big").is_none());
+    }
 
     #[test]
     fn reads_streamed_chunks() {

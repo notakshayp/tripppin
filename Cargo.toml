@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# tripppin-ui needs GTK 4 and gtk4-layer-shell, which only the Fedora build has;
+# plain `cargo build` / `cargo test` skip it. CI builds it in a Fedora container.
+default-members = ["crates/hwdetect", "crates/trip"]
 
 [workspace.package]
 version = "0.1.0"

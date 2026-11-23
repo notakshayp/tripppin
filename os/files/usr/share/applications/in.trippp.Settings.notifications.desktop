@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=notifications settings
+Comment=settings → notifications
+Exec=tripppin-ui settings notifications
+Icon=preferences-system-notifications
+Keywords=do not disturb;quiet;mute;
+Categories=Settings;

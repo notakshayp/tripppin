@@ -1,0 +1,133 @@
+// The tripppin desktop, everything but the mouse and touchpad (pointer.kdl): both
+// /etc/niri/config.kdl and the person's own config include it. Every window floats,
+// with rounded corners, a soft shadow and a green ring on the focused one.
+
+input {
+    keyboard {
+        numlock
+    }
+    focus-follows-mouse max-scroll-amount="0%"
+}
+
+layout {
+    gaps 16
+    center-focused-column "never"
+    default-column-width { proportion 0.5; }
+
+    focus-ring {
+        width 2
+        active-color "#57d99a"
+        inactive-color "#2a3632"
+    }
+    border {
+        off
+    }
+    shadow {
+        on
+        softness 40
+        spread 4
+        offset x=0 y=14
+        color "#0000008c"
+    }
+}
+
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 24
+}
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+screenshot-path "~/Pictures/Screenshots/%Y-%m-%d %H-%M-%S.png"
+
+environment {
+    // The terminal opens straight into the AI shell; the animated logo is for consoles.
+    TRIPPPIN_NO_LOGO "1"
+}
+
+// The wallpaper: the person's choice (Settings → Appearance), else ours.
+spawn-at-startup "sh" "-c" "w=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
+spawn-at-startup "waybar"
+spawn-at-startup "swaync"
+// Asks for your password when an app needs an administrator (GTK3, so it takes our theme).
+spawn-at-startup "/usr/libexec/polkit-mate-authentication-agent-1"
+// Clipboard history for Super + V (text and images).
+spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
+// USB drives and phones: mounted when plugged in, with a notification to open or eject.
+spawn-at-startup "udiskie" "--automount" "--notify" "--no-tray" "--file-manager" "thunar"
+spawn-at-startup "tripppin-ui" "orb"
+spawn-at-startup "tripppin-ui" "first-boot"
+spawn-at-startup "tripppin-ui" "welcome" "--first-time"
+// When the computer is left alone: the person's timings (Settings → Power), else ours
+// (lock after 5 minutes, screen off after 10, sleep after 30; always lock before sleeping).
+spawn-at-startup "sh" "-c" "f=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/idle; [ -f \"$f\" ] || f=/usr/share/tripppin/idle; exec swayidle -w -C \"$f\""
+
+window-rule {
+    geometry-corner-radius 16
+    clip-to-geometry true
+    open-floating true
+}
+
+animations {
+    window-open {
+        duration-ms 220
+        curve "ease-out-expo"
+    }
+    window-close {
+        duration-ms 160
+        curve "ease-out-quad"
+    }
+}
+
+binds {
+    Mod+Space { spawn "tripppin-ui" "orb" "--toggle"; }
+    Mod+Return { spawn "foot"; }
+    Mod+D { spawn "fuzzel"; }
+    Mod+N { spawn "swaync-client" "-t" "-sw"; }
+    Mod+Escape { spawn "tripppin-power"; }
+    Mod+L { spawn "tripppin-ui" "lock"; }
+    Mod+Q { close-window; }
+    Mod+F { fullscreen-window; }
+    Mod+T { toggle-window-floating; }
+    // Every window and workspace at once, with live previews.
+    Mod+Tab { toggle-overview; }
+    // The recent windows, most recent first; let go of Alt to switch.
+    Alt+Tab { spawn "tripppin-ui" "switch"; }
+    // Snap the focused window to half or a quarter of the screen, or fill it.
+    Mod+Left { spawn "tripppin-ui" "snap" "left"; }
+    Mod+Right { spawn "tripppin-ui" "snap" "right"; }
+    Mod+Up { spawn "tripppin-ui" "snap" "max"; }
+    Mod+Down { center-window; }
+    Mod+Alt+Left { spawn "tripppin-ui" "snap" "top-left"; }
+    Mod+Alt+Up { spawn "tripppin-ui" "snap" "top-right"; }
+    Mod+Alt+Down { spawn "tripppin-ui" "snap" "bottom-left"; }
+    Mod+Alt+Right { spawn "tripppin-ui" "snap" "bottom-right"; }
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+Shift+1 { move-window-to-workspace 1; }
+    Mod+Shift+2 { move-window-to-workspace 2; }
+    Mod+Shift+3 { move-window-to-workspace 3; }
+    Mod+Slash { spawn "tripppin-ui" "keys"; }
+    Mod+V { spawn "tripppin-clipboard"; }
+    Mod+Period { spawn "tripppin-emoji"; }
+    Mod+Shift+E { quit; }
+    Print { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print { screenshot-window; }
+    Mod+Shift+S { spawn "tripppin-annotate"; }
+    Mod+Shift+R { spawn "tripppin-record"; }
+    Mod+Shift+Alt+R { spawn "tripppin-record" "area"; }
+
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ && tripppin-ui osd volume"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- && tripppin-ui osd volume"; }
+    XF86AudioMute allow-when-locked=true { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle && tripppin-ui osd volume"; }
+    XF86AudioMicMute allow-when-locked=true { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle && tripppin-ui osd mic"; }
+    XF86AudioPlay allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q -c backlight set 5%+ && tripppin-ui osd brightness"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q -c backlight set 5%- && tripppin-ui osd brightness"; }
+    XF86KbdBrightnessUp allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q -d '*::kbd_backlight' set 33%+ && tripppin-ui osd keyboard"; }
+    XF86KbdBrightnessDown allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q -d '*::kbd_backlight' set 33%- && tripppin-ui osd keyboard"; }
+}

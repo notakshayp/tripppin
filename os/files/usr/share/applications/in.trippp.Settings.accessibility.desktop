@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=accessibility settings
+Comment=settings → accessibility
+Exec=tripppin-ui settings accessibility
+Icon=preferences-desktop-accessibility
+Keywords=screen reader;contrast;larger text;cursor;zoom;
+Categories=Settings;

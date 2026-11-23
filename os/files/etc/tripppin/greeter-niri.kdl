@@ -1,0 +1,15 @@
+// The login screen's own tiny session: niri shows only tripppin-ui greeter, with no
+// key bindings, and quits once someone has logged in.
+hotkey-overlay {
+    skip-at-startup
+}
+
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 24
+}
+
+spawn-at-startup "sh" "-c" "tripppin-ui greeter; niri msg action quit --skip-confirmation"
+
+binds {
+}

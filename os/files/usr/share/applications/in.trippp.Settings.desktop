@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=settings
+Comment=wi-fi, bluetooth, sound, display and everything else
+Exec=tripppin-ui settings
+Icon=tripppin
+Keywords=preferences;control;system;configure;
+Categories=Settings;

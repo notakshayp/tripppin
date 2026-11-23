@@ -1,0 +1,134 @@
+/* Matches the mockup: ink pill, DM Mono, paper for what matters, green for live. */
+* {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+window#waybar {
+    background: rgba(20, 27, 25, 0.82);
+    border: 1px solid #222d2a;
+    border-radius: 12px;
+    color: #b7c3bd;
+}
+
+#image.logo {
+    padding: 0 10px 0 16px;
+}
+
+/* Dots: the labels are empty, so size comes from min-width/height alone. */
+#workspaces button {
+    padding: 0;
+    margin: 0 3px;
+    min-width: 6px;
+    min-height: 6px;
+    font-size: 1px;
+    border-radius: 3px;
+    background: #3d4a45;
+    color: transparent;
+    transition: min-width 160ms ease;
+}
+
+#workspaces button label {
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    min-height: 0;
+    font-size: 1px;
+}
+
+#workspaces {
+    margin: 16px 4px;
+}
+
+#workspaces button.active {
+    min-width: 18px;
+    background: #57d99a;
+}
+
+#workspaces button:hover {
+    background: #8a9a93;
+}
+
+#window {
+    color: #f2f5ef;
+    margin-left: 10px;
+}
+
+#custom-clock {
+    color: #f2f5ef;
+}
+
+#custom-orb,
+#network,
+#pulseaudio,
+#battery {
+    padding: 0 8px;
+}
+
+#custom-orb {
+    color: #57d99a;
+}
+
+#custom-notifications {
+    padding: 0 8px;
+    color: #8a9a93;
+}
+
+#custom-notifications.notification,
+#custom-notifications.dnd-notification {
+    color: #57d99a;
+}
+
+#custom-power {
+    padding: 0 16px 0 8px;
+    color: #b7c3bd;
+}
+
+#custom-power:hover,
+#custom-notifications:hover {
+    color: #57d99a;
+}
+
+#battery.warning:not(.charging) {
+    color: #f0a868;
+}
+
+/* Recording the screen: a red dot, the one place red appears, so it can't be missed. */
+#custom-recording {
+    color: #ff8a7a;
+    margin-right: 6px;
+}
+
+#language,
+#bluetooth {
+    padding: 0 8px;
+    color: #b7c3bd;
+}
+
+#bluetooth.connected {
+    color: #57d99a;
+}
+
+#tray {
+    padding: 0 8px;
+}
+
+#tray menu {
+    background: #141b19;
+    color: #f2f5ef;
+    border: 1px solid #2f3d38;
+    border-radius: 12px;
+}
+
+#privacy {
+    padding: 0 4px;
+}
+
+#privacy-item {
+    padding: 0 4px;
+    color: #ff8a7a;
+}

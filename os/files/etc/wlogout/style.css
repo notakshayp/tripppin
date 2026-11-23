@@ -1,0 +1,40 @@
+/* The power menu: the desktop dims, five round ink buttons in a row, green on hover. */
+* {
+    background-image: none;
+    box-shadow: none;
+    font-family: Inter, sans-serif;
+}
+
+window {
+    background-color: rgba(5, 8, 7, 0.72);
+}
+
+button {
+    margin: 12px;
+    min-width: 150px;
+    border-radius: 28px;
+    border: 1px solid #2a3632;
+    background-color: #141b19;
+    background-repeat: no-repeat;
+    background-position: center 38%;
+    background-size: 30%;
+    color: #c9d4ce;
+    font-size: 16px;
+    font-weight: 500;
+    padding-top: 90px;
+    outline-style: none;
+}
+
+button:focus,
+button:hover {
+    border-color: #57d99a;
+    background-color: #1a2522;
+    color: #f2f5ef;
+}
+
+#lock { background-image: url("/usr/share/tripppin/icons/power/lock.svg"); }
+#logout { background-image: url("/usr/share/tripppin/icons/power/logout.svg"); }
+#suspend { background-image: url("/usr/share/tripppin/icons/power/suspend.svg"); }
+#reboot { background-image: url("/usr/share/tripppin/icons/power/reboot.svg"); }
+#shutdown { background-image: url("/usr/share/tripppin/icons/power/shutdown.svg"); }
+#shutdown:hover, #shutdown:focus { border-color: #e0786b; }

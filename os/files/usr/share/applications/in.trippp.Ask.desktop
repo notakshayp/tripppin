@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ask tripppin
+Comment=tell your computer what you want
+Exec=tripppin-ui orb --toggle
+Icon=tripppin
+Keywords=ai;assistant;help;calculator;calculate;search;do;
+Categories=Settings;

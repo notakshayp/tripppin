@@ -1,0 +1,58 @@
+/* Tripppin colours for every GTK 3 app (adw-gtk3 reads the same names), including ones installed later.
+   The named colours are libadwaita's; the custom properties are its newer (1.6+) names. */
+
+@define-color accent_color #57d99a;
+@define-color accent_bg_color #1f6b45;
+@define-color accent_fg_color #f2f5ef;
+@define-color destructive_color #e0786b;
+@define-color destructive_bg_color #8a3a30;
+@define-color success_color #57d99a;
+@define-color warning_color #e8c26e;
+@define-color error_color #e0786b;
+
+@define-color window_bg_color #0d1211;
+@define-color window_fg_color #f2f5ef;
+@define-color view_bg_color #0f1513;
+@define-color view_fg_color #f2f5ef;
+@define-color headerbar_bg_color #0d1211;
+@define-color headerbar_fg_color #f2f5ef;
+@define-color headerbar_backdrop_color #0d1211;
+@define-color sidebar_bg_color #0b100f;
+@define-color sidebar_fg_color #d9e1dd;
+@define-color secondary_sidebar_bg_color #0f1513;
+@define-color card_bg_color #141b19;
+@define-color card_fg_color #f2f5ef;
+@define-color dialog_bg_color #141b19;
+@define-color dialog_fg_color #f2f5ef;
+@define-color popover_bg_color #141b19;
+@define-color popover_fg_color #f2f5ef;
+@define-color thumbnail_bg_color #141b19;
+
+
+window.background,
+window.background.csd {
+    border-radius: 16px;
+}
+
+/* The button that does the thing (Authenticate, Save, OK) in green, like ours. */
+button.default,
+button.suggested-action {
+    background: #57d99a;
+    color: #0d1211;
+    border: none;
+    box-shadow: none;
+    font-weight: 600;
+}
+
+button.default:hover,
+button.suggested-action:hover {
+    background: #6fe3ab;
+}
+
+button {
+    border-radius: 10px;
+}
+
+entry {
+    border-radius: 10px;
+}

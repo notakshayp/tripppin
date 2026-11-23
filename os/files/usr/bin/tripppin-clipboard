@@ -1,0 +1,7 @@
+#!/bin/sh
+# Clipboard history (Super + V): what you copied recently, newest first, in the launcher's
+# menu. Picking one puts it back on the clipboard. cliphist keeps the history; niri starts
+# `wl-paste --watch cliphist store` at login.
+if pkill -x fuzzel; then exit 0; fi
+pick=$(cliphist list | fuzzel --dmenu --with-nth=2 --prompt "clipboard  " --placeholder "search what you copied" --lines 10 --width 56) || exit 0
+printf '%s' "$pick" | cliphist decode | wl-copy
