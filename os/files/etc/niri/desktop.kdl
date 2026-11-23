@@ -112,6 +112,8 @@ binds {
     XF86AudioMute allow-when-locked=true { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle && tripppin-ui osd volume"; }
     XF86AudioMicMute allow-when-locked=true { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle && tripppin-ui osd mic"; }
     XF86AudioPlay allow-when-locked=true { spawn "playerctl" "play-pause"; }
-    XF86MonBrightnessUp allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q set 5%+ && tripppin-ui osd brightness"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q set 5%- && tripppin-ui osd brightness"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q -c backlight set 5%+ && tripppin-ui osd brightness"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q -c backlight set 5%- && tripppin-ui osd brightness"; }
+    XF86KbdBrightnessUp allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q -d '*::kbd_backlight' set 33%+ && tripppin-ui osd keyboard"; }
+    XF86KbdBrightnessDown allow-when-locked=true { spawn "sh" "-c" "brightnessctl -q -d '*::kbd_backlight' set 33%- && tripppin-ui osd keyboard"; }
 }

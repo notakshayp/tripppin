@@ -1,4 +1,4 @@
-//! Volume, brightness and mic pop-ups: a small ink pill near the bottom of the screen with a
+//! Volume, brightness, keyboard light, mic and caps-lock pop-ups: a small ink pill near the bottom of the screen with a
 //! green bar, shown when a key changes the level and gone two seconds later. niri runs the
 //! change itself (wpctl, brightnessctl) and then `tripppin-ui osd <kind>`; a second call while
 //! the pill is up updates it instead of opening another.
@@ -19,6 +19,21 @@ pub struct Level {
     pub name: &'static str,
     pub value: f64,
     pub muted: bool,
+    /// A word to show instead of the percentage ("on", "off").
+    pub word: Option<&'static str>,
+}
+
+/// Whether caps lock is on, from the keyboards' caps-lock lights; None without one.
+pub fn caps_lock() -> Option<bool> {
+    let dirs = std::fs::read_dir("/sys/class/leds").ok()?;
+    let mut found = None;
+    for d in dirs.flatten() {
+        if d.file_name().to_string_lossy().ends_with("::capslock") {
+            let on = std::fs::read_to_string(d.path().join("brightness")).is_ok_and(|b| b.trim() != "0");
+            found = Some(found.unwrap_or(false) || on);
+        }
+    }
+    found
 }
 
 /// `wpctl get-volume` prints "Volume: 0.40" or "Volume: 0.40 [MUTED]".
@@ -45,14 +60,28 @@ fn read(kind: &str) -> Option<Level> {
     match kind {
         "volume" => {
             let (value, muted) = parse_wpctl(&run("wpctl", &["get-volume", "@DEFAULT_AUDIO_SINK@"])?)?;
-            Some(Level { name: "vol", value, muted })
+            Some(Level { name: "vol", value, muted, word: None })
         }
         "mic" => {
             let (value, muted) = parse_wpctl(&run("wpctl", &["get-volume", "@DEFAULT_AUDIO_SOURCE@"])?)?;
-            Some(Level { name: "mic", value, muted })
+            Some(Level { name: "mic", value, muted, word: None })
         }
         "brightness" => {
-            Some(Level { name: "light", value: parse_brightnessctl(&run("brightnessctl", &["-m"])?)?, muted: false })
+            let value = parse_brightnessctl(&run("brightnessctl", &["-m", "-c", "backlight"])?)?;
+            Some(Level { name: "light", value, muted: false, word: None })
+        }
+        "keyboard" => {
+            let value = parse_brightnessctl(&run("brightnessctl", &["-m", "-d", "*::kbd_backlight"])?)?;
+            Some(Level { name: "keys", value, muted: false, word: None })
+        }
+        "caps" => {
+            let on = caps_lock()?;
+            Some(Level {
+                name: "caps",
+                value: if on { 1.0 } else { 0.0 },
+                muted: !on,
+                word: Some(if on { "on" } else { "off" }),
+            })
         }
         _ => None,
     }
@@ -69,9 +98,12 @@ struct Osd {
 
 impl Osd {
     fn show(self: &Rc<Self>, app: &gtk::Application, level: &Level) {
-        self.name.set_text(if level.muted { "muted" } else { level.name });
+        self.name.set_text(if level.muted && level.word.is_none() { "muted" } else { level.name });
         self.bar.set_fraction(level.value.clamp(0.0, 1.0));
-        self.value.set_text(&format!("{:.0}", (level.value * 100.0).round()));
+        match level.word {
+            Some(w) => self.value.set_text(w),
+            None => self.value.set_text(&format!("{:.0}", (level.value * 100.0).round())),
+        }
         if level.muted {
             self.bar.add_css_class("muted");
         } else {

@@ -51,7 +51,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [x] Notifications: our cards top right
 - [~] Calendar pop-up from the clock, with upcoming events (the month and today, opened and closed from the clock; events wait for calendar accounts)
 - [x] Power menu (wlogout): lock, log out, sleep, restart, shut down
-- [~] Volume, brightness, keyboard-light, caps-lock and mic-mute pop-ups (ours): volume, mute, mic and brightness done; keyboard light and caps lock to do
+- [x] Volume, brightness, keyboard-light, caps-lock and mic-mute pop-ups (ours) (caps lock watched by the orb from the keyboard light, checked in the VM; the keyboard light keys checked on the laptop)
 - [x] Launcher (fuzzel): apps
 - [ ] Launcher: settings pages, files, calculator, "ask tripppin" handing over to the orb
 - [ ] Window switcher (Alt+Tab) with previews; overview of all windows and workspaces

@@ -220,6 +220,7 @@ pub fn run() -> glib::ExitCode {
         let built = build(app);
         *started.borrow_mut() = Some(built);
         write_status("");
+        watch_caps_lock();
     });
     app.connect_command_line(move |_, cmd| {
         let toggle = cmd.arguments().iter().any(|a| a.to_str() == Some("--toggle"));
@@ -491,6 +492,23 @@ fn model_line() -> String {
         Some(t) => format!("{} · on this computer", t.model.to_lowercase()),
         None => "no model yet · it downloads on first start".into(),
     }
+}
+
+/// niri has no caps-lock event, so the orb (always running) watches the keyboards' caps-lock
+/// light and shows the pop-up when it changes.
+fn watch_caps_lock() {
+    let last = std::cell::Cell::new(crate::osd::caps_lock());
+    if last.get().is_none() {
+        return;
+    }
+    glib::timeout_add_local(std::time::Duration::from_millis(250), move || {
+        let now = crate::osd::caps_lock();
+        if now != last.get() {
+            last.set(now);
+            let _ = std::process::Command::new("tripppin-ui").args(["osd", "caps"]).spawn();
+        }
+        glib::ControlFlow::Continue
+    });
 }
 
 /// Exists once the person has opened the orb.
