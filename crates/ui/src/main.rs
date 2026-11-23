@@ -33,6 +33,7 @@ mod snd;
 mod storage;
 mod switch;
 mod system;
+mod watch;
 
 use gtk::glib::ExitCode;
 

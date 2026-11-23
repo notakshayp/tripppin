@@ -221,6 +221,7 @@ pub fn run() -> glib::ExitCode {
         *started.borrow_mut() = Some(built);
         write_status("");
         watch_caps_lock();
+        crate::watch::start();
     });
     app.connect_command_line(move |_, cmd| {
         let toggle = cmd.arguments().iter().any(|a| a.to_str() == Some("--toggle"));

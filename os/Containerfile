@@ -100,6 +100,9 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       google-noto-sans-gujarati-vf-fonts google-noto-sans-gurmukhi-vf-fonts \
       firewalld orca espeak-ng speech-dispatcher speech-dispatcher-espeak-ng NetworkManager-openvpn NetworkManager-openvpn-gnome \
       cups cups-filters ipp-usb nss-mdns system-config-printer sane-backends sane-airscan simple-scan unicode-emoji wtype mate-polkit google-noto-color-emoji-fonts plymouth plymouth-plugin-script \
+      thunar thunar-volman thunar-archive-plugin tumbler gvfs gvfs-mtp file-roller \
+      gnome-text-editor loupe papers gnome-calculator celluloid gnome-system-monitor gnome-disk-utility \
+      udiskie greenboot greenboot-default-health-checks \
     && dnf clean all
 
 COPY os/files/ /
@@ -117,6 +120,7 @@ RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } >
 
 # The desktop starts on tty1 through greetd; other consoles (Ctrl+Alt+F2…) are kmscon.
 RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service firewalld.service cups.socket \
+      tripppin-firefox.service greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
     && systemctl set-default graphical.target \
     && dconf update
 

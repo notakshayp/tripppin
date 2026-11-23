@@ -30,6 +30,10 @@ IPAddressAllow=localhost
 # Never compete with the desktop for CPU.
 Nice=10
 CPUWeight=50
+# When memory runs out, the model goes first (it reloads by itself on the next question),
+# never the app you're working in.
+OOMScoreAdjust=800
+OOMPolicy=continue
 
 [Install]
 WantedBy=multi-user.target

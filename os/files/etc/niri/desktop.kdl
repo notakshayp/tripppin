@@ -55,6 +55,8 @@ spawn-at-startup "swaync"
 spawn-at-startup "/usr/libexec/polkit-mate-authentication-agent-1"
 // Clipboard history for Super + V (text and images).
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
+// USB drives and phones: mounted when plugged in, with a notification to open or eject.
+spawn-at-startup "udiskie" "--automount" "--notify" "--no-tray" "--file-manager" "thunar"
 spawn-at-startup "tripppin-ui" "orb"
 spawn-at-startup "tripppin-ui" "first-boot"
 // When the computer is left alone: the person's timings (Settings → Power), else ours
