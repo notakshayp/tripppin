@@ -44,7 +44,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 ## The shell
 
 - [~] Bar (waybar): logo, workspaces, focused app, date, orb status, network, volume, battery
-- [ ] Bar: Bluetooth, tray (for apps like Discord), keyboard layout, recording indicator, mic/camera in use
+- [x] Bar: Bluetooth, tray (for apps like Discord), keyboard layout, recording indicator, mic/camera in use (mic and screen sharing via waybar's privacy module; camera use has no reliable signal under PipeWire yet)
 - [x] Quick settings (SwayNotificationCenter control centre): Wi-Fi, Bluetooth, do not disturb, night light,
       airplane mode, volume and brightness sliders, media player, power-mode, screenshot, lock
 - [x] Notification centre (SwayNotificationCenter): history, grouping, actions, inline replies
@@ -61,7 +61,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [~] Emoji and symbol picker (Super + .; Unicode's names, typed with wtype and copied; checked once the next image brings unicode-emoji and wtype)
 - [x] Screenshots (grim + slurp + swappy): area, window, screen; annotate; copy or save (niri's own capture: print, ctrl/alt + print, saved and copied; super + shift + s draws on the last one in swappy; checked in the VM)
 - [x] Screen recording (wf-recorder) with a bar indicator (super + shift + r, alt for an area; red "● rec" in the bar stops it; checked in the VM)
-- [ ] Password prompts for admin actions (lxpolkit), styled
+- [~] Password prompts for admin actions (lxpolkit), styled (mate-polkit, GTK3: appears in our theme with the green action button, checked in the VM; entering the password checked with a real keyboard on the laptop; its own sentences stay capitalised)
 - [ ] On-screen keyboard (for touchscreens)
 - [x] Wallpaper
 

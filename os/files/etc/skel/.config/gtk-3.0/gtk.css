@@ -33,3 +33,26 @@ window.background,
 window.background.csd {
     border-radius: 16px;
 }
+
+/* The button that does the thing (Authenticate, Save, OK) in green, like ours. */
+button.default,
+button.suggested-action {
+    background: #57d99a;
+    color: #0d1211;
+    border: none;
+    box-shadow: none;
+    font-weight: 600;
+}
+
+button.default:hover,
+button.suggested-action:hover {
+    background: #6fe3ab;
+}
+
+button {
+    border-radius: 10px;
+}
+
+entry {
+    border-radius: 10px;
+}
