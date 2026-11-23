@@ -30,6 +30,7 @@ mod region;
 mod settings;
 mod snd;
 mod storage;
+mod switch;
 mod system;
 
 use gtk::glib::ExitCode;
@@ -63,9 +64,11 @@ fn main() -> ExitCode {
         Some("settings") => settings::run(),
         Some("calendar") => calendar::run(),
         Some("keys") => keys::run(),
+        Some("switch") => switch::run(),
+        Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where>"
             );
             ExitCode::from(2)
         }

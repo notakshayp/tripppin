@@ -885,6 +885,33 @@ calendar.month > grid > label.day-number:selected {
     color: #c9d4ce;
 }
 
+/* ---- alt + tab --------------------------------------------------------- */
+
+.switch-strip {
+    padding: 18px;
+    border-radius: 24px;
+    background: #101614;
+    border: 1px solid #2a3632;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+.switch-card {
+    padding: 18px 16px 14px;
+    min-width: 128px;
+    border-radius: 16px;
+    border: 2px solid transparent;
+}
+
+.switch-card.selected {
+    background: rgba(87, 217, 154, 0.10);
+    border-color: #57d99a;
+}
+
+.switch-title {
+    font-size: 13px;
+    color: #c9d4ce;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

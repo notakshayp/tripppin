@@ -54,8 +54,8 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [x] Volume, brightness, keyboard-light, caps-lock and mic-mute pop-ups (ours) (caps lock watched by the orb from the keyboard light, checked in the VM; the keyboard light keys checked on the laptop)
 - [x] Launcher (fuzzel): apps
 - [ ] Launcher: settings pages, files, calculator, "ask tripppin" handing over to the orb
-- [ ] Window switcher (Alt+Tab) with previews; overview of all windows and workspaces
-- [ ] Window controls: snap halves/quarters, maximise, minimise, always on top, move to workspace
+- [x] Window switcher (Alt+Tab) with previews; overview of all windows and workspaces (alt + tab: our switcher, most recent first, app icons; super + tab: niri's overview with live previews; checked in the VM)
+- [~] Window controls: snap halves/quarters, maximise, minimise, always on top, move to workspace (halves, quarters, fill, centre and move to workspace done; niri has no minimise or always-on-top; Settings is too wide for half of a small screen)
 - [x] Keyboard shortcuts cheat sheet (Super+/), in our style
 - [x] Clipboard history (cliphist) with a picker (Super + V; checked in the VM: text and images, picking puts it back)
 - [~] Emoji and symbol picker (Super + .; Unicode's names, typed with wtype and copied; search checked in the VM; the colour emoji font comes with the next image)
