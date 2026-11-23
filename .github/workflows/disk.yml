@@ -161,7 +161,8 @@ jobs:
           aws s3 cp "$iso" "$BUCKET/releases/$day/$iso" --endpoint-url "$endpoint" --only-show-errors
           aws s3 cp SHA256SUMS "$BUCKET/releases/$day/SHA256SUMS" --endpoint-url "$endpoint" --only-show-errors
           aws s3 cp SHA256SUMS.bundle "$BUCKET/releases/$day/SHA256SUMS.bundle" --endpoint-url "$endpoint" --only-show-errors
-          aws s3 cp "$BUCKET/releases/$day/$iso" "$BUCKET/latest/tripppin-x86_64.iso" --endpoint-url "$endpoint" --only-show-errors
+          # R2 has no object tagging, which a server-side copy asks for, so upload it again.
+          aws s3 cp "$iso" "$BUCKET/latest/tripppin-x86_64.iso" --endpoint-url "$endpoint" --only-show-errors
           sed "s/$iso/tripppin-x86_64.iso/" SHA256SUMS > latest-SHA256SUMS
           aws s3 cp latest-SHA256SUMS "$BUCKET/latest/SHA256SUMS" --endpoint-url "$endpoint" --only-show-errors
           size=$(stat -c %s "$iso"); sha=$(cut -d' ' -f1 SHA256SUMS)
