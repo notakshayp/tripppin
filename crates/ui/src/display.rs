@@ -156,20 +156,26 @@ fn remember(name: &str, mode: &Mode, scale: f64, transform: &str) -> std::io::Re
     std::fs::create_dir_all(&dir)?;
     let file = dir.join("tripppin-displays.kdl");
     let old = std::fs::read_to_string(&file).unwrap_or_default();
+    std::fs::write(&file, with_screen(&old, &output_block(name, mode, scale, transform), name))?;
+
+    include_in_niri("tripppin-displays.kdl")
+}
+
+/// The displays file with this screen's block replaced (or added). Comments are dropped
+/// and the header written once, so saving again never piles up duplicates.
+pub fn with_screen(old: &str, block: &str, name: &str) -> String {
     let mut blocks: Vec<String> = Vec::new();
     let mut current = String::new();
-    for line in old.lines() {
+    for line in old.lines().filter(|l| !l.trim_start().starts_with("//")) {
         current.push_str(line);
         current.push('\n');
         if line.trim() == "}" {
             blocks.push(std::mem::take(&mut current));
         }
     }
-    blocks.retain(|b| !b.starts_with(&format!("output \"{name}\"")));
-    blocks.push(output_block(name, mode, scale, transform));
-    std::fs::write(&file, format!("// Screens, written by tripppin settings.\n{}", blocks.join("")))?;
-
-    include_in_niri("tripppin-displays.kdl")
+    blocks.retain(|b| !b.trim_start().starts_with(&format!("output \"{name}\"")));
+    blocks.push(block.to_string());
+    format!("// Screens, written by tripppin settings.\n{}", blocks.join(""))
 }
 
 /// Makes sure the person's niri config includes the system desktop, their own pointer
@@ -263,6 +269,18 @@ mod tests {
         assert_eq!(
             output_block("Virtual-1", &o.modes[1], 1.5, "90"),
             "output \"Virtual-1\" {\n    mode \"1920x1080@60.000\"\n    scale 1.5\n    transform \"90\"\n}\n"
+        );
+    }
+
+    #[test]
+    fn saving_a_screen_replaces_its_block() {
+        let old = "// Screens, written by tripppin settings.\n// Screens, written by tripppin settings.\n\
+                   output \"Virtual-1\" {\n    scale 1.25\n}\noutput \"HDMI-A-1\" {\n    scale 1\n}\n";
+        let new = with_screen(old, "output \"Virtual-1\" {\n    scale 1\n}\n", "Virtual-1");
+        assert_eq!(
+            new,
+            "// Screens, written by tripppin settings.\noutput \"HDMI-A-1\" {\n    scale 1\n}\n\
+             output \"Virtual-1\" {\n    scale 1\n}\n"
         );
     }
 

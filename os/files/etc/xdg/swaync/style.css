@@ -73,7 +73,8 @@ button:active { transform: scale(0.96); }
   to { opacity: 1; transform: none; }
 }
 .control-center-list { background: transparent; }
-.control-center-list-placeholder { color: #6b7a74; font-family: "DM Mono", monospace; font-size: 12px; }
+.control-center-list-placeholder { color: #6b7a74; font-family: "DM Mono", monospace; font-size: 11px; padding: 10px 0; }
+.control-center-list-placeholder image { -gtk-icon-size: 0; min-width: 0; min-height: 0; margin: 0; opacity: 0; }
 .widget { margin: 4px 0; }
 
 .widget-title > label { font-size: 15px; font-weight: 700; color: #f2f5ef; }
@@ -106,13 +107,13 @@ button:active { transform: scale(0.96); }
   color: #f2f5ef;
 }
 
-.widget-volume, .widget-backlight {
+.widget-volume, .widget-slider, .widget-backlight {
   padding: 6px 12px;
   border-radius: 12px;
   background: #0f1513;
   border: 1px solid #222d2a;
 }
-.widget-volume label, .widget-backlight label {
+.widget-volume label, .widget-slider label, .widget-backlight label {
   font-size: 14px; color: #8a9a93; min-width: 24px;
 }
 scale trough { min-height: 6px; border-radius: 3px; background: #1d2825; }

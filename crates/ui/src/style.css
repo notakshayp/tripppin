@@ -1258,3 +1258,9 @@ button.wall-tile:hover {
 .origin-left-bottom { transform-origin: left bottom; }
 .origin-right-top { transform-origin: right top; }
 .origin-left-top { transform-origin: left top; }
+
+/* A finished step's mark: a small icon, centred in its circle (more specific than .icon). */
+.icon.tick {
+    font-size: 10px;
+    padding: 0;
+}

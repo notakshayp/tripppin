@@ -391,6 +391,19 @@ impl Message {
     }
 }
 
+/// Saves a conversation as JSON, for another program to pick up (the orb hands its request
+/// to the terminal this way).
+pub fn save_conversation(history: &[Message]) -> String {
+    serde_json::Value::Array(history.iter().map(|m| m.0.clone()).collect()).to_string()
+}
+
+/// Reads a saved conversation; `None` unless it's a list of messages.
+pub fn load_conversation(text: &str) -> Option<Vec<Message>> {
+    let list = serde_json::from_str::<serde_json::Value>(text).ok()?;
+    let messages: Vec<Message> = list.as_array()?.iter().cloned().map(Message).collect();
+    messages.iter().all(|m| m.0["role"].is_string()).then_some(messages)
+}
+
 /// A tool call as the model sent it, before it's been checked.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ToolCall {
@@ -614,6 +627,16 @@ fn merge_tool_calls(chunk: &serde_json::Value, calls: &mut Vec<ToolCall>) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conversations_round_trip() {
+        let history = vec![Message::system(), Message::user("free up space"), Message::assistant("done")];
+        let back = load_conversation(&save_conversation(&history)).unwrap();
+        assert_eq!(back.len(), 3);
+        assert_eq!(back[1].0["content"], "free up space");
+        assert!(load_conversation("{\"role\":\"user\"}").is_none());
+        assert!(load_conversation("not json").is_none());
+    }
 
     #[test]
     fn reads_an_endpoint() {

@@ -224,6 +224,20 @@ fn short(path: &str) -> String {
     path.rsplit('/').find(|s| !s.is_empty()).unwrap_or(path).to_string()
 }
 
+/// The round mark for a finished step: the icon centred in its circle both ways.
+fn tick(glyph: char, failed: bool) -> gtk::Label {
+    let t = common::icon(glyph, &["tick"]);
+    if failed {
+        t.add_css_class("failed");
+    }
+    t.set_xalign(0.5);
+    t.set_yalign(0.5);
+    t.set_justify(gtk::Justification::Center);
+    t.set_halign(gtk::Align::Center);
+    t.set_valign(gtk::Align::Center);
+    t
+}
+
 /// One row in the working card.
 struct StepRow {
     root: gtk::Box,
@@ -241,8 +255,8 @@ impl StepRow {
         mark.set_transition_type(gtk::StackTransitionType::Crossfade);
         mark.set_transition_duration(160);
         mark.add_named(&common::spinner(16), Some("running"));
-        mark.add_named(&label(&icons::CHECK.to_string(), &["tick"]), Some("done"));
-        mark.add_named(&label(&icons::ALERT.to_string(), &["tick", "failed"]), Some("failed"));
+        mark.add_named(&tick(icons::CHECK, false), Some("done"));
+        mark.add_named(&tick(icons::ALERT, true), Some("failed"));
         mark.set_visible_child_name("running");
 
         let title = label(title, &["step-title", "running"]);
@@ -503,13 +517,20 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     answer.set_visible(false);
     let foot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     foot.add_css_class("card-foot");
-    let terminal = gtk::Button::with_label("show in terminal");
+    let terminal = gtk::Button::with_label("continue in terminal");
     terminal.set_valign(gtk::Align::Center);
+    terminal.set_tooltip_text(Some("open this request in the terminal and keep talking about it"));
     terminal.add_css_class("link");
     terminal.set_hexpand(true);
     terminal.set_halign(gtk::Align::Start);
+    // The terminal picks up this request as a chat: what was asked, the steps, the answer.
     terminal.connect_clicked(|_| {
-        let _ = std::process::Command::new("foot").spawn();
+        let mut foot = std::process::Command::new("foot");
+        let saved = conversation_file();
+        if saved.exists() {
+            foot.env("TRIPPPIN_CONTINUE", saved);
+        }
+        let _ = foot.spawn();
     });
     let stop = gtk::Button::with_label("stop");
     stop.add_css_class("stop");
@@ -682,6 +703,11 @@ fn used_file() -> std::path::PathBuf {
         .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/state")))
         .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
         .join("tripppin/orb-used")
+}
+
+/// The last request's whole conversation, for "continue in terminal".
+fn conversation_file() -> std::path::PathBuf {
+    common::runtime_dir().join("orb-conversation.json")
 }
 
 fn write_status(text: &str) {
@@ -927,6 +953,7 @@ impl Orb {
             let mut history = vec![Message::system(), Message::user(&text)];
             let mut ui = Sender(tx.clone());
             let result = agent::run(&mut history, &cancel, &mut ui).map(|_| ()).map_err(|e| format!("{e:#}"));
+            let _ = std::fs::write(conversation_file(), trip::model::save_conversation(&history));
             let _ = tx.send_blocking(Event::Done(result));
         });
         let orb = self.clone();
