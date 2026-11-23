@@ -912,6 +912,40 @@ calendar.month > grid > label.day-number:selected {
     color: #c9d4ce;
 }
 
+/* ---- login: people and warnings --------------------------------------- */
+
+button.person {
+    padding: 8px 14px 8px 8px;
+    border-radius: 9999px;
+    background: rgba(20, 27, 25, 0.8);
+    border: 1px solid #2a3632;
+    box-shadow: none;
+}
+
+button.person.selected {
+    border-color: #57d99a;
+    background: rgba(31, 107, 69, 0.35);
+}
+
+.avatar.small {
+    min-width: 30px;
+    min-height: 30px;
+    font-size: 14px;
+    color: #f2f5ef;
+}
+
+.who-small {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+.caps-warning {
+    font-family: "DM Mono", monospace;
+    font-size: 13px;
+    color: #e8c26e;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

@@ -36,7 +36,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [ ] Boot splash (Plymouth): the power-spark logo animating in, on ink
 - [ ] Boot menu (GRUB): hidden unless Shift/Esc; themed when shown
 - [x] Login screen (ours): clock, avatar, password pill, power menu
-- [ ] Login: several people, switching user, caps-lock warning, "forgot password" help
+- [x] Login: several people, switching user, caps-lock warning, "forgot password" help (a chip per person plus "other"; caps-lock warning from the keyboard light; honest help text; checked in the VM with two people)
 - [~] Lock screen (ours): clock, what finished while you were away, password
 - [ ] Lock: media controls, notifications count, battery, wake from sleep cleanly
 - [ ] Idle: dim before locking, screen off, sleep (configurable in Settings)

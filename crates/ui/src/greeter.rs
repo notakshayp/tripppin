@@ -86,13 +86,80 @@ fn build(app: &gtk::Application) {
     pill.append(&go);
     let error = label("", &["error"]);
     error.set_visible(false);
+    // Who's logging in: the one person, or a chip each (and "other" for a name not listed).
+    let chosen = std::rc::Rc::new(std::cell::RefCell::new(user.clone()));
     if people.len() == 1 {
         form.append(&who);
     } else {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let chips: std::rc::Rc<std::cell::RefCell<Vec<gtk::Button>>> = std::rc::Rc::default();
+        let add_chip = |login: Option<&str>| {
+            let shown = login.map(common::display_name).unwrap_or_else(|| "other".into()).to_lowercase();
+            let chip = gtk::Button::new();
+            chip.add_css_class("person");
+            let inner = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            let letter = shown.chars().next().map(|c| c.to_string()).unwrap_or_default();
+            let a = label(&letter, &["avatar", "small"]);
+            a.set_xalign(0.5);
+            inner.append(&a);
+            inner.append(&label(&shown, &["who-small"]));
+            chip.set_child(Some(&inner));
+            if login == Some(user.as_str()) {
+                chip.add_css_class("selected");
+            }
+            let (chosen, chips2, name_pill, password) =
+                (chosen.clone(), chips.clone(), name_pill.clone(), password.clone());
+            let login = login.map(str::to_string);
+            chip.connect_clicked(move |b| {
+                for c in chips2.borrow().iter() {
+                    c.remove_css_class("selected");
+                }
+                b.add_css_class("selected");
+                *chosen.borrow_mut() = login.clone().unwrap_or_default();
+                name_pill.set_visible(login.is_none());
+                password.grab_focus();
+            });
+            chips.borrow_mut().push(chip.clone());
+            row.append(&chip);
+        };
+        for p in &people {
+            add_chip(Some(p));
+        }
+        add_chip(None);
+        name_pill.set_visible(false);
+        form.append(&row);
         form.append(&name_pill);
     }
     form.append(&pill);
+    // Caps lock: the keyboard's light says so, checked a few times a second.
+    let caps = label("caps lock is on", &["caps-warning"]);
+    caps.set_visible(crate::osd::caps_lock() == Some(true));
+    {
+        let caps = caps.clone();
+        glib::timeout_add_local(std::time::Duration::from_millis(300), move || {
+            caps.set_visible(crate::osd::caps_lock() == Some(true));
+            glib::ControlFlow::Continue
+        });
+    }
+    form.append(&caps);
     form.append(&error);
+    let forgot = gtk::Button::with_label("forgot your password?");
+    forgot.add_css_class("link");
+    forgot.set_halign(gtk::Align::Start);
+    let help = label(
+        "another administrator on this computer can set a new one in settings → accounts. if you're the only one, the password can't be recovered: your files stay safe, but tripppin has to be installed again.",
+        &["status"],
+    );
+    help.set_wrap(true);
+    help.set_xalign(0.0);
+    help.set_max_width_chars(46);
+    help.set_visible(false);
+    {
+        let help = help.clone();
+        forgot.connect_clicked(move |_| help.set_visible(!help.is_visible()));
+    }
+    form.append(&forgot);
+    form.append(&help);
     overlay.add_overlay(&form);
 
     // Network, battery, power.
@@ -134,9 +201,10 @@ fn build(app: &gtk::Application) {
 
     let attempt = {
         let (password, username, error, app) = (password.clone(), username.clone(), error.clone(), app.clone());
-        let single = (people.len() == 1).then_some(user);
+        let chosen = chosen.clone();
         move || {
-            let who = single.clone().unwrap_or_else(|| username.text().trim().to_string());
+            let picked = chosen.borrow().clone();
+            let who = if picked.is_empty() { username.text().trim().to_string() } else { picked };
             let pw = password.text().to_string();
             if who.is_empty() || pw.is_empty() {
                 return;
