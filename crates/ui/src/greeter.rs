@@ -230,5 +230,8 @@ fn build(app: &gtk::Application) {
     }
     go.connect_clicked(move |_| attempt());
     window.present();
+    if let Some(c) = window.child() {
+        crate::common::play(&c, "fade");
+    }
     password.grab_focus();
 }

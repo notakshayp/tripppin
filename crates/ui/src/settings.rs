@@ -5,7 +5,7 @@
 use crate::accounts;
 use crate::apps;
 use crate::bt;
-use crate::common::label;
+use crate::common::{icons, label};
 use crate::display;
 use crate::keyboard;
 use crate::nm;
@@ -22,30 +22,49 @@ use gtk::{gio, glib};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// The sections, in sidebar order: (id, title).
-const SECTIONS: [(&str, &str); 21] = [
-    ("wifi", "wi-fi"),
-    ("network", "network & vpn"),
-    ("bluetooth", "bluetooth"),
-    ("sound", "sound"),
-    ("display", "display"),
-    ("appearance", "appearance"),
-    ("power", "power & battery"),
-    ("ai", "ai"),
-    ("notifications", "notifications"),
-    ("apps", "apps"),
-    ("keyboard", "keyboard"),
-    ("pointer", "mouse & touchpad"),
-    ("printers", "printers & scanners"),
-    ("time", "date & time"),
-    ("language", "language & region"),
-    ("accounts", "accounts"),
-    ("privacy", "privacy"),
-    ("accessibility", "accessibility"),
-    ("storage", "storage"),
-    ("updates", "updates"),
-    ("about", "about"),
+/// The sections, in sidebar order: (id, title, icon, page).
+type Section = (&'static str, &'static str, char, fn() -> gtk::ScrolledWindow);
+const SECTIONS: [Section; 21] = [
+    ("wifi", "wi-fi", icons::WIFI, wifi_page),
+    ("network", "network & vpn", icons::NETWORK, network_page),
+    ("bluetooth", "bluetooth", icons::BLUETOOTH, bluetooth_page),
+    ("sound", "sound", icons::SOUND, sound_page),
+    ("display", "display", icons::DISPLAY, display_page),
+    ("appearance", "appearance", icons::PALETTE, appearance_page),
+    ("power", "power & battery", icons::BATTERY, power_page),
+    ("ai", "ai", icons::SPARKLES, ai_page),
+    ("notifications", "notifications", icons::BELL, notifications_page),
+    ("apps", "apps", icons::APPS, apps_page),
+    ("keyboard", "keyboard", icons::KEYBOARD, keyboard_page),
+    ("pointer", "mouse & touchpad", icons::POINTER, pointer_page),
+    ("printers", "printers & scanners", icons::PRINTER, printers_page),
+    ("time", "date & time", icons::CLOCK, time_page),
+    ("language", "language & region", icons::LANGUAGE, language_page),
+    ("accounts", "accounts", icons::USERS, accounts_page),
+    ("privacy", "privacy", icons::SHIELD, privacy_page),
+    ("accessibility", "accessibility", icons::ACCESSIBILITY, accessibility_page),
+    ("storage", "storage", icons::DISK, storage_page),
+    ("updates", "updates", icons::UPDATE, updates_page),
+    ("about", "about", icons::INFO, about_page),
 ];
+
+/// Shows section `i`, building its page the first time (pages read the system as they're
+/// made, so building all of them up front made Settings slow to open), and plays it in.
+fn show_section(stack: &gtk::Stack, i: usize) {
+    let (id, _, _, make) = SECTIONS[i];
+    let page = match stack.child_by_name(id) {
+        Some(page) => page,
+        None => {
+            let page = make();
+            stack.add_named(&page, Some(id));
+            page.upcast()
+        }
+    };
+    stack.set_visible_child_name(id);
+    if let Some(body) = page.downcast_ref::<gtk::ScrolledWindow>().and_then(|s| s.child()) {
+        crate::common::play(&body, "rise");
+    }
+}
 
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder()
@@ -58,8 +77,8 @@ pub fn run() -> glib::ExitCode {
         let mut slot = window.borrow_mut();
         let (win, stack, nav) = slot.get_or_insert_with(|| build(app)).clone();
         drop(slot);
-        if let Some(i) = wanted.and_then(|w| SECTIONS.iter().position(|(id, _)| *id == w)) {
-            stack.set_visible_child_name(SECTIONS[i].0);
+        if let Some(i) = wanted.and_then(|w| SECTIONS.iter().position(|(id, ..)| *id == w)) {
+            show_section(&stack, i);
             if let Some(row) = nav.row_at_index(i as i32) {
                 nav.select_row(Some(&row));
                 // Once the window is laid out, scroll the sidebar so the open section shows.
@@ -80,56 +99,33 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     let window = gtk::ApplicationWindow::builder()
         .application(app)
         .title("settings")
-        .default_width(1040)
-        .default_height(660)
+        .default_width(920)
+        .default_height(600)
         .build();
     window.add_css_class("tripppin");
     window.add_css_class("settings");
-    // No title text, as in the design: just the close button.
-    let header = gtk::HeaderBar::new();
-    header.set_title_widget(Some(&gtk::Label::new(None)));
-    header.add_css_class("bare");
-    window.set_titlebar(Some(&header));
+    // No title bar: the sidebar runs to the top and the close button floats over the page.
+    window.set_titlebar(Some(&gtk::Box::new(gtk::Orientation::Horizontal, 0)));
 
+    // Pages are built as they're first opened (show_section).
     let stack = gtk::Stack::new();
     stack.set_transition_type(gtk::StackTransitionType::Crossfade);
+    stack.set_transition_duration(160);
     stack.set_hexpand(true);
-    stack.add_named(&wifi_page(), Some("wifi"));
-    stack.add_named(&network_page(), Some("network"));
-    stack.add_named(&bluetooth_page(), Some("bluetooth"));
-    stack.add_named(&sound_page(), Some("sound"));
-    stack.add_named(&display_page(), Some("display"));
-    stack.add_named(&appearance_page(), Some("appearance"));
-    stack.add_named(&power_page(), Some("power"));
-    stack.add_named(&ai_page(), Some("ai"));
-    stack.add_named(&notifications_page(), Some("notifications"));
-    stack.add_named(&apps_page(), Some("apps"));
-    stack.add_named(&keyboard_page(), Some("keyboard"));
-    stack.add_named(&pointer_page(), Some("pointer"));
-    stack.add_named(&printers_page(), Some("printers"));
-    stack.add_named(&time_page(), Some("time"));
-    stack.add_named(&language_page(), Some("language"));
-    stack.add_named(&accounts_page(), Some("accounts"));
-    stack.add_named(&privacy_page(), Some("privacy"));
-    stack.add_named(&accessibility_page(), Some("accessibility"));
-    stack.add_named(&storage_page(), Some("storage"));
-    stack.add_named(&updates_page(), Some("updates"));
-    stack.add_named(&about_page(), Some("about"));
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
-    side.set_size_request(260, -1);
+    side.set_size_request(220, -1);
     let search = gtk::SearchEntry::new();
     search.set_placeholder_text(Some("search settings"));
     search.add_css_class("search");
     let nav = gtk::ListBox::new();
     nav.add_css_class("nav");
-    for (_, title) in SECTIONS {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-        let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        dot.add_css_class("dot");
-        dot.set_valign(gtk::Align::Center);
-        row.append(&dot);
+    for (_, title, glyph, _) in SECTIONS {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let tile = crate::common::icon(glyph, &["nav-icon"]);
+        tile.set_valign(gtk::Align::Center);
+        row.append(&tile);
         row.append(&label(title, &["nav-title"]));
         nav.append(&row);
     }
@@ -137,7 +133,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
         let stack = stack.clone();
         nav.connect_row_selected(move |_, row| {
             if let Some(row) = row {
-                stack.set_visible_child_name(SECTIONS[row.index() as usize].0);
+                show_section(&stack, row.index() as usize);
             }
         });
     }
@@ -167,7 +163,18 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     let root = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     root.append(&side);
     root.append(&stack);
-    window.set_child(Some(&root));
+    let overlay = gtk::Overlay::new();
+    overlay.set_child(Some(&root));
+    let controls = gtk::WindowControls::new(gtk::PackType::End);
+    controls.set_halign(gtk::Align::End);
+    controls.set_valign(gtk::Align::Start);
+    controls.set_margin_top(10);
+    controls.set_margin_end(10);
+    overlay.add_overlay(&controls);
+    // Drag the window by any empty part of it.
+    let handle = gtk::WindowHandle::new();
+    handle.set_child(Some(&overlay));
+    window.set_child(Some(&handle));
     (window, stack, nav)
 }
 
@@ -626,7 +633,9 @@ fn bluetooth_page() -> gtk::ScrolledWindow {
     mine.set_selection_mode(gtk::SelectionMode::None);
     let near_head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let near_caption = caption("nearby");
-    let spinner = gtk::Spinner::new();
+    let spinner = crate::common::spinner(14);
+    spinner.set_valign(gtk::Align::Center);
+    spinner.set_visible(false);
     let again = gtk::Button::with_label("look again");
     again.add_css_class("link");
     again.add_css_class("accent");
@@ -668,12 +677,12 @@ fn bluetooth_page() -> gtk::ScrolledWindow {
     let scan: Rc<dyn Fn()> = {
         let (near, spinner, reload, error) = (near.clone(), spinner.clone(), reload.clone(), error.clone());
         Rc::new(move || {
-            spinner.start();
+            spinner.set_visible(true);
             let (near, spinner, reload, error) = (near.clone(), spinner.clone(), reload.clone(), error.clone());
             background(
                 || bt::scan(8),
                 move |found| {
-                    spinner.stop();
+                    spinner.set_visible(false);
                     clear(&near);
                     if found.is_empty() {
                         let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);

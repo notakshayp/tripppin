@@ -5,13 +5,13 @@
   "control-center-layer": "top",
   "layer-shell": true,
   "cssPriority": "user",
-  "control-center-margin-top": 10,
+  "control-center-margin-top": 8,
   "control-center-margin-bottom": 10,
   "control-center-margin-right": 12,
   "control-center-margin-left": 0,
-  "control-center-width": 400,
-  "notification-window-width": 380,
-  "notification-icon-size": 36,
+  "control-center-width": 360,
+  "notification-window-width": 340,
+  "notification-icon-size": 32,
   "notification-body-image-height": 120,
   "notification-body-image-width": 240,
   "notification-inline-replies": true,
@@ -19,10 +19,11 @@
   "timeout": 6,
   "timeout-low": 4,
   "timeout-critical": 0,
-  "fit-to-screen": true,
+  "fit-to-screen": false,
+  "control-center-height": -1,
   "keyboard-shortcuts": true,
   "image-visibility": "when-available",
-  "transition-time": 200,
+  "transition-time": 260,
   "hide-on-clear": false,
   "hide-on-action": true,
   "script-fail-notify": true,
@@ -31,40 +32,40 @@
     "title": { "text": "quick settings", "clear-all-button": true, "button-text": "clear all" },
     "dnd": { "text": "do not disturb" },
     "buttons-grid": {
-      "buttons-per-row": 3,
+      "buttons-per-row": 2,
       "actions": [
         {
-          "label": "wi-fi",
+          "label": "\ue1ae   wi-fi",
           "type": "toggle",
           "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && nmcli radio wifi on || nmcli radio wifi off'",
           "update-command": "sh -c '[ \"$(nmcli radio wifi)\" = enabled ] && echo true || echo false'"
         },
         {
-          "label": "bluetooth",
+          "label": "\ue05c   bluetooth",
           "type": "toggle",
           "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && bluetoothctl power on || bluetoothctl power off'",
           "update-command": "sh -c 'bluetoothctl show | grep -q \"Powered: yes\" && echo true || echo false'"
         },
         {
-          "label": "airplane",
+          "label": "\ue1de   airplane",
           "type": "toggle",
           "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && nmcli radio all off || nmcli radio all on'",
           "update-command": "sh -c '[ \"$(nmcli radio wifi)\" = disabled ] && [ \"$(nmcli radio wwan)\" != enabled ] && echo true || echo false'"
         },
         {
-          "label": "night light",
+          "label": "\ue11e   night light",
           "type": "toggle",
           "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && (pgrep -x wlsunset || setsid wlsunset -T 4500 -t 3500 >/dev/null 2>&1 &) || pkill -x wlsunset'",
           "update-command": "sh -c 'pgrep -x wlsunset >/dev/null && echo true || echo false'"
         },
-        { "label": "screenshot", "command": "sh -c 'swaync-client -cp; sleep 0.4; grim -g \"$(slurp)\" - | swappy -f -'" },
-        { "label": "lock", "command": "sh -c 'swaync-client -cp; tripppin-ui lock'" },
-        { "label": "settings", "command": "sh -c 'swaync-client -cp; tripppin-ui settings'" },
-        { "label": "power", "command": "sh -c 'swaync-client -cp; tripppin-power'" }
+        { "label": "\ue14e   screenshot", "command": "sh -c 'swaync-client -cp; sleep 0.4; grim -g \"$(slurp)\" - | swappy -f -'" },
+        { "label": "\ue10b   lock", "command": "sh -c 'swaync-client -cp; tripppin-ui lock'" },
+        { "label": "\ue154   settings", "command": "sh -c 'swaync-client -cp; tripppin-ui settings'" },
+        { "label": "\ue140   power", "command": "sh -c 'swaync-client -cp; tripppin-power'" }
       ]
     },
-    "volume": { "label": "vol", "show-per-app": true, "show-per-app-label": true },
-    "backlight": { "label": "light", "min": 5 },
-    "mpris": { "image-size": 56, "image-radius": 12 }
+    "volume": { "label": "\ue1ab", "show-per-app": true, "show-per-app-label": true },
+    "backlight": { "label": "\ue178", "min": 5 },
+    "mpris": { "image-size": 48, "image-radius": 10 }
   }
 }

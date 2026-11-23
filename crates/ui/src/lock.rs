@@ -388,6 +388,9 @@ fn build_preview(app: &gtk::Application) {
     }
     window.add_controller(keys);
     window.present();
+    if let Some(c) = window.child() {
+        crate::common::play(&c, "fade");
+    }
 }
 
 #[cfg(test)]

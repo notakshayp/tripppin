@@ -34,6 +34,8 @@ pub struct Output {
     pub current: Option<usize>,
     pub scale: f64,
     pub transform: String,
+    /// Width and height in millimetres, when the screen reports them.
+    pub physical: Option<(u32, u32)>,
 }
 
 /// Parses `niri msg -j outputs`. Modes are listed largest first, one per size and rate.
@@ -65,6 +67,10 @@ pub fn parse_outputs(json: &str) -> Vec<Output> {
                 current: o["current_mode"].as_u64().map(|i| i as usize),
                 scale: o["logical"]["scale"].as_f64().unwrap_or(1.0),
                 transform: o["logical"]["transform"].as_str().unwrap_or("Normal").to_lowercase(),
+                physical: o["physical_size"]
+                    .as_array()
+                    .and_then(|p| Some((p.first()?.as_u64()? as u32, p.get(1)?.as_u64()? as u32)))
+                    .filter(|&(w, h)| w > 0 && h > 0),
             }
         })
         .collect();
@@ -89,6 +95,35 @@ fn niri(args: &[&str]) -> Result<(), String> {
 /// niri's names for rotations, from the words we show.
 pub const ROTATIONS: [(&str, &str); 4] = [("normal", "normal"), ("90°", "90"), ("180°", "180"), ("270°", "270")];
 pub const SCALES: [f64; 6] = [1.0, 1.25, 1.5, 1.75, 2.0, 2.5];
+
+/// The scale that keeps text crisp: a whole number, so every pixel lines up. 2 for
+/// high-density screens with room to spare (a 13" 2560×1600 laptop, a 27" 4K or 5K), else
+/// 1, which suits ordinary laptops and monitors and keeps the desktop compact. niri's own
+/// guess is often fractional (1.25, 1.5), which blurs text and makes everything larger.
+pub fn crisp_scale(o: &Output) -> f64 {
+    let Some(mode) = o.current.and_then(|i| o.modes.get(i)) else { return 1.0 };
+    let dpi = o.physical.map(|(w, _)| f64::from(mode.width) / (f64::from(w) / 25.4));
+    match dpi {
+        Some(dpi) if dpi >= 150.0 && mode.height >= 1440 => 2.0,
+        _ => 1.0,
+    }
+}
+
+/// Screens the person has set up in Settings → Display keep their choice.
+fn remembered(name: &str) -> bool {
+    std::fs::read_to_string(config_dir().join("tripppin-displays.kdl"))
+        .is_ok_and(|t| t.contains(&format!("output \"{name}\"")))
+}
+
+/// At login: every screen the person hasn't set up gets its crisp scale.
+pub fn use_crisp_scales() {
+    for o in outputs() {
+        let scale = crisp_scale(&o);
+        if !remembered(&o.name) && (o.scale - scale).abs() > 0.01 {
+            let _ = niri(&["msg", "output", &o.name, "scale", &format!("{scale}")]);
+        }
+    }
+}
 
 /// Applies a change now and remembers it for next time.
 pub fn apply(o: &Output, mode: &Mode, scale: f64, transform: &str) -> Result<(), String> {
@@ -221,11 +256,35 @@ mod tests {
         assert_eq!(o.current, Some(0));
         assert_eq!(o.scale, 1.25);
         assert_eq!(o.transform, "normal");
+        assert_eq!(o.physical, None);
+        assert_eq!(crisp_scale(o), 1.0);
         assert_eq!(o.modes[0].label(), "1280×800 · 60 hz");
         assert_eq!(o.modes[0].spec(), "1280x800@59.995");
         assert_eq!(
             output_block("Virtual-1", &o.modes[1], 1.5, "90"),
             "output \"Virtual-1\" {\n    mode \"1920x1080@60.000\"\n    scale 1.5\n    transform \"90\"\n}\n"
         );
+    }
+
+    #[test]
+    fn picks_whole_number_scales() {
+        let screen = |w, h, mm: (u32, u32)| Output {
+            name: "eDP-1".into(),
+            title: "screen".into(),
+            modes: vec![Mode { width: w, height: h, refresh: 60000, preferred: true }],
+            current: Some(0),
+            scale: 1.25,
+            transform: "normal".into(),
+            physical: Some(mm),
+        };
+        // A 14" 1920×1200 laptop, a 24" 1080p monitor: 1.
+        assert_eq!(crisp_scale(&screen(1920, 1200, (302, 189))), 1.0);
+        assert_eq!(crisp_scale(&screen(1920, 1080, (527, 296))), 1.0);
+        // A 13" 2560×1600 laptop, a 27" 4K or 5K: 2.
+        assert_eq!(crisp_scale(&screen(2560, 1600, (286, 179))), 2.0);
+        assert_eq!(crisp_scale(&screen(3840, 2160, (597, 336))), 2.0);
+        assert_eq!(crisp_scale(&screen(5120, 2880, (597, 336))), 2.0);
+        // A 27" 1440p monitor: 1.
+        assert_eq!(crisp_scale(&screen(2560, 1440, (597, 336))), 1.0);
     }
 }

@@ -243,6 +243,9 @@ fn build(app: &gtk::Application, windows: Vec<Window>) -> Rc<Switcher> {
     }
     window.add_controller(keys);
     window.present();
+    if let Some(c) = window.child() {
+        crate::common::play(&c, "pop");
+    }
     s
 }
 

@@ -1,10 +1,11 @@
 // The tripppin bar: a floating pill. Left: logo, workspaces, the focused app.
-// Centre: the date. Right: what the orb is doing, network, volume, battery.
+// Centre: the date. Right: what the orb is doing, then icons: network, bluetooth, volume,
+// battery, notifications, power (Lucide, from the icon font, in Pango spans).
 {
     "layer": "top",
     "position": "top",
-    "height": 38,
-    "margin-top": 10,
+    "height": 32,
+    "margin-top": 8,
     "margin-left": 12,
     "margin-right": 12,
     "spacing": 0,
@@ -12,7 +13,7 @@
     "modules-center": ["custom/clock"],
     "modules-right": ["custom/recording", "privacy", "custom/orb", "niri/language", "network", "bluetooth", "pulseaudio", "battery", "tray", "custom/notifications", "custom/power"],
 
-    "image#logo": { "path": "/usr/share/tripppin/logo-bar.png", "size": 18 },
+    "image#logo": { "path": "/usr/share/tripppin/logo-bar.png", "size": 16 },
     "niri/workspaces": { "format": "{icon}", "format-icons": { "default": "", "active": "" } },
     "niri/window": {
         "format": "{app_id}",
@@ -69,11 +70,11 @@
         "on-click": "tripppin-ui settings keyboard"
     },
     "bluetooth": {
-        "format": "bt",
+        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05c</span>",
         "format-disabled": "",
         "format-off": "",
         "format-no-controller": "",
-        "format-connected": "bt {num_connections}",
+        "format-connected": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue1b8</span>",
         "tooltip-format-connected": "{device_enumerate}",
         "tooltip-format-enumerate-connected": "{device_alias}",
         "on-click": "tripppin-ui settings bluetooth"
@@ -84,16 +85,19 @@
         "spacing": 8
     },
     "network": {
-        "format-wifi": "{essid}",
-        "format-ethernet": "wired",
-        "format-disconnected": "offline",
-        "tooltip": false,
+        "format-wifi": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue1ae</span>",
+        "format-ethernet": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue620</span>",
+        "format-disconnected": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue1af</span>",
+        "tooltip-format-wifi": "{essid} · {signalStrength}%",
+        "tooltip-format-ethernet": "wired",
+        "tooltip-format-disconnected": "offline",
         "on-click": "swaync-client -t -sw"
     },
     "pulseaudio": {
-        "format": "vol {volume}",
-        "format-muted": "muted",
-        "tooltip": false,
+        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'>{icon}</span>",
+        "format-muted": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue1ac</span>",
+        "format-icons": { "default": ["\ue1a9", "\ue1aa", "\ue1ab"] },
+        "tooltip-format": "volume {volume}%",
         "on-click": "swaync-client -t -sw",
         "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
@@ -102,24 +106,25 @@
         "return-type": "json",
         "format": "{icon}",
         "format-icons": {
-            "notification": "●", "none": "○",
-            "dnd-notification": "◐", "dnd-none": "◌",
-            "inhibited-notification": "●", "inhibited-none": "○",
-            "dnd-inhibited-notification": "◐", "dnd-inhibited-none": "◌"
+            "notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue42b</span>", "none": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue059</span>",
+            "dnd-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05a</span>", "dnd-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05a</span>",
+            "inhibited-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue42b</span>", "inhibited-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue059</span>",
+            "dnd-inhibited-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05a</span>", "dnd-inhibited-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05a</span>"
         },
         "tooltip": false,
-        "escape": true,
+        "escape": false,
         "on-click": "swaync-client -t -sw",
         "on-click-right": "swaync-client -d -sw"
     },
     "custom/power": {
-        "format": "⏻",
+        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue140</span>",
         "tooltip": false,
         "on-click": "tripppin-power"
     },
     "battery": {
-        "format": "{capacity}%",
-        "format-charging": "{capacity}% +",
+        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'>{icon}</span> {capacity}%",
+        "format-charging": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue054</span> {capacity}%",
+        "format-icons": ["\ue056", "\ue057", "\ue055"],
         "tooltip": false
     }
 }

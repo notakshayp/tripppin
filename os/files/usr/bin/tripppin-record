@@ -17,4 +17,4 @@ else
 fi
 pid=$!
 wait "$pid"
-notify-send -a recording "recording saved" "$(basename "$file") in videos/recordings"
+notify-send -a recording -i media-record "recording saved" "$(basename "$file") in videos/recordings"

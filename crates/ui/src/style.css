@@ -1,4 +1,7 @@
-/* The Tripppin screens, from the design mockup. Ink, paper, forest green; Inter and DM Mono. */
+/* The Tripppin screens, from the design mockup. Ink, paper, forest green; Inter and DM Mono.
+   Sizes are for scale 1 and kept compact. Motion: one curve everywhere,
+   cubic-bezier(0.32, 0.72, 0, 1) (a fast start settling softly, like a critically damped
+   spring), 160-360 ms; things grow from where they come from and nothing waits on motion. */
 
 window.tripppin,
 .tripppin {
@@ -17,47 +20,79 @@ window.clear {
 /* ---- the orb ------------------------------------------------------------ */
 
 button.orb {
-    min-width: 64px;
-    min-height: 64px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0;
     border-radius: 9999px;
     border: 1px solid #2a3632;
     background-image: radial-gradient(circle at 50% 38%, #1f6b45 0%, #102019 60%, #0d1211 100%);
-    box-shadow: 0 0 0 6px rgba(87, 217, 154, 0.06), 0 0 34px rgba(87, 217, 154, 0.35), 0 12px 30px rgba(0, 0, 0, 0.5);
-    transition: box-shadow 400ms ease, border-color 400ms ease;
+    box-shadow: 0 0 0 4px rgba(87, 217, 154, 0.05), 0 0 22px rgba(87, 217, 154, 0.28), 0 8px 20px rgba(0, 0, 0, 0.5);
+    transition: box-shadow 400ms cubic-bezier(0.32, 0.72, 0, 1), border-color 400ms ease,
+        transform 300ms cubic-bezier(0.32, 0.72, 0, 1), opacity 300ms ease;
+}
+
+button.orb:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 5px rgba(87, 217, 154, 0.08), 0 0 30px rgba(87, 217, 154, 0.4), 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+button.orb:active {
+    transform: scale(0.92);
+}
+
+/* Tucked away: a small dim dot in its corner until the pointer comes near. */
+button.orb.tucked {
+    min-width: 18px;
+    min-height: 18px;
+    opacity: 0.55;
+    box-shadow: 0 0 10px rgba(87, 217, 154, 0.25);
+}
+
+button.orb.tucked:hover {
+    opacity: 1;
+}
+
+button.orb.dragging {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 6px rgba(87, 217, 154, 0.10), 0 0 36px rgba(87, 217, 154, 0.45), 0 16px 30px rgba(0, 0, 0, 0.55);
 }
 
 button.orb.working {
     border: 2px solid #57d99a;
     background-image: radial-gradient(circle at 50% 38%, #2a8a5c 0%, #123526 60%, #0d1211 100%);
-    box-shadow: 0 0 0 8px rgba(87, 217, 154, 0.10), 0 0 50px rgba(87, 217, 154, 0.55);
+    animation: breathe 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+    from { box-shadow: 0 0 0 4px rgba(87, 217, 154, 0.08), 0 0 22px rgba(87, 217, 154, 0.35); }
+    to { box-shadow: 0 0 0 8px rgba(87, 217, 154, 0.14), 0 0 40px rgba(87, 217, 154, 0.6); }
 }
 
 .orb-hint {
     font-family: "DM Mono", monospace;
-    font-size: 13px;
+    font-size: 11px;
     color: #5c6b65;
 }
 
 .backdrop {
-    background: rgba(5, 8, 7, 0.45);
+    background: rgba(5, 8, 7, 0.28);
 }
 
 .ask-pill {
-    min-height: 76px;
-    padding: 0 12px;
-    border-radius: 38px;
+    min-height: 54px;
+    padding: 0 8px;
+    border-radius: 27px;
     background: #141b19;
     border: 1px solid #2f3d38;
-    box-shadow: 0 0 0 1px rgba(87, 217, 154, 0.15), 0 0 60px rgba(87, 217, 154, 0.18), 0 30px 70px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 0 1px rgba(87, 217, 154, 0.15), 0 0 44px rgba(87, 217, 154, 0.16), 0 24px 56px rgba(0, 0, 0, 0.6);
 }
 
 .ask-orb {
-    min-width: 52px;
-    min-height: 52px;
+    min-width: 38px;
+    min-height: 38px;
     border-radius: 9999px;
     background-image: radial-gradient(circle at 50% 38%, #1f6b45 0%, #102019 60%, #0d1211 100%);
-    box-shadow: 0 0 24px rgba(87, 217, 154, 0.45);
+    box-shadow: 0 0 18px rgba(87, 217, 154, 0.4);
 }
 
 entry.ask {
@@ -65,7 +100,7 @@ entry.ask {
     border: none;
     outline: none;
     box-shadow: none;
-    font-size: 21px;
+    font-size: 17px;
     font-weight: 500;
     color: #f2f5ef;
     caret-color: #57d99a;
@@ -76,8 +111,8 @@ entry.ask > text > placeholder {
 }
 
 button.send {
-    min-width: 48px;
-    min-height: 48px;
+    min-width: 38px;
+    min-height: 38px;
     padding: 0;
     border-radius: 9999px;
     border: none;
@@ -87,14 +122,14 @@ button.send {
 }
 
 button.chip {
-    min-height: 36px;
-    padding: 0 16px;
-    border-radius: 18px;
+    min-height: 28px;
+    padding: 0 12px;
+    border-radius: 14px;
     border: 1px solid #2a3632;
     background: rgba(20, 27, 25, 0.9);
     box-shadow: none;
     color: #c9d4ce;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
 }
 
@@ -105,21 +140,21 @@ button.chip:hover {
 
 .hint {
     font-family: "DM Mono", monospace;
-    font-size: 12px;
+    font-size: 11px;
     color: #6b7a74;
 }
 
 .card {
-    padding: 22px;
-    border-radius: 22px;
+    padding: 16px 18px;
+    border-radius: 18px;
     background: #141b19;
     border: 1px solid #2f3d38;
-    box-shadow: 0 0 50px rgba(87, 217, 154, 0.12), 0 30px 70px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 40px rgba(87, 217, 154, 0.10), 0 24px 56px rgba(0, 0, 0, 0.6);
 }
 
 .caption {
     font-family: "DM Mono", monospace;
-    font-size: 12px;
+    font-size: 11px;
     color: #8a9a93;
 }
 
@@ -128,12 +163,12 @@ button.chip:hover {
 }
 
 .asked {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 600;
 }
 
 .step-title {
-    font-size: 14px;
+    font-size: 13px;
     color: #c9d4ce;
 }
 
@@ -144,18 +179,25 @@ button.chip:hover {
 
 .step-detail {
     font-family: "DM Mono", monospace;
-    font-size: 12px;
+    font-size: 11px;
     color: #6b7a74;
 }
 
 .tick {
-    min-width: 18px;
-    min-height: 18px;
+    min-width: 16px;
+    min-height: 16px;
     border-radius: 9999px;
     background: #1f6b45;
     color: #f2f5ef;
-    font-size: 11px;
-    font-weight: 800;
+    font-family: lucide;
+    font-size: 10px;
+    animation: tick-in 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* The tick lands with a small overshoot, the one playful spring in the system. */
+@keyframes tick-in {
+    from { transform: scale(0.4); opacity: 0; }
+    to { transform: none; opacity: 1; }
 }
 
 .tick.failed {
@@ -167,8 +209,12 @@ spinner {
     color: #57d99a;
 }
 
+.spinner {
+    margin: 1px;
+}
+
 .answer {
-    font-size: 15px;
+    font-size: 14px;
     color: #f2f5ef;
 }
 
@@ -178,14 +224,14 @@ spinner {
 }
 
 button.stop {
-    min-height: 36px;
-    padding: 0 18px;
-    border-radius: 18px;
+    min-height: 28px;
+    padding: 0 14px;
+    border-radius: 14px;
     background: #2a1d14;
     border: 1px solid #5a3a22;
     box-shadow: none;
     color: #f4d6bd;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
 }
 
@@ -195,7 +241,7 @@ button.link {
     border: none;
     box-shadow: none;
     color: #9fb0a8;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 400;
 }
 
@@ -204,26 +250,26 @@ button.link:hover {
 }
 
 button.primary {
-    min-height: 52px;
-    padding: 0 30px;
-    border-radius: 26px;
+    min-height: 40px;
+    padding: 0 22px;
+    border-radius: 20px;
     border: none;
     box-shadow: none;
     background: #57d99a;
     color: #0d1211;
-    font-size: 17px;
+    font-size: 14px;
     font-weight: 600;
 }
 
 button.secondary {
-    min-height: 46px;
-    padding: 0 24px;
-    border-radius: 23px;
+    min-height: 36px;
+    padding: 0 18px;
+    border-radius: 18px;
     border: none;
     box-shadow: none;
     background: #1d2825;
     color: #f2f5ef;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
 }
 
@@ -376,30 +422,37 @@ window.settings {
     background: #0d1211;
 }
 
-headerbar.bare {
-    min-height: 0;
-    padding: 8px 10px 0;
-    background: #0d1211;
-    border: none;
+window.settings windowcontrols button {
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0;
+    border-radius: 9999px;
+    background: #1d2825;
+    color: #b7c3bd;
     box-shadow: none;
 }
 
+window.settings windowcontrols button:hover {
+    background: #2a3632;
+    color: #f2f5ef;
+}
+
 .sidebar {
-    padding: 22px 14px;
+    padding: 14px 10px;
     background: #0b100f;
     border-right: 1px solid #1d2825;
 }
 
 entry.search,
 searchentry.search {
-    min-height: 40px;
-    padding: 0 12px;
-    border-radius: 12px;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 9px;
     background: #141b19;
     border: 1px solid #222d2a;
     box-shadow: none;
     color: #f2f5ef;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 list.nav {
@@ -407,12 +460,29 @@ list.nav {
 }
 
 list.nav > row {
-    min-height: 40px;
-    padding: 0 12px;
-    margin-bottom: 2px;
-    border-radius: 12px;
+    min-height: 30px;
+    padding: 0 8px;
+    margin-bottom: 1px;
+    border-radius: 8px;
     background: transparent;
     outline: none;
+    transition: background 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Each section's icon on a small tile: ink, then green when it's the open section. */
+.nav-icon {
+    min-width: 22px;
+    min-height: 22px;
+    border-radius: 6px;
+    background: #1d2825;
+    color: #c9d4ce;
+    font-size: 13px;
+    transition: background 220ms cubic-bezier(0.32, 0.72, 0, 1), color 220ms ease;
+}
+
+list.nav > row:selected .nav-icon {
+    background: #1f6b45;
+    color: #f2f5ef;
 }
 
 list.nav > row:hover {
@@ -435,7 +505,7 @@ list.nav > row:selected .dot {
 }
 
 .nav-title {
-    font-size: 15px;
+    font-size: 13px;
     color: #c9d4ce;
 }
 
@@ -445,27 +515,28 @@ list.nav > row:selected .nav-title {
 }
 
 .page {
-    padding: 30px 36px;
+    padding: 20px 28px;
 }
 
 .page-title {
-    font-size: 32px;
+    font-size: 24px;
     font-weight: 800;
-    letter-spacing: -1.2px;
+    letter-spacing: -0.8px;
 }
 
 .page-sub {
     font-family: "DM Mono", monospace;
-    font-size: 13px;
+    font-size: 11px;
     color: #8a9a93;
 }
 
 switch {
-    min-width: 48px;
-    min-height: 26px;
+    min-width: 38px;
+    min-height: 22px;
     border-radius: 9999px;
     border: none;
     background: #1d2825;
+    transition: background 240ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 switch:checked {
@@ -473,17 +544,17 @@ switch:checked {
 }
 
 switch > slider {
-    min-width: 22px;
-    min-height: 22px;
+    min-width: 18px;
+    min-height: 18px;
     margin: 2px;
     border-radius: 9999px;
     background: #f2f5ef;
     border: none;
-    box-shadow: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 list.list-card {
-    border-radius: 16px;
+    border-radius: 12px;
     background: #141b19;
     border: 1px solid #222d2a;
 }
@@ -499,8 +570,8 @@ list.list-card > row:last-child {
 }
 
 .net-row {
-    min-height: 56px;
-    padding: 0 18px;
+    min-height: 42px;
+    padding: 0 14px;
 }
 
 .net-row.connected {
@@ -508,12 +579,12 @@ list.list-card > row:last-child {
 }
 
 .row-title {
-    font-size: 16px;
+    font-size: 13px;
     color: #d9e1dd;
 }
 
 .row-title-strong {
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 600;
     color: #f2f5ef;
 }
@@ -524,7 +595,7 @@ list.list-card > row:last-child {
 
 .row-sub {
     font-family: "DM Mono", monospace;
-    font-size: 12px;
+    font-size: 11px;
     color: #6b7a74;
 }
 
@@ -549,14 +620,15 @@ button.link.accent {
 
 entry.field,
 passwordentry.field {
-    min-height: 44px;
-    padding: 0 14px;
-    border-radius: 12px;
+    min-height: 32px;
+    padding: 0 10px;
+    border-radius: 8px;
     background: #0b100f;
     border: 1px solid #2a3632;
     box-shadow: none;
     color: #f2f5ef;
-    font-size: 16px;
+    font-size: 13px;
+    transition: border-color 180ms ease;
 }
 
 entry.field:focus-within,
@@ -565,20 +637,20 @@ passwordentry.field:focus-within {
 }
 
 button.pill {
-    min-height: 44px;
-    padding: 0 22px;
-    border-radius: 22px;
+    min-height: 32px;
+    padding: 0 16px;
+    border-radius: 16px;
     border: none;
     box-shadow: none;
     background: #57d99a;
     color: #0d1211;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
 }
 
 button.small-card {
-    padding: 14px 16px;
-    border-radius: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
     background: #141b19;
     border: 1px solid #222d2a;
     box-shadow: none;
@@ -589,25 +661,25 @@ button.small-card:hover {
 }
 
 .card-title {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
     color: #f2f5ef;
 }
 
 .card-sub {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 400;
     color: #8a9a93;
 }
 
 .dev-row {
-    min-height: 64px;
+    min-height: 48px;
 }
 
 .dev-icon {
-    min-width: 36px;
-    min-height: 36px;
-    border-radius: 10px;
+    min-width: 30px;
+    min-height: 30px;
+    border-radius: 8px;
     background: #1d2825;
 }
 
@@ -664,14 +736,14 @@ scale.level slider {
 }
 
 dropdown.choice > button {
-    min-height: 36px;
-    padding: 0 12px;
-    border-radius: 12px;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 8px;
     background: #0f1513;
     border: 1px solid #2a3632;
     box-shadow: none;
     color: #f2f5ef;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 dropdown.choice > button:hover {
@@ -686,7 +758,7 @@ dropdown.choice popover > contents {
 }
 
 dropdown.choice popover listview > row {
-    min-height: 34px;
+    min-height: 28px;
     padding: 0 10px;
     border-radius: 10px;
     color: #d9e1dd;
@@ -719,18 +791,18 @@ picture.wall-pic {
 
 .row-value {
     font-family: "DM Mono", monospace;
-    font-size: 14px;
+    font-size: 12px;
     color: #f2f5ef;
 }
 
 button.segment {
-    min-height: 48px;
-    border-radius: 14px;
+    min-height: 34px;
+    border-radius: 10px;
     background: #141b19;
     border: 1px solid #222d2a;
     box-shadow: none;
     color: #c9d4ce;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 500;
 }
 
@@ -770,8 +842,8 @@ frame.avatar-pic {
 }
 
 .inline-form {
-    padding: 18px;
-    border-radius: 16px;
+    padding: 14px;
+    border-radius: 12px;
     background: #141b19;
     border: 1px solid #222d2a;
 }
@@ -792,7 +864,7 @@ frame.avatar-pic {
 }
 
 .calendar-day {
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 700;
     color: #f2f5ef;
     letter-spacing: -0.5px;
@@ -809,7 +881,7 @@ calendar.month {
     background: transparent;
     border: none;
     color: #d9e1dd;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 calendar.month > header {
@@ -860,7 +932,7 @@ calendar.month > grid > label.day-number:selected {
 /* ---- shortcuts cheat sheet -------------------------------------------- */
 
 .keys-card {
-    padding: 34px 40px 28px;
+    padding: 26px 30px 22px;
     border-radius: 24px;
     background: #101614;
     border: 1px solid #2a3632;
@@ -868,7 +940,7 @@ calendar.month > grid > label.day-number:selected {
 }
 
 .keys-title {
-    font-size: 30px;
+    font-size: 24px;
     font-weight: 800;
     letter-spacing: -0.8px;
     color: #f2f5ef;
@@ -876,12 +948,12 @@ calendar.month > grid > label.day-number:selected {
 
 .keys-combo {
     font-family: "DM Mono", monospace;
-    font-size: 14px;
+    font-size: 12px;
     color: #57d99a;
 }
 
 .keys-what {
-    font-size: 14px;
+    font-size: 13px;
     color: #c9d4ce;
 }
 
@@ -985,14 +1057,14 @@ button.media-button:hover {
 }
 
 .welcome-title {
-    font-size: 34px;
+    font-size: 28px;
     font-weight: 800;
     letter-spacing: -1px;
     color: #f2f5ef;
 }
 
 .welcome-words {
-    font-size: 17px;
+    font-size: 14px;
     line-height: 1.4;
     color: #c9d4ce;
 }
@@ -1012,10 +1084,10 @@ button.media-button:hover {
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {
-    min-width: 300px;
-    min-height: 56px;
-    padding: 0 22px;
-    border-radius: 28px;
+    min-width: 240px;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 22px;
     background: rgba(20, 27, 25, 0.96);
     border: 1px solid #2f3d38;
     box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
@@ -1024,7 +1096,7 @@ button.media-button:hover {
 .osd-name,
 .osd-value {
     font-family: "DM Mono", monospace;
-    font-size: 13px;
+    font-size: 12px;
     color: #9fb0a8;
 }
 
@@ -1051,7 +1123,7 @@ progressbar.osd-bar.muted progress {
 /* ---- first boot --------------------------------------------------------- */
 
 .fb-card {
-    padding: 40px;
+    padding: 30px;
     border-radius: 24px;
     background: #141b19;
     border: 1px solid #2a3632;
@@ -1062,13 +1134,13 @@ window.fb {
 }
 
 .fb-title {
-    font-size: 32px;
+    font-size: 26px;
     font-weight: 800;
     letter-spacing: -1.2px;
 }
 
 .body {
-    font-size: 17px;
+    font-size: 14px;
     color: #c9d4ce;
 }
 
@@ -1094,3 +1166,95 @@ window.fb {
 window.dim {
     background: #000000;
 }
+
+/* ---- icons --------------------------------------------------------------- */
+
+.icon {
+    font-family: lucide;
+    font-size: 15px;
+}
+
+.osd-icon {
+    font-size: 17px;
+    color: #f2f5ef;
+}
+
+button.icon-button {
+    min-width: 26px;
+    min-height: 26px;
+    padding: 0;
+    border-radius: 9999px;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    color: #8a9a93;
+    font-family: lucide;
+    font-size: 14px;
+}
+
+button.icon-button:hover {
+    background: rgba(242, 245, 239, 0.08);
+    color: #f2f5ef;
+}
+
+/* ---- motion -------------------------------------------------------------- */
+
+/* Everything you can press answers at once: colours ease, and it gives a little. */
+button,
+switch,
+entry,
+dropdown > button,
+list.list-card > row {
+    transition: background 200ms cubic-bezier(0.32, 0.72, 0, 1), border-color 200ms cubic-bezier(0.32, 0.72, 0, 1),
+        color 200ms ease, box-shadow 240ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease;
+}
+
+button:active,
+button.chip:active,
+button.small-card:active,
+button.segment:active,
+button.wall-tile:active {
+    transform: scale(0.96);
+}
+
+button.chip:hover,
+button.small-card:hover,
+button.wall-tile:hover {
+    transform: translateY(-1px);
+}
+
+/* Entrances, played by common::play: pop grows from slightly small (pop-ups, the ask bar),
+   rise comes up a few pixels (pages, steps, cards above the orb), drop comes down (things
+   under the bar), fade just fades (the dim behind the ask bar). Two copies of each so they
+   can play again. */
+@keyframes pop-a { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes pop-b { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes rise-a { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rise-b { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes drop-a { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes drop-b { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes fade-a { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-b { from { opacity: 0; } to { opacity: 1; } }
+
+.pop-a { animation: pop-a 340ms cubic-bezier(0.32, 0.72, 0, 1); }
+.pop-b { animation: pop-b 340ms cubic-bezier(0.32, 0.72, 0, 1); }
+.rise-a { animation: rise-a 360ms cubic-bezier(0.32, 0.72, 0, 1); }
+.rise-b { animation: rise-b 360ms cubic-bezier(0.32, 0.72, 0, 1); }
+.drop-a { animation: drop-a 300ms cubic-bezier(0.32, 0.72, 0, 1); }
+.drop-b { animation: drop-b 300ms cubic-bezier(0.32, 0.72, 0, 1); }
+.fade-a { animation: fade-a 220ms ease-out; }
+.fade-b { animation: fade-b 220ms ease-out; }
+
+/* Leaving: a quick fade and shrink toward where it came from, then the window hides. */
+@keyframes leave {
+    to { opacity: 0; transform: scale(0.94); }
+}
+
+.leave {
+    animation: leave 170ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.origin-right-bottom { transform-origin: right bottom; }
+.origin-left-bottom { transform-origin: left bottom; }
+.origin-right-top { transform-origin: right top; }
+.origin-left-top { transform-origin: left top; }

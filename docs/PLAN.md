@@ -99,6 +99,7 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 - [x] Every app in our style: GTK 3 and 4 colours, a Tripppin icon theme (green folders), Qt through qt6ct, Flatpak overrides, a text colour scheme
 - [x] Apps: Thunar, Text Editor, Loupe, Papers, Calculator, Celluloid, File Roller, System Monitor, Disks; Firefox on first boot
 - [x] Behaviour: USB automount, low battery, updates staged with rollback (greenboot), crash notices, the model freed first when memory runs low, a welcome tour
+- [x] Polish pass: sharp text at a whole-number scale, a compact layout, icons throughout, a movable orb, spring motion everywhere (DESKTOP.md, "Polish pass")
 - [ ] Checked on the laptop: Wi-Fi, Bluetooth, sound devices, brightness, battery, the boot splash, a real USB stick and printer
 - [ ] Later: light mode, sounds, voice input, on-screen keyboard (see DESKTOP.md)
 

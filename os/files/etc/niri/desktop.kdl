@@ -47,6 +47,9 @@ environment {
     TRIPPPIN_NO_LOGO "1"
 }
 
+// Whole-number scales first, so text is sharp and the desktop compact (Settings → Display
+// keeps the person's own choice).
+spawn-at-startup "tripppin-ui" "displays"
 // The wallpaper: the person's choice (Settings → Appearance), else ours.
 spawn-at-startup "sh" "-c" "w=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
 spawn-at-startup "waybar"
@@ -70,14 +73,63 @@ window-rule {
     open-floating true
 }
 
+// Motion, after Apple's fluid interfaces: springs rather than fixed timings, so a movement
+// can be interrupted and redirected, critically damped (no wobble) for things that move and
+// a touch under for things that appear, which settle with the slightest overshoot.
+// Reduce motion (Settings) turns all of it off.
 animations {
-    window-open {
-        duration-ms 220
-        curve "ease-out-expo"
+    workspace-switch {
+        spring damping-ratio=1.0 stiffness=900 epsilon=0.0001
     }
-    window-close {
-        duration-ms 160
+    horizontal-view-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+    window-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+    window-resize {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+    overview-open-close {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+    config-notification-open-close {
+        spring damping-ratio=0.8 stiffness=1000 epsilon=0.001
+    }
+    screenshot-ui-open {
+        duration-ms 200
         curve "ease-out-quad"
+    }
+    // Opening: grows from 92% and fades in, settling with a slight overshoot.
+    window-open {
+        spring damping-ratio=0.78 stiffness=650 epsilon=0.001
+        custom-shader r"
+            vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+                float p = niri_progress;
+                float scale = mix(0.92, 1.0, p);
+                vec3 coords = vec3((coords_geo.xy - vec2(0.5)) / scale + vec2(0.5), 1.0);
+                if (coords.x < 0.0 || coords.x > 1.0 || coords.y < 0.0 || coords.y > 1.0)
+                    return vec4(0.0);
+                vec4 color = texture2D(niri_tex, (niri_geo_to_tex * coords).st);
+                return color * clamp(niri_clamped_progress * 1.6, 0.0, 1.0);
+            }
+        "
+    }
+    // Closing: shrinks to 94% and fades, quickly, out of the way.
+    window-close {
+        duration-ms 180
+        curve "ease-out-quad"
+        custom-shader r"
+            vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+                float p = niri_clamped_progress;
+                float scale = mix(1.0, 0.94, p);
+                vec3 coords = vec3((coords_geo.xy - vec2(0.5)) / scale + vec2(0.5), 1.0);
+                if (coords.x < 0.0 || coords.x > 1.0 || coords.y < 0.0 || coords.y > 1.0)
+                    return vec4(0.0);
+                vec4 color = texture2D(niri_tex, (niri_geo_to_tex * coords).st);
+                return color * (1.0 - p);
+            }
+        "
     }
 }
 
