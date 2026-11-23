@@ -138,8 +138,8 @@ real hardware.
 
 ## Website (trippp.in, tripppin-web repo)
 
-- [ ] Rebuilt around the new designs: real screenshots of login, desktop, orb and Settings
-- [ ] Download ISO button (Cloudflare R2, dl link from CI) with size, checksum and signature
-- [ ] Setup page: write the USB (Mac, Windows, Linux), boot it, install, first boot
-- [ ] No "scroll" hint on the hero
-- [ ] Deployed to Firebase hosting
+- [x] Rebuilt around the new designs: the ask demo is the real desktop (bar, Files, the orb's ask bar and working card) rebuilt in HTML from our styles, playing real requests; no screenshot gallery
+- [x] Download ISO button (Cloudflare R2, dl link from CI) with size, checksum and signature
+- [x] Setup page: write the USB (Mac, Windows, Linux), boot it, install, first boot
+- [x] No "scroll" hint on the hero
+- [x] Deployed to Firebase hosting

@@ -28,7 +28,7 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 | M2 | Model service | `trip ask "hello"` answers locally | **next** |
 | M3 | AI shell + harness (ISO 2) | Sentences in the terminal do things | |
 | M4 | Safety | Booby-trapped pages get refused | |
-| M5 | Desktop + orb (ISO 3) | Branded desktop with the orb | **in review** |
+| M5 | Desktop + orb (ISO 3) | Branded desktop with the orb | **shipped**: first ISO on R2, trippp.in live; laptop check left |
 | M6 | Update loop + channels | Overnight updates, bad build rolls back | |
 | M7 | Agents + bring your own model | Background jobs, cloud keys, own server | |
 | M8 | Installer | Five-minute install, our own UI | |
