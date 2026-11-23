@@ -102,3 +102,33 @@ window#waybar {
     color: #ff8a7a;
     margin-right: 6px;
 }
+
+#language,
+#bluetooth {
+    padding: 0 8px;
+    color: #b7c3bd;
+}
+
+#bluetooth.connected {
+    color: #57d99a;
+}
+
+#tray {
+    padding: 0 8px;
+}
+
+#tray menu {
+    background: #141b19;
+    color: #f2f5ef;
+    border: 1px solid #2f3d38;
+    border-radius: 12px;
+}
+
+#privacy {
+    padding: 0 4px;
+}
+
+#privacy-item {
+    padding: 0 4px;
+    color: #ff8a7a;
+}

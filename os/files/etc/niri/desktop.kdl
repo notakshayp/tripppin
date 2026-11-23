@@ -51,6 +51,8 @@ environment {
 spawn-at-startup "sh" "-c" "w=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
 spawn-at-startup "waybar"
 spawn-at-startup "swaync"
+// Asks for your password when an app needs an administrator (GTK3, so it takes our theme).
+spawn-at-startup "/usr/libexec/polkit-mate-authentication-agent-1"
 // Clipboard history for Super + V (text and images).
 spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 spawn-at-startup "tripppin-ui" "orb"

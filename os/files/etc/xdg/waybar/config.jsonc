@@ -10,7 +10,7 @@
     "spacing": 0,
     "modules-left": ["image#logo", "niri/workspaces", "niri/window"],
     "modules-center": ["custom/clock"],
-    "modules-right": ["custom/recording", "custom/orb", "network", "pulseaudio", "battery", "custom/notifications", "custom/power"],
+    "modules-right": ["custom/recording", "privacy", "custom/orb", "niri/language", "network", "bluetooth", "pulseaudio", "battery", "tray", "custom/notifications", "custom/power"],
 
     "image#logo": { "path": "/usr/share/tripppin/logo-bar.png", "size": 18 },
     "niri/workspaces": { "format": "{icon}", "format-icons": { "default": "", "active": "" } },
@@ -51,6 +51,35 @@
         "interval": 1,
         "tooltip": false,
         "on-click": "tripppin-ui orb --toggle"
+    },
+    // Mic or screen sharing in use: a dot, so it's never a surprise.
+    "privacy": {
+        "icon-size": 12,
+        "icon-spacing": 6,
+        "modules": [
+            { "type": "audio-in", "tooltip": true },
+            { "type": "screenshare", "tooltip": true }
+        ]
+    },
+    // The keyboard layout, for people with more than one (Settings → Keyboard).
+    "niri/language": {
+        "format": "{short}",
+        "on-click": "tripppin-ui settings keyboard"
+    },
+    "bluetooth": {
+        "format": "bt",
+        "format-disabled": "",
+        "format-off": "",
+        "format-no-controller": "",
+        "format-connected": "bt {num_connections}",
+        "tooltip-format-connected": "{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}",
+        "on-click": "tripppin-ui settings bluetooth"
+    },
+    // Apps that live in the background (chat apps, sync tools) keep their icons here.
+    "tray": {
+        "icon-size": 15,
+        "spacing": 8
     },
     "network": {
         "format-wifi": "{essid}",
