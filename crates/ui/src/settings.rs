@@ -2059,14 +2059,8 @@ fn apps_page() -> gtk::ScrolledWindow {
     mine.set_selection_mode(gtk::SelectionMode::None);
     body.append(&mine);
     body.append(&error);
-    let more = gtk::Button::with_label("get more apps: ask tripppin (super + space)");
-    more.add_css_class("link");
-    more.add_css_class("accent");
-    more.set_halign(gtk::Align::Start);
-    more.connect_clicked(|_| {
-        let _ = std::process::Command::new("tripppin-ui").args(["orb", "--toggle"]).spawn();
-    });
-    body.append(&more);
+    body.append(&caption("get apps from flathub"));
+    body.append(&store_section(&error));
     body.append(&caption("part of tripppin"));
     let system = label("", &["row-sub"]);
     system.set_wrap(true);
@@ -3840,4 +3834,80 @@ fn printers_page() -> gtk::ScrolledWindow {
         }
     });
     scroll
+}
+
+/// Search Flathub and install, in the page: a search field, up to a dozen results with what
+/// they are, and an install button each. The orb can do the same in words.
+fn store_section(error: &gtk::Label) -> gtk::Box {
+    let section = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let search = gtk::SearchEntry::new();
+    search.set_placeholder_text(Some("search apps: photo editor, spotify, discord…"));
+    search.add_css_class("search");
+    let results = card();
+    results.set_visible(false);
+    let hint = label("or just ask tripppin: super + space, \"install a photo editor\".", &["row-sub"]);
+    hint.set_xalign(0.0);
+    section.append(&search);
+    section.append(&results);
+    section.append(&hint);
+    let error = error.clone();
+    search.connect_activate(move |e| {
+        let query = e.text().trim().to_string();
+        if query.is_empty() {
+            return;
+        }
+        clear(&results);
+        results.set_visible(true);
+        results.append(&setting_row("looking on flathub…", &label("", &["row-sub"])));
+        let (results, error) = (results.clone(), error.clone());
+        background(
+            move || (apps::search(&query), apps::flatpaks()),
+            move |(found, have)| {
+                clear(&results);
+                if found.is_empty() {
+                    results.append(&setting_row("nothing found; try other words", &label("", &["row-sub"])));
+                }
+                for app in found {
+                    let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+                    row.add_css_class("net-row");
+                    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+                    text.set_hexpand(true);
+                    text.set_valign(gtk::Align::Center);
+                    text.append(&label(&app.name.to_lowercase(), &["row-title"]));
+                    let sub = label(&app.summary.to_lowercase(), &["row-sub"]);
+                    sub.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                    sub.set_max_width_chars(48);
+                    text.append(&sub);
+                    row.append(&text);
+                    let installed = have.iter().any(|h| h.id == app.id);
+                    let install = gtk::Button::with_label(if installed { "installed" } else { "install" });
+                    install.add_css_class("link");
+                    install.add_css_class("accent");
+                    install.set_sensitive(!installed);
+                    let error = error.clone();
+                    let id = app.id.clone();
+                    install.connect_clicked(move |b| {
+                        b.set_sensitive(false);
+                        b.set_label("installing…");
+                        let (b, error, id) = (b.clone(), error.clone(), id.clone());
+                        background(
+                            move || apps::install(&id),
+                            move |r| match r {
+                                Ok(()) => b.set_label("installed"),
+                                Err(e) => {
+                                    b.set_label("install");
+                                    b.set_sensitive(true);
+                                    error.set_text(&format!("couldn't install it: {e}"));
+                                    error.set_visible(true);
+                                }
+                            },
+                        );
+                    });
+                    row.append(&install);
+                    results.append(&row);
+                }
+            },
+        );
+    });
+    section
 }

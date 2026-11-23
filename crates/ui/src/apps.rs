@@ -136,6 +136,55 @@ pub fn remove(app: &Flatpak) -> Result<(), String> {
     flatpak(&["uninstall", "-y", "--noninteractive", &format!("--{}", app.installation), &app.id]).map(|_| ())
 }
 
+/// One app found on Flathub.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Found {
+    pub id: String,
+    pub name: String,
+    pub summary: String,
+}
+
+/// Parses `flatpak search --columns=application,name,description,remotes`, keeping Flathub's.
+pub fn parse_search(out: &str) -> Vec<Found> {
+    let mut seen = Vec::new();
+    out.lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split('\t').collect();
+            (f.len() >= 4 && f[3].contains("flathub") && !seen.contains(&f[0].to_string())).then(|| {
+                seen.push(f[0].to_string());
+                Found { id: f[0].to_string(), name: f[1].to_string(), summary: f[2].to_string() }
+            })
+        })
+        .take(12)
+        .collect()
+}
+
+/// Puts the apps whose name and description mention every word first.
+pub fn rank(mut found: Vec<Found>, words: &[String]) -> Vec<Found> {
+    let hits = |f: &Found| {
+        let text = format!("{} {}", f.name, f.summary).to_lowercase();
+        words.iter().filter(|w| text.contains(w.as_str())).count()
+    };
+    found.sort_by_key(|f| std::cmp::Reverse(hits(f)));
+    found
+}
+
+/// flatpak matches the whole phrase, so "photo editor" finds nothing; search the longest word
+/// and rank by the rest.
+pub fn search(query: &str) -> Vec<Found> {
+    let words: Vec<String> = query.to_lowercase().split_whitespace().map(str::to_string).collect();
+    let Some(longest) = words.iter().max_by_key(|w| w.len()) else { return Vec::new() };
+    let found = flatpak(&["search", "--columns=application,name,description,remotes", longest])
+        .map(|o| parse_search(&o))
+        .unwrap_or_default();
+    rank(found, &words)
+}
+
+/// Installs for everyone on the computer; administrators need no password (Flatpak's rule).
+pub fn install(id: &str) -> Result<(), String> {
+    flatpak(&["install", "-y", "--noninteractive", "--system", "flathub", id]).map(|_| ())
+}
+
 // ---- default apps -------------------------------------------------------------------------
 
 /// What a default is for, and the file types that make it up (the first decides which app
@@ -405,6 +454,19 @@ mod tests {
             default_in(&with_default("", &["inode/directory"], "thunar"), "inode/directory").as_deref(),
             Some("thunar")
         );
+    }
+
+    #[test]
+    fn reads_flathub_search() {
+        let out = "org.videolan.VLC\tVLC\tVLC media player\tflathub\nio.mpv.Mpv\tmpv\tA media player\tflathub\norg.videolan.VLC\tVLC\tdup\tflathub\nx.y\tZ\tz\tother\n";
+        let found = parse_search(out);
+        assert_eq!(found.len(), 2);
+        assert_eq!(
+            found[0],
+            Found { id: "org.videolan.VLC".into(), name: "VLC".into(), summary: "VLC media player".into() }
+        );
+        let ranked = rank(found, &["mpv".into(), "player".into()]);
+        assert_eq!(ranked[0].id, "io.mpv.Mpv");
     }
 
     #[test]

@@ -110,7 +110,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [x] Text editor, image viewer, PDF viewer, calculator, archive manager, media player (Text Editor with our colour scheme, Loupe, Papers, Calculator, File Roller, Celluloid; set as defaults)
 - [x] System monitor (gnome-system-monitor): processes, resources, end a stuck app
 - [x] Disks (gnome-disk-utility): format a USB stick, check health
-- [ ] App store: browse and install from Flathub, in our style (part of Settings → Apps or a small app)
+- [x] App store: browse and install from Flathub, in our style (part of Settings → Apps or a small app) (search and install in Settings → Apps; phrases search by the longest word and rank by the rest)
 - [x] Help / tips: what the orb can do, shortcuts, where things are ("welcome & tips" in the launcher)
 
 ## System behaviour people notice
