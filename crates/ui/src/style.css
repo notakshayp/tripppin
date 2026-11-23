@@ -978,6 +978,37 @@ button.media-button:hover {
     color: #f2f5ef;
 }
 
+/* ---- welcome & tips ---------------------------------------------------- */
+
+.welcome-body {
+    padding: 8px 48px 36px;
+}
+
+.welcome-title {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: #f2f5ef;
+}
+
+.welcome-words {
+    font-size: 17px;
+    line-height: 1.4;
+    color: #c9d4ce;
+}
+
+.welcome-dot {
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 9999px;
+    background: #2a3632;
+}
+
+.welcome-dot.on {
+    min-width: 22px;
+    background: #57d99a;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {

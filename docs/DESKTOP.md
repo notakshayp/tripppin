@@ -111,7 +111,7 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [x] System monitor (gnome-system-monitor): processes, resources, end a stuck app
 - [x] Disks (gnome-disk-utility): format a USB stick, check health
 - [ ] App store: browse and install from Flathub, in our style (part of Settings → Apps or a small app)
-- [ ] Help / tips: what the orb can do, shortcuts, where things are
+- [x] Help / tips: what the orb can do, shortcuts, where things are ("welcome & tips" in the launcher)
 
 ## System behaviour people notice
 
@@ -122,13 +122,13 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [x] Crash: "app quit unexpectedly" with restart, not a silent close (from systemd-coredump, with "open it again")
 - [ ] App not responding: "wait or force quit"
 - [x] Out of memory: the AI model unloads first (OOMScoreAdjust=800 on the model service)
-- [ ] First-boot welcome: model download (done), then a short tour
+- [x] First-boot welcome: model download (done), then a short tour
 
 ## Install and first run
 
 - [~] Installer ISO (Fedora's, interactive); ours in M8
 - [x] First boot: model download with progress
-- [ ] First boot: a short tour, Wi-Fi if not connected, Firefox installed
+- [x] First boot: a short tour, Wi-Fi if not connected, Firefox installed (the tour opens once at the first login, with a wi-fi card first when offline; Firefox installs once online)
 
 ## Website (trippp.in, tripppin-web repo)
 

@@ -34,6 +34,7 @@ mod storage;
 mod switch;
 mod system;
 mod watch;
+mod welcome;
 
 use gtk::glib::ExitCode;
 
@@ -67,11 +68,12 @@ fn main() -> ExitCode {
         Some("calendar") => calendar::run(),
         Some("keys") => keys::run(),
         Some("dim") => dim::run(),
+        Some("welcome") => welcome::run(),
         Some("switch") => switch::run(),
         Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time]"
             );
             ExitCode::from(2)
         }

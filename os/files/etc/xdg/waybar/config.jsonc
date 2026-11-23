@@ -20,6 +20,7 @@
         "rewrite": {
             "foot": "terminal",
             "swappy": "screenshot",
+            "in\\.trippp\\.Welcome": "welcome",
             "polkit-mate-authentication-agent-1": "password",
             "footclient": "terminal",
             "org\\.mozilla\\.firefox|firefox": "firefox",
