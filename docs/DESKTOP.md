@@ -105,23 +105,23 @@ Simple sections are ours; deep ones open the themed specialist tool.
 ## Apps that come with it
 
 - [x] Terminal (foot) opening into the AI shell
-- [ ] Files (Thunar): sidebar, tabs, search, trash, drives, network shares, archive extract
-- [ ] Browser: Firefox (Flatpak) on first boot, dark, Inter
-- [ ] Text editor, image viewer, PDF viewer, calculator, archive manager, media player
-- [ ] System monitor (gnome-system-monitor): processes, resources, end a stuck app
-- [ ] Disks (gnome-disk-utility): format a USB stick, check health
+- [x] Files (Thunar): sidebar, tabs, search, trash, drives, network shares, archive extract (with volume manager, archive plugin, thumbnails, gvfs; green folders; checked in the VM)
+- [x] Browser: Firefox (Flatpak) on first boot, dark, Inter (installed by a one-shot service once online; dark and Inter checked in the VM)
+- [x] Text editor, image viewer, PDF viewer, calculator, archive manager, media player (Text Editor with our colour scheme, Loupe, Papers, Calculator, File Roller, Celluloid; set as defaults)
+- [x] System monitor (gnome-system-monitor): processes, resources, end a stuck app
+- [x] Disks (gnome-disk-utility): format a USB stick, check health
 - [ ] App store: browse and install from Flathub, in our style (part of Settings → Apps or a small app)
 - [ ] Help / tips: what the orb can do, shortcuts, where things are
 
 ## System behaviour people notice
 
-- [ ] USB drives: mount automatically, notification with "open" and "eject"
-- [ ] Phone: file transfer (MTP), tethering
-- [ ] Low battery warning, critical battery sleep
-- [ ] Update available notification; restart into the new version; automatic rollback if it fails
-- [ ] Crash: "app quit unexpectedly" with restart, not a silent close
+- [~] USB drives: mount automatically, notification with "open" and "eject" (udiskie starts with the desktop; a real USB stick checked on the laptop)
+- [~] Phone: file transfer (MTP), tethering (gvfs-mtp and NetworkManager in the image; a phone checked on the laptop)
+- [~] Low battery warning, critical battery sleep (warnings at 10% and 5% from the orb; UPower's critical action; checked on the laptop)
+- [x] Update available notification; restart into the new version; automatic rollback if it fails (the orb notifies when an update is staged; greenboot health check and rollback trigger on)
+- [x] Crash: "app quit unexpectedly" with restart, not a silent close (from systemd-coredump, with "open it again")
 - [ ] App not responding: "wait or force quit"
-- [ ] Out of memory: the AI model unloads first
+- [x] Out of memory: the AI model unloads first (OOMScoreAdjust=800 on the model service)
 - [ ] First-boot welcome: model download (done), then a short tour
 
 ## Install and first run
