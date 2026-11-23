@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Tripppin
+Description=The power-spark logo on ink: the ring fades in and the spark breathes.
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/tripppin
+ScriptFile=/usr/share/plymouth/themes/tripppin/tripppin.script

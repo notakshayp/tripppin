@@ -1,0 +1,59 @@
+// Tripppin's boot screen: ink, the ring fading in, the green spark breathing, and a
+// password prompt for encrypted disks. Colours from the brand: ink #0d1211, paper #f2f5ef.
+
+Window.SetBackgroundTopColor(0.051, 0.071, 0.067);
+Window.SetBackgroundBottomColor(0.051, 0.071, 0.067);
+
+ring_image = Image("ring.png");
+spark_image = Image("spark.png");
+x = Window.GetX() + Window.GetWidth() / 2 - ring_image.GetWidth() / 2;
+y = Window.GetY() + Window.GetHeight() / 2 - ring_image.GetHeight() / 2 - 20;
+
+ring = Sprite(ring_image);
+ring.SetPosition(x, y, 1);
+ring.SetOpacity(0);
+spark = Sprite(spark_image);
+spark.SetPosition(x, y, 2);
+spark.SetOpacity(0);
+
+frame = 0;
+fun refresh() {
+    frame++;
+    // The ring over the first second, then the spark joins and breathes.
+    if (frame < 50) ring.SetOpacity(frame / 50);
+    else ring.SetOpacity(1);
+    if (frame > 30) spark.SetOpacity(0.65 + 0.35 * Math.Sin((frame - 30) / 14));
+}
+Plymouth.SetRefreshFunction(refresh);
+
+// The disk's password, when it's encrypted: a prompt and dots under the logo.
+prompt_sprite = Sprite();
+dots_sprite = Sprite();
+fun show_password(prompt, bullets) {
+    text = prompt;
+    if (text == "") text = "password for this disk";
+    prompt_image = Image.Text(text, 0.56, 0.64, 0.61, 1, "Inter 13");
+    prompt_sprite.SetImage(prompt_image);
+    prompt_sprite.SetPosition(Window.GetWidth() / 2 - prompt_image.GetWidth() / 2, y + ring_image.GetHeight() + 30, 3);
+    dots = "";
+    for (i = 0; i < bullets; i++) dots += "● ";
+    dots_image = Image.Text(dots, 0.95, 0.96, 0.94, 1, "Inter 15");
+    dots_sprite.SetImage(dots_image);
+    dots_sprite.SetPosition(Window.GetWidth() / 2 - dots_image.GetWidth() / 2, y + ring_image.GetHeight() + 60, 3);
+}
+Plymouth.SetDisplayPasswordFunction(show_password);
+
+fun back_to_normal() {
+    prompt_sprite.SetOpacity(0);
+    dots_sprite.SetOpacity(0);
+}
+Plymouth.SetDisplayNormalFunction(back_to_normal);
+
+// Messages (a filesystem check, an update being applied) in small grey type.
+message_sprite = Sprite();
+fun show_message(text) {
+    message_image = Image.Text(text, 0.56, 0.64, 0.61, 1, "Inter 12");
+    message_sprite.SetImage(message_image);
+    message_sprite.SetPosition(Window.GetWidth() / 2 - message_image.GetWidth() / 2, Window.GetHeight() - 80, 3);
+}
+Plymouth.SetMessageFunction(show_message);

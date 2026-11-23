@@ -33,8 +33,8 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 
 ## Boot, login, lock
 
-- [ ] Boot splash (Plymouth): the power-spark logo animating in, on ink
-- [ ] Boot menu (GRUB): hidden unless Shift/Esc; themed when shown
+- [~] Boot splash (Plymouth): the power-spark logo animating in, on ink (our script theme in the initramfs, quiet boot; it runs in the VM (journal); seeing it is checked on the laptop)
+- [~] Boot menu (GRUB): hidden unless Shift/Esc; themed when shown (hidden with a one-second Esc window through bootupd, on new installs; a themed menu to do)
 - [x] Login screen (ours): clock, avatar, password pill, power menu
 - [x] Login: several people, switching user, caps-lock warning, "forgot password" help (a chip per person plus "other"; caps-lock warning from the keyboard light; honest help text; checked in the VM with two people)
 - [~] Lock screen (ours): clock, what finished while you were away, password

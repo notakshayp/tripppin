@@ -99,7 +99,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       google-noto-sans-telugu-vf-fonts google-noto-sans-kannada-vf-fonts google-noto-sans-malayalam-vf-fonts \
       google-noto-sans-gujarati-vf-fonts google-noto-sans-gurmukhi-vf-fonts \
       firewalld orca espeak-ng speech-dispatcher speech-dispatcher-espeak-ng NetworkManager-openvpn NetworkManager-openvpn-gnome \
-      cups cups-filters ipp-usb nss-mdns system-config-printer sane-backends sane-airscan simple-scan unicode-emoji wtype mate-polkit google-noto-color-emoji-fonts \
+      cups cups-filters ipp-usb nss-mdns system-config-printer sane-backends sane-airscan simple-scan unicode-emoji wtype mate-polkit google-noto-color-emoji-fonts plymouth plymouth-plugin-script \
     && dnf clean all
 
 COPY os/files/ /
@@ -119,6 +119,12 @@ RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } >
 RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service firewalld.service cups.socket \
     && systemctl set-default graphical.target \
     && dconf update
+
+# The boot splash: our Plymouth theme, built into the initramfs so it shows from the start.
+RUN plymouth-set-default-theme tripppin \
+    && kver=$(cd /usr/lib/modules && echo *) \
+    && DRACUT_NO_XATTR=1 dracut -f --no-hostonly --reproducible "/usr/lib/modules/$kver/initramfs.img" "$kver" \
+    && lsinitrd "/usr/lib/modules/$kver/initramfs.img" | grep -q plymouth/themes/tripppin
 
 # Fails the build if the image breaks bootc's rules (e.g. content in /var it can't manage).
 RUN bootc container lint
