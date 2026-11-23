@@ -1,7 +1,7 @@
 /* Matches the mockup: ink pill, DM Mono, paper for what matters, green for live. */
 * {
-    font-family: "DM Mono", monospace;
-    font-size: 13px;
+    font-family: "DM Mono", lucide, monospace;
+    font-size: 12px;
     min-height: 0;
     border: none;
     border-radius: 0;
@@ -16,7 +16,7 @@ window#waybar {
 }
 
 #image.logo {
-    padding: 0 10px 0 16px;
+    padding: 0 8px 0 14px;
 }
 
 /* Dots: the labels are empty, so size comes from min-width/height alone. */
@@ -29,7 +29,7 @@ window#waybar {
     border-radius: 3px;
     background: #3d4a45;
     color: transparent;
-    transition: min-width 160ms ease;
+    transition: min-width 280ms cubic-bezier(0.32, 0.72, 0, 1), background 200ms ease;
 }
 
 #workspaces button label {
@@ -41,7 +41,7 @@ window#waybar {
 }
 
 #workspaces {
-    margin: 16px 4px;
+    margin: 13px 4px;
 }
 
 #workspaces button.active {
@@ -56,6 +56,7 @@ window#waybar {
 #window {
     color: #f2f5ef;
     margin-left: 10px;
+    transition: color 200ms ease;
 }
 
 #custom-clock {
@@ -66,7 +67,34 @@ window#waybar {
 #network,
 #pulseaudio,
 #battery {
-    padding: 0 8px;
+    padding: 0 7px;
+}
+
+/* Icons answer the pointer: a soft green lift, eased like everything else. */
+#network,
+#pulseaudio,
+#bluetooth,
+#battery,
+#custom-notifications,
+#custom-power,
+#custom-clock,
+#language {
+    border-radius: 8px;
+    margin: 4px 1px;
+    transition: background 180ms ease, color 180ms ease;
+}
+
+#network:hover,
+#pulseaudio:hover,
+#bluetooth:hover,
+#custom-clock:hover,
+#language:hover {
+    background: rgba(242, 245, 239, 0.07);
+    color: #f2f5ef;
+}
+
+#custom-clock {
+    padding: 0 10px;
 }
 
 #custom-orb {
@@ -84,13 +112,15 @@ window#waybar {
 }
 
 #custom-power {
-    padding: 0 16px 0 8px;
+    padding: 0 8px;
+    margin-right: 6px;
     color: #b7c3bd;
 }
 
 #custom-power:hover,
 #custom-notifications:hover {
     color: #57d99a;
+    background: rgba(87, 217, 154, 0.10);
 }
 
 #battery.warning:not(.charging) {

@@ -9,7 +9,7 @@ cursor {
     xcursor-size 24
 }
 
-spawn-at-startup "sh" "-c" "tripppin-ui greeter; niri msg action quit --skip-confirmation"
+spawn-at-startup "sh" "-c" "tripppin-ui displays; tripppin-ui greeter; niri msg action quit --skip-confirmation"
 
 binds {
 }

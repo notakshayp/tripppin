@@ -7,8 +7,8 @@ use serde_json::Value;
 use std::cell::{Cell, RefCell};
 use std::process::Command;
 
-fn notify(app: &str, title: &str, body: &str, urgency: &str) {
-    let _ = Command::new("notify-send").args(["-a", app, "-u", urgency, title, body]).spawn();
+fn notify(app: &str, icon: &str, title: &str, body: &str, urgency: &str) {
+    let _ = Command::new("notify-send").args(["-a", app, "-i", icon, "-u", urgency, title, body]).spawn();
 }
 
 /// What to say when the battery reaches `percent` while discharging, given the last warning.
@@ -59,7 +59,13 @@ pub fn start() {
                 warned.set(None);
             } else if let Some((level, text)) = battery_warning(b.percent, true, warned.get()) {
                 warned.set(Some(level));
-                notify("battery", text, "", if level == 5 { "critical" } else { "normal" });
+                notify(
+                    "battery",
+                    if level == 5 { "battery-caution" } else { "battery-low" },
+                    text,
+                    "",
+                    if level == 5 { "critical" } else { "normal" },
+                );
             }
         }
         // An update downloaded and waiting.
@@ -67,7 +73,13 @@ pub fn start() {
         if let Some(next) = st.staged {
             if *staged.borrow() != next.version {
                 *staged.borrow_mut() = next.version.clone();
-                notify("updates", "an update is ready", "it starts the next time you restart", "normal");
+                notify(
+                    "updates",
+                    "system-software-update",
+                    "an update is ready",
+                    "it starts the next time you restart",
+                    "normal",
+                );
             }
         }
         // Crashes since we last looked.
@@ -85,7 +97,7 @@ pub fn start() {
             // Wait for the person's answer off the main loop; "reopen" starts it again.
             std::thread::spawn(move || {
                 let answer = Command::new("notify-send")
-                    .args(["-a", "tripppin", "-A", "reopen=open it again", "--wait"])
+                    .args(["-a", "tripppin", "-i", "dialog-warning", "-A", "reopen=open it again", "--wait"])
                     .arg(format!("{name} quit unexpectedly"))
                     .arg("its work since the last save may be lost")
                     .output()

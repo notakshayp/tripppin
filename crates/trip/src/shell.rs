@@ -2,7 +2,8 @@
 //!
 //! Plain text goes to the model as a single question. `/chat` starts a conversation
 //! with memory, `/terminal` opens a normal shell, and `!command` runs one command
-//! exactly as typed.
+//! exactly as typed. Started with TRIPPPIN_CONTINUE set to a saved conversation (the
+//! orb's "continue in terminal"), it picks that conversation up as a chat.
 
 use anyhow::Result;
 use reedline::{
@@ -116,7 +117,7 @@ pub fn run() -> Result<()> {
     }
     println!("{DIM}type anything to ask · /chat for a conversation · /terminal for a normal shell · /help{RESET}");
 
-    let mut chat: Option<Vec<Message>> = None;
+    let mut chat: Option<Vec<Message>> = continued();
     loop {
         let prompt = ShellPrompt { chat: chat.is_some() };
         let line = match editor.read_line(&prompt)? {
@@ -166,6 +167,30 @@ pub fn run() -> Result<()> {
             }
         }
     }
+}
+
+/// The conversation the orb handed over (TRIPPPIN_CONTINUE), shown as a short recap and
+/// kept as a chat so follow-ups know what happened.
+fn continued() -> Option<Vec<Message>> {
+    let path = std::env::var_os("TRIPPPIN_CONTINUE")?;
+    let history = crate::model::load_conversation(&std::fs::read_to_string(path).ok()?)?;
+    let said = |role: &str| {
+        history.iter().rev().find_map(|m| {
+            (m.0["role"] == role && m.0.get("tool_calls").is_none())
+                .then(|| m.0["content"].as_str().unwrap_or("").trim().to_string())
+                .filter(|t| !t.is_empty())
+        })
+    };
+    let steps = history.iter().filter(|m| m.0["role"] == "tool").count();
+    println!("{DIM}continuing from the orb · it remembers this until /exit{RESET}");
+    if let Some(q) = said("user") {
+        println!("\n{DIM}you asked{RESET}  {q}");
+    }
+    println!("{DIM}{steps} step{} taken{RESET}", if steps == 1 { "" } else { "s" });
+    if let Some(a) = said("assistant") {
+        println!("\n{a}\n");
+    }
+    Some(history)
 }
 
 /// Works on one request with the agent, which streams its answer and shows each step.

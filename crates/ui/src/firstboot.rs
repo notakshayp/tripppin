@@ -157,7 +157,14 @@ fn build(app: &gtk::Application, tier: Tier) {
                     right.set_text("");
                     let _ = std::process::Command::new("systemctl").args(["restart", "tripppin-llm.service"]).status();
                     let _ = std::process::Command::new("notify-send")
-                        .args(["-a", "tripppin", "the ai is ready", "press super + space and ask anything."])
+                        .args([
+                            "-a",
+                            "tripppin",
+                            "-i",
+                            "tripppin",
+                            "the ai is ready",
+                            "press super + space and ask anything.",
+                        ])
                         .status();
                     app.quit();
                 }

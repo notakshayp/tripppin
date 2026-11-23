@@ -21,6 +21,9 @@ pub fn run() -> glib::ExitCode {
         } else {
             let w = build(app);
             w.present();
+            if let Some(c) = w.child() {
+                crate::common::play(&c, "pop");
+            }
             *slot = Some(w);
         }
         glib::ExitCode::SUCCESS

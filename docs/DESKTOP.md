@@ -120,6 +120,18 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [x] First boot: model download with progress
 - [x] First boot: a short tour, Wi-Fi if not connected, Firefox installed (the tour opens once at the first login, with a wi-fi card first when offline; Firefox installs once online)
 
+## Polish pass (after the first ISO)
+
+From the owner's first hands-on test: sluggish, soft text, too large, no icons, no motion.
+
+- [x] Sharp text: greyscale antialiasing with slight hinting (fontconfig, GTK 3 and 4, dconf), and a whole-number display scale at login (`tripppin-ui displays`: 2 on dense screens, else 1; niri's own guess was 1.25, which blurred text and enlarged everything). Settings → Display keeps a person's own choice
+- [x] Compact: Inter 10 everywhere, and every screen of ours, the bar, quick settings and the launcher resized for scale 1
+- [x] Speed: the GPU draws our screens (the software renderer only without 3D); Settings builds each page when first opened instead of all 21 at start
+- [x] Icons: Lucide as a font (bar, quick settings tiles and sliders, Settings sidebar, pop-ups, the orb's card); our own notifications carry icons
+- [x] Orb: smaller (44 px); drag it and it springs to the nearest corner; right-click tucks it into a dot; the working card minimises into it and opens from its corner
+- [x] Motion: niri springs for every window movement, open and close shaders (grow from 92% with a slight settle, shrink away), one easing curve in every stylesheet, press-in on buttons, entrances for every pop-up and page, exits that fade toward where things came from, a frame-clock spinner, gliding pop-up bars. Reduce motion turns it all off
+- [ ] Checked on the laptop: sharpness and scale on a real panel, animation smoothness on a real GPU
+
 ## Later (after this desktop lands)
 
 Not blockers for the desktop: bigger features, things niri can't do yet, and checks that need

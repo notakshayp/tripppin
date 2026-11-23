@@ -7,7 +7,7 @@
 # a new one, and that PR runs the full image pipeline before it can merge.
 
 # ---- Rust tools -------------------------------------------------------------
-FROM quay.io/fedora/fedora:45@sha256:6d8462b7b0474af891c3e84e680df7bdfb487cf37ccb6239b5e05444d1b92cbd AS build
+FROM quay.io/fedora/fedora:45@sha256:62d5eaec1e8a34f6cb94934f806420754611834c7eef8a4f50b9cdbcd1c90c10 AS build
 RUN dnf -y install --setopt=install_weak_deps=False cargo rust gcc gtk4-devel gtk4-layer-shell-devel && dnf clean all
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rustfmt.toml ./
@@ -17,7 +17,7 @@ RUN cargo build --release --locked -p trip -p tripppin-ui
 
 # ---- llama.cpp ------------------------------------------------------------
 # Pinned release, Vulkan backend (falls back to the CPU when there's no GPU).
-FROM quay.io/fedora/fedora:45@sha256:6d8462b7b0474af891c3e84e680df7bdfb487cf37ccb6239b5e05444d1b92cbd AS llama
+FROM quay.io/fedora/fedora:45@sha256:62d5eaec1e8a34f6cb94934f806420754611834c7eef8a4f50b9cdbcd1c90c10 AS llama
 ARG LLAMA_CPP_TAG=v1.0.0
 RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ vulkan-headers vulkan-loader-devel glslc spirv-headers-devel && dnf clean all
 RUN git clone --depth 1 --branch "$LLAMA_CPP_TAG" https://github.com/ggml-org/llama.cpp /src/llama.cpp
@@ -28,7 +28,7 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NAT
     && cmake --build build --target llama-server -j"$(nproc)"
 
 # ---- The OS -----------------------------------------------------------------
-FROM quay.io/fedora/fedora-bootc:45@sha256:f387c5f622d2f095e23b1587c97a4d4659231df6c8a649329839a9336a99c5e4
+FROM quay.io/fedora/fedora-bootc:45@sha256:f0cdc050f149f554ab84d3cc88e80583096e195ddb083f9670c3015e48e86b7a
 
 LABEL org.opencontainers.image.title="tripppin" \
       org.opencontainers.image.description="A Linux with an AI built in." \
@@ -80,6 +80,16 @@ RUN dnf -y install --setopt=install_weak_deps=False kmscon kmscon-pango dejavu-s
          "https://raw.githubusercontent.com/google/fonts/${DM_MONO_REV}/ofl/dmmono/OFL.txt" \
     && fc-cache -f
 
+# Icons for the bar, quick settings and our screens: Lucide (ISC), as a font, so GTK 3
+# and GTK 4 draw the same line icons at any size and in any colour.
+ARG LUCIDE_VERSION=1.66.0
+ARG LUCIDE_SHA256=c6355db6e4f0834f62193f9effde900dab785c5c18877cf95cd1a44fa62fa8d5
+RUN mkdir -p /usr/share/fonts/lucide /usr/share/licenses/lucide \
+    && curl -fsSL -o /usr/share/fonts/lucide/lucide.ttf "https://unpkg.com/lucide-static@${LUCIDE_VERSION}/font/lucide.ttf" \
+    && echo "${LUCIDE_SHA256}  /usr/share/fonts/lucide/lucide.ttf" | sha256sum -c - \
+    && curl -fsSL -o /usr/share/licenses/lucide/LICENSE "https://unpkg.com/lucide-static@${LUCIDE_VERSION}/LICENSE" \
+    && fc-cache -f
+
 # The desktop: niri (a Wayland compositor) with every window floating, styled end
 # to end. waybar, fuzzel, mako, foot and swaybg are configured in os/files; the
 # orb, login and lock screens are ours (tripppin-ui). Inter is the interface font.
@@ -122,7 +132,8 @@ RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } >
 RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service firewalld.service cups.socket \
       tripppin-firefox.service greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
     && systemctl set-default graphical.target \
-    && dconf update
+    && dconf update \
+    && fc-cache -f
 
 # Icons: Papirus-Dark with the folders recoloured from Papirus blue to Tripppin greens, as
 # a small theme of its own that inherits everything else.

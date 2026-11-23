@@ -127,6 +127,100 @@ pub fn arrow(up: bool) -> gtk::DrawingArea {
     area
 }
 
+/// Icons are Lucide, drawn from its font (installed by os/Containerfile), so they take the
+/// text colour and any size. Code points from lucide-static's font/lucide.css.
+pub mod icons {
+    pub const WIFI: char = '\u{e1ae}';
+    pub const NETWORK: char = '\u{e125}';
+    pub const BLUETOOTH: char = '\u{e05c}';
+    pub const SOUND: char = '\u{e1ab}';
+    pub const MIC: char = '\u{e118}';
+    pub const MUTED: char = '\u{e1ac}';
+    pub const MIC_OFF: char = '\u{e119}';
+    pub const SUN: char = '\u{e178}';
+    pub const KEYBOARD: char = '\u{e284}';
+    pub const DISPLAY: char = '\u{e11d}';
+    pub const PALETTE: char = '\u{e1dd}';
+    pub const BATTERY: char = '\u{e055}';
+    pub const SPARKLES: char = '\u{e412}';
+    pub const BELL: char = '\u{e059}';
+    pub const APPS: char = '\u{e0ff}';
+    pub const POINTER: char = '\u{e1c3}';
+    pub const PRINTER: char = '\u{e141}';
+    pub const CLOCK: char = '\u{e087}';
+    pub const LANGUAGE: char = '\u{e0fe}';
+    pub const USERS: char = '\u{e1a4}';
+    pub const SHIELD: char = '\u{e1ff}';
+    pub const ACCESSIBILITY: char = '\u{e297}';
+    pub const DISK: char = '\u{e0ed}';
+    pub const UPDATE: char = '\u{e145}';
+    pub const INFO: char = '\u{e0f9}';
+    pub const CHECK: char = '\u{e06c}';
+    pub const ALERT: char = '\u{e077}';
+    pub const MINIMIZE: char = '\u{e11b}';
+    pub const CAPS: char = '\u{e04a}';
+}
+
+/// An icon (see `icons`) as a label with the given CSS classes.
+pub fn icon(ch: char, classes: &[&str]) -> gtk::Label {
+    let l = gtk::Label::new(Some(&ch.to_string()));
+    l.add_css_class("icon");
+    for c in classes {
+        l.add_css_class(c);
+    }
+    l
+}
+
+/// Plays one of the stylesheet's entrance animations (`pop`, `rise`, `drop`) on `w` again.
+/// GTK starts a CSS animation when the animation's name changes, so each comes in two
+/// identical copies, -a and -b, and this swaps between them.
+pub fn play(w: &impl IsA<gtk::Widget>, name: &str) {
+    let (a, b) = (format!("{name}-a"), format!("{name}-b"));
+    let (from, to) = if w.has_css_class(&a) { (a, b) } else { (b, a) };
+    w.remove_css_class(&from);
+    w.add_css_class(&to);
+}
+
+/// Spring-like easing for motion drawn in code: fast out, settling with no bounce, the same
+/// feel as the stylesheet's cubic-bezier(0.32, 0.72, 0, 1).
+pub fn ease_out(t: f64) -> f64 {
+    let t = t.clamp(0.0, 1.0);
+    1.0 - (1.0 - t).powi(4)
+}
+
+/// The working spinner: a green arc that sweeps round, lengthening and shortening as it goes,
+/// drawn every frame by the frame clock so it stays smooth. It only runs while shown.
+pub fn spinner(size: i32) -> gtk::DrawingArea {
+    let area = gtk::DrawingArea::new();
+    area.set_content_width(size);
+    area.set_content_height(size);
+    area.set_can_target(false);
+    area.add_css_class("spinner");
+    area.set_draw_func(|a, cr, w, h| {
+        let t = a.frame_clock().map_or(0.0, |c| c.frame_time() as f64 / 1_000_000.0);
+        let (w, h) = (f64::from(w), f64::from(h));
+        let r = w.min(h) / 2.0 - 2.0;
+        let (cx, cy) = (w / 2.0, h / 2.0);
+        cr.set_line_width((w / 8.0).max(2.0));
+        cr.set_line_cap(cairo::LineCap::Round);
+        cr.set_source_rgba(GREEN.0, GREEN.1, GREEN.2, 0.18);
+        cr.arc(cx, cy, r, 0.0, std::f64::consts::TAU);
+        cr.stroke().ok();
+        // One turn every 0.9 s; the arc breathes between a fifth and two thirds of the ring.
+        let turn = (t / 0.9).fract() * std::f64::consts::TAU;
+        let breathe = 0.5 - 0.5 * (t * std::f64::consts::TAU / 1.6).cos();
+        let length = (0.2 + 0.47 * breathe) * std::f64::consts::TAU;
+        cr.set_source_rgb(GREEN.0, GREEN.1, GREEN.2);
+        cr.arc(cx, cy, r, turn - std::f64::consts::FRAC_PI_2, turn - std::f64::consts::FRAC_PI_2 + length);
+        cr.stroke().ok();
+    });
+    area.add_tick_callback(|a, _| {
+        a.queue_draw();
+        glib::ControlFlow::Continue
+    });
+    area
+}
+
 pub fn clock() -> String {
     let format = if crate::region::twelve_hour() { "%-I:%M %p" } else { "%H:%M" };
     glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_lowercase()).unwrap_or_default()

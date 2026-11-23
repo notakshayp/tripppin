@@ -3,7 +3,7 @@
 //! change itself (wpctl, brightnessctl) and then `tripppin-ui osd <kind>`; a second call while
 //! the pill is up updates it instead of opening another.
 
-use crate::common::label;
+use crate::common::{self, icons, label};
 use gtk::prelude::*;
 use gtk::{gio, glib};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
@@ -87,8 +87,22 @@ fn read(kind: &str) -> Option<Level> {
     }
 }
 
+/// The icon for a level: a speaker, a mic, the sun, a keyboard, caps lock's arrow.
+fn icon_for(level: &Level) -> char {
+    match (level.name, level.muted) {
+        ("vol", false) => icons::SOUND,
+        ("vol", true) => icons::MUTED,
+        ("mic", false) => icons::MIC,
+        ("mic", true) => icons::MIC_OFF,
+        ("light", _) => icons::SUN,
+        ("caps", _) => icons::CAPS,
+        _ => icons::KEYBOARD,
+    }
+}
+
 struct Osd {
     window: gtk::Window,
+    pill: gtk::Box,
     name: gtk::Label,
     bar: gtk::ProgressBar,
     value: gtk::Label,
@@ -98,8 +112,16 @@ struct Osd {
 
 impl Osd {
     fn show(self: &Rc<Self>, app: &gtk::Application, level: &Level) {
-        self.name.set_text(if level.muted && level.word.is_none() { "muted" } else { level.name });
-        self.bar.set_fraction(level.value.clamp(0.0, 1.0));
+        self.name.set_text(&icon_for(level).to_string());
+        // The bar glides to the new level rather than jumping.
+        let (from, to) = (self.bar.fraction(), level.value.clamp(0.0, 1.0));
+        let begun = Cell::new(None::<i64>);
+        self.bar.add_tick_callback(move |bar, clock| {
+            let now = clock.frame_time();
+            let t = (now - *begun.get().get_or_insert(now)) as f64 / 160_000.0;
+            bar.set_fraction(from + (to - from) * common::ease_out(t));
+            if t >= 1.0 { glib::ControlFlow::Break } else { glib::ControlFlow::Continue }
+        });
         match level.word {
             Some(w) => self.value.set_text(w),
             None => self.value.set_text(&format!("{:.0}", (level.value * 100.0).round())),
@@ -109,14 +131,23 @@ impl Osd {
         } else {
             self.bar.remove_css_class("muted");
         }
-        self.window.present();
+        if !self.window.is_visible() {
+            self.window.present();
+            common::play(&self.pill, "pop");
+        }
+        self.pill.remove_css_class("leave");
         let generation = self.generation.get() + 1;
         self.generation.set(generation);
         let (osd, app) = (self.clone(), app.clone());
         glib::timeout_add_local_once(std::time::Duration::from_millis(u64::from(SHOW_FOR_MS)), move || {
             if osd.generation.get() == generation {
-                osd.window.set_visible(false);
-                app.quit();
+                osd.pill.add_css_class("leave");
+                glib::timeout_add_local_once(std::time::Duration::from_millis(170), move || {
+                    if osd.generation.get() == generation {
+                        osd.window.set_visible(false);
+                        app.quit();
+                    }
+                });
             }
         });
     }
@@ -151,7 +182,7 @@ fn build(app: &gtk::Application) -> Rc<Osd> {
     window.set_namespace(Some("tripppin-osd"));
     window.set_layer(Layer::Overlay);
     window.set_anchor(Edge::Bottom, true);
-    window.set_margin(Edge::Bottom, 96);
+    window.set_margin(Edge::Bottom, 72);
     window.set_keyboard_mode(KeyboardMode::None);
     window.set_exclusive_zone(-1);
     let pill = gtk::Box::new(gtk::Orientation::Horizontal, 14);
@@ -160,8 +191,8 @@ fn build(app: &gtk::Application) -> Rc<Osd> {
     pill.set_margin_bottom(24);
     pill.set_margin_start(24);
     pill.set_margin_end(24);
-    let name = label("vol", &["osd-name"]);
-    name.set_width_chars(5);
+    let name = common::icon(icons::SOUND, &["osd-icon"]);
+    name.set_width_chars(2);
     let bar = gtk::ProgressBar::new();
     bar.add_css_class("osd-bar");
     bar.set_hexpand(true);
@@ -179,7 +210,7 @@ fn build(app: &gtk::Application) -> Rc<Osd> {
             surface.set_input_region(Some(&gtk::cairo::Region::create()));
         }
     });
-    Rc::new(Osd { window, name, bar, value, generation: Cell::new(0) })
+    Rc::new(Osd { window, pill, name, bar, value, generation: Cell::new(0) })
 }
 
 #[cfg(test)]

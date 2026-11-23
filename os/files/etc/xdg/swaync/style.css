@@ -1,106 +1,143 @@
-/* Quick settings and notifications in the Tripppin style: ink cards, paper text, green for on. */
+/* Quick settings and notifications in the Tripppin style: ink cards, paper text, green for on.
+   Icons come from the Lucide font inside the labels. Motion: one curve everywhere
+   (cubic-bezier(0.32, 0.72, 0, 1), a fast start that settles softly, like a critically
+   damped spring), 160-280 ms, and a slight press-in on everything that can be clicked. */
 * {
-  font-family: Inter, sans-serif;
+  font-family: Inter, lucide, sans-serif;
   color: #f2f5ef;
 }
+
+/* The windows cover the screen (for the animations) but show nothing themselves: no dim,
+   no slab behind the notifications. */
+window, .blank-window, .floating-notifications, .control-center-window { background: transparent; }
+
+button, switch, .notification, .notification-default-action, .close-button {
+  transition: background 200ms cubic-bezier(0.32, 0.72, 0, 1), border-color 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    color 200ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease;
+}
+
+button:active { transform: scale(0.96); }
 
 /* ---- notifications (top right, under the bar) ---- */
 .notification-row { outline: none; background: transparent; }
 .notification-row:focus, .notification-row:hover { background: transparent; }
-.notification-background { padding: 4px 0; }
+.notification-background { padding: 3px 0; }
 .notification {
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid #2f3d38;
   background: rgba(20, 27, 25, 0.96);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
   padding: 0;
+  animation: arrive 340ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
 }
 .notification-default-action, .notification-action {
-  padding: 12px 14px;
-  border-radius: 16px;
+  padding: 10px 12px;
+  border-radius: 14px;
   background: transparent;
   border: none;
 }
 .notification-default-action:hover { background: rgba(242, 245, 239, 0.04); }
 .notification-action { border-top: 1px solid #222d2a; border-radius: 0; color: #57d99a; }
-.summary { font-size: 14px; font-weight: 600; color: #f2f5ef; }
+.notification-action:hover { background: rgba(87, 217, 154, 0.08); }
+.summary { font-size: 13px; font-weight: 600; color: #f2f5ef; }
 .time { font-family: "DM Mono", monospace; font-size: 11px; color: #8a9a93; margin-right: 6px; }
-.body { font-size: 13px; color: #c9d4ce; }
-.app-icon, .image { border-radius: 10px; }
+.body { font-size: 12px; color: #c9d4ce; }
+.app-icon, .image { border-radius: 8px; margin-right: 4px; }
 .close-button {
-  min-width: 22px; min-height: 22px; margin: 8px; padding: 0;
+  min-width: 20px; min-height: 20px; margin: 7px; padding: 0;
   border-radius: 9999px; border: none;
   background: #1d2825; color: #b7c3bd;
 }
-.close-button:hover { background: #2a3632; }
+.close-button:hover { background: #2a3632; color: #f2f5ef; }
 .notification.critical { border-color: #f0a868; }
 .inline-reply-entry {
-  background: #0f1513; border: 1px solid #2a3632; border-radius: 12px; padding: 6px 10px; color: #f2f5ef;
+  background: #0f1513; border: 1px solid #2a3632; border-radius: 10px; padding: 5px 10px; color: #f2f5ef;
 }
-.inline-reply-button { background: #57d99a; color: #0d1211; border-radius: 12px; border: none; }
+.inline-reply-button { background: #57d99a; color: #0d1211; border-radius: 10px; border: none; }
 
 /* ---- the quick settings panel ---- */
 .control-center {
-  border-radius: 22px;
+  border-radius: 20px;
   border: 1px solid #2f3d38;
   background: rgba(20, 27, 25, 0.97);
-  box-shadow: 0 0 50px rgba(87, 217, 154, 0.08), 0 30px 70px rgba(0, 0, 0, 0.6);
-  padding: 18px;
+  box-shadow: 0 0 40px rgba(87, 217, 154, 0.07), 0 24px 60px rgba(0, 0, 0, 0.6);
+  padding: 14px;
+  animation: open 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes open {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
 }
 .control-center-list { background: transparent; }
-.control-center-list-placeholder { color: #6b7a74; font-family: "DM Mono", monospace; font-size: 12px; }
-.widget { margin: 6px 0; }
+.control-center-list-placeholder { color: #6b7a74; font-family: "DM Mono", monospace; font-size: 11px; padding: 10px 0; }
+.control-center-list-placeholder image { -gtk-icon-size: 0; min-width: 0; min-height: 0; margin: 0; opacity: 0; }
+.widget { margin: 4px 0; }
 
-.widget-title > label { font-size: 17px; font-weight: 700; color: #f2f5ef; }
+.widget-title > label { font-size: 15px; font-weight: 700; color: #f2f5ef; }
 .widget-title > button {
-  font-family: "DM Mono", monospace; font-size: 12px;
-  padding: 4px 12px; border-radius: 9999px;
+  font-family: "DM Mono", monospace; font-size: 11px;
+  padding: 3px 10px; border-radius: 9999px;
   border: 1px solid #2a3632; background: transparent; color: #9fb0a8;
 }
 .widget-title > button:hover { color: #57d99a; border-color: #57d99a; }
 
-.widget-buttons-grid { padding: 4px 0; }
+/* Tiles: icon and name, ink when off, forest green when on. */
+.widget-buttons-grid { padding: 2px 0; }
 .widget-buttons-grid > flowbox > flowboxchild > button {
-  min-width: 104px;
-  min-height: 46px;
+  min-width: 100px;
+  min-height: 40px;
   margin: 3px;
-  border-radius: 14px;
+  padding: 0 12px;
+  border-radius: 12px;
   border: 1px solid #222d2a;
   background: #0f1513;
   color: #d9e1dd;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
-.widget-buttons-grid > flowbox > flowboxchild > button:hover { border-color: #57d99a; }
-.widget-buttons-grid > flowbox > flowboxchild > button.toggle:checked {
+.widget-buttons-grid > flowbox > flowboxchild > button:hover { border-color: #3d4a45; background: #141d1a; }
+.widget-buttons-grid > flowbox > flowboxchild > button.toggle:checked,
+.widget-buttons-grid > flowbox > flowboxchild > button.active {
   background: #1f6b45;
   border-color: #57d99a;
   color: #f2f5ef;
 }
 
-.widget-volume, .widget-backlight {
-  padding: 8px 14px;
-  border-radius: 14px;
+.widget-volume, .widget-slider, .widget-backlight {
+  padding: 6px 12px;
+  border-radius: 12px;
   background: #0f1513;
   border: 1px solid #222d2a;
 }
-.widget-volume label, .widget-backlight label {
-  font-family: "DM Mono", monospace; font-size: 12px; color: #8a9a93; min-width: 42px;
+.widget-volume label, .widget-slider label, .widget-backlight label {
+  font-size: 14px; color: #8a9a93; min-width: 24px;
 }
 scale trough { min-height: 6px; border-radius: 3px; background: #1d2825; }
 scale highlight { border-radius: 3px; background: #57d99a; }
-scale slider { min-width: 16px; min-height: 16px; border-radius: 9999px; background: #f2f5ef; border: none; box-shadow: none; }
+scale slider {
+  min-width: 14px; min-height: 14px; border-radius: 9999px; background: #f2f5ef; border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+scale slider:hover { transform: scale(1.15); }
 
 .widget-mpris-player {
-  padding: 12px; border-radius: 14px; background: #0f1513; border: 1px solid #222d2a;
+  padding: 10px; border-radius: 12px; background: #0f1513; border: 1px solid #222d2a;
 }
-.widget-mpris-title { font-weight: 600; font-size: 14px; }
-.widget-mpris-subtitle { font-size: 12px; color: #9fb0a8; }
+.widget-mpris-title { font-weight: 600; font-size: 13px; }
+.widget-mpris-subtitle { font-size: 11px; color: #9fb0a8; }
 
 .widget-dnd {
-  padding: 8px 14px; border-radius: 14px; background: #0f1513; border: 1px solid #222d2a;
+  padding: 6px 12px; border-radius: 12px; background: #0f1513; border: 1px solid #222d2a;
 }
-.widget-dnd > label { font-size: 13px; color: #d9e1dd; }
+.widget-dnd > label { font-size: 12px; color: #d9e1dd; }
 .widget-dnd > switch { border-radius: 9999px; background: #1d2825; border: none; }
 .widget-dnd > switch:checked { background: #1f6b45; }
-.widget-dnd > switch slider { border-radius: 9999px; background: #f2f5ef; }
+.widget-dnd > switch slider {
+  border-radius: 9999px; background: #f2f5ef;
+  transition: all 240ms cubic-bezier(0.32, 0.72, 0, 1);
+}

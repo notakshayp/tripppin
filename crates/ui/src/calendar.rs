@@ -25,6 +25,9 @@ pub fn run() -> glib::ExitCode {
             None => {
                 let w = build(app);
                 w.present();
+                if let Some(c) = w.child() {
+                    crate::common::play(&c, "drop");
+                }
                 *slot = Some(w);
             }
         }

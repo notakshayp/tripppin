@@ -3,7 +3,7 @@
 dir="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
 latest=$(ls -t "$dir"/*.png 2>/dev/null | head -1)
 if [ -z "$latest" ]; then
-    notify-send -a screenshots "no screenshot yet" "press print to take one first"
+    notify-send -a screenshots -i applets-screenshooter "no screenshot yet" "press print to take one first"
     exit 0
 fi
 exec swappy -f "$latest"
