@@ -124,6 +124,21 @@ RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsco
     && systemctl set-default graphical.target \
     && dconf update
 
+# Icons: Papirus-Dark with the folders recoloured from Papirus blue to Tripppin greens, as
+# a small theme of its own that inherits everything else.
+RUN set -e; src=/usr/share/icons/Papirus; dst=/usr/share/icons/Tripppin; \
+    for dir in "$src"/*/places; do \
+      size=$(basename "$(dirname "$dir")"); mkdir -p "$dst/$size/places"; \
+      for f in "$dir"/*.svg; do \
+        real=$(readlink -f "$f"); grep -q '#5294e2' "$real" || continue; \
+        sed -e 's/#5294e2/#3aa873/g; s/#4877b1/#1f6b45/g; s/#1d344f/#0d2a1c/g' "$real" > "$dst/$size/places/$(basename "$f")"; \
+      done; \
+    done; \
+    sed -e 's/^Name=.*/Name=Tripppin/; s/^Comment=.*/Comment=Papirus-Dark with Tripppin folders/; s/^Inherits=.*/Inherits=Papirus-Dark,breeze-dark,hicolor/' \
+      /usr/share/icons/Papirus-Dark/index.theme > "$dst/index.theme"; \
+    gtk-update-icon-cache -q -f "$dst"; \
+    test -f "$dst/48x48/places/folder.svg"
+
 # The boot splash: our Plymouth theme, built into the initramfs so it shows from the start.
 RUN plymouth-set-default-theme tripppin \
     && kver=$(cd /usr/lib/modules && echo *) \
