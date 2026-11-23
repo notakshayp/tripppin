@@ -154,19 +154,23 @@ jobs:
             echo "no R2 credentials or no ISO; skipping"; exit 0
           fi
           export AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          # Big parts, few at a time: R2 sometimes rejects a many-part upload (InvalidPart).
+          aws configure set default.s3.multipart_chunksize 128MB
+          aws configure set default.s3.max_concurrent_requests 4
+          up(){ for try in 1 2 3; do aws s3 cp "$@" --endpoint-url "$endpoint" --only-show-errors && return 0; echo "upload failed (try $try), retrying"; sleep 15; done; return 1; }
           endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           cd r2
           iso=$(ls *.iso | head -1)
           day=$(date -u +%Y-%m-%d)
-          aws s3 cp "$iso" "$BUCKET/releases/$day/$iso" --endpoint-url "$endpoint" --only-show-errors
-          aws s3 cp SHA256SUMS "$BUCKET/releases/$day/SHA256SUMS" --endpoint-url "$endpoint" --only-show-errors
-          aws s3 cp SHA256SUMS.bundle "$BUCKET/releases/$day/SHA256SUMS.bundle" --endpoint-url "$endpoint" --only-show-errors
+          up "$iso" "$BUCKET/releases/$day/$iso"
+          up SHA256SUMS "$BUCKET/releases/$day/SHA256SUMS"
+          up SHA256SUMS.bundle "$BUCKET/releases/$day/SHA256SUMS.bundle"
           # R2 has no object tagging, which a server-side copy asks for, so upload it again.
-          aws s3 cp "$iso" "$BUCKET/latest/tripppin-x86_64.iso" --endpoint-url "$endpoint" --only-show-errors
+          up "$iso" "$BUCKET/latest/tripppin-x86_64.iso"
           sed "s/$iso/tripppin-x86_64.iso/" SHA256SUMS > latest-SHA256SUMS
-          aws s3 cp latest-SHA256SUMS "$BUCKET/latest/SHA256SUMS" --endpoint-url "$endpoint" --only-show-errors
+          up latest-SHA256SUMS "$BUCKET/latest/SHA256SUMS"
           size=$(stat -c %s "$iso"); sha=$(cut -d' ' -f1 SHA256SUMS)
           printf '{"version":"%s","date":"%s","file":"latest/tripppin-x86_64.iso","dated":"releases/%s/%s","bytes":%s,"sha256":"%s","commit":"%s"}\n' \
             "$day" "$day" "$day" "$iso" "$size" "$sha" "${GITHUB_SHA::12}" > latest.json
-          aws s3 cp latest.json "$BUCKET/latest.json" --endpoint-url "$endpoint" --content-type application/json --only-show-errors
+          up latest.json "$BUCKET/latest.json" --content-type application/json
           cat latest.json
