@@ -107,6 +107,11 @@ fn idle_file() -> PathBuf {
 pub fn swayidle_config(idle: &Idle) -> String {
     let mut out = String::from("# When the computer is left alone. Written by tripppin settings.\n");
     if idle.lock > 0 {
+        // Fade the screen half a minute first, so locking never comes as a surprise.
+        out.push_str(&format!(
+            "timeout {} 'tripppin-ui dim' resume 'pkill -f \"^(/usr/bin/)?tripppin-ui dim\"'\n",
+            idle.lock * 60 - 30
+        ));
         out.push_str(&format!("timeout {} 'tripppin-ui lock'\n", idle.lock * 60));
     }
     if idle.screen_off > 0 {
@@ -132,7 +137,9 @@ pub fn parse_idle(text: &str) -> Idle {
         }
         let secs: u32 = words.next().and_then(|s| s.parse().ok()).unwrap_or(0);
         let rest = words.collect::<Vec<_>>().join(" ");
-        if rest.contains("lock") {
+        if rest.contains("dim") {
+            continue;
+        } else if rest.contains("lock") {
             idle.lock = secs / 60;
         } else if rest.contains("power-off-monitors") {
             idle.screen_off = secs / 60;

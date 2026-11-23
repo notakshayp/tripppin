@@ -1058,3 +1058,8 @@ window.fb {
     font-size: 13px;
     color: #9fb0a8;
 }
+
+/* The screen fading before it locks. */
+window.dim {
+    background: #000000;
+}

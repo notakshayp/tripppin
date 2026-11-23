@@ -12,6 +12,7 @@ mod apps;
 mod bt;
 mod calendar;
 mod common;
+mod dim;
 mod display;
 mod firstboot;
 mod greetd;
@@ -64,11 +65,12 @@ fn main() -> ExitCode {
         Some("settings") => settings::run(),
         Some("calendar") => calendar::run(),
         Some("keys") => keys::run(),
+        Some("dim") => dim::run(),
         Some("switch") => switch::run(),
         Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where>"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim"
             );
             ExitCode::from(2)
         }
