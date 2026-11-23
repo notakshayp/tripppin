@@ -57,8 +57,8 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [ ] Window switcher (Alt+Tab) with previews; overview of all windows and workspaces
 - [ ] Window controls: snap halves/quarters, maximise, minimise, always on top, move to workspace
 - [x] Keyboard shortcuts cheat sheet (Super+/), in our style
-- [ ] Clipboard history (cliphist) with a picker
-- [ ] Emoji and symbol picker
+- [x] Clipboard history (cliphist) with a picker (Super + V; checked in the VM: text and images, picking puts it back)
+- [~] Emoji and symbol picker (Super + .; Unicode's names, typed with wtype and copied; checked once the next image brings unicode-emoji and wtype)
 - [ ] Screenshots (grim + slurp + swappy): area, window, screen; annotate; copy or save
 - [ ] Screen recording (wf-recorder) with a bar indicator
 - [ ] Password prompts for admin actions (lxpolkit), styled

@@ -213,6 +213,8 @@ pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
             ("terminal", "super + return"),
             ("apps", "super + d"),
             ("quick settings", "super + n"),
+            ("clipboard history", "super + v"),
+            ("emoji", "super + ."),
             ("these shortcuts", "super + /"),
         ],
     ),

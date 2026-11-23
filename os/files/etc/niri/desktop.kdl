@@ -51,6 +51,8 @@ environment {
 spawn-at-startup "sh" "-c" "w=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
 spawn-at-startup "waybar"
 spawn-at-startup "swaync"
+// Clipboard history for Super + V (text and images).
+spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 spawn-at-startup "tripppin-ui" "orb"
 spawn-at-startup "tripppin-ui" "first-boot"
 // When the computer is left alone: the person's timings (Settings → Power), else ours
@@ -93,6 +95,8 @@ binds {
     Mod+Shift+2 { move-window-to-workspace 2; }
     Mod+Shift+3 { move-window-to-workspace 3; }
     Mod+Slash { spawn "tripppin-ui" "keys"; }
+    Mod+V { spawn "tripppin-clipboard"; }
+    Mod+Period { spawn "tripppin-emoji"; }
     Mod+Shift+E { quit; }
     Print { screenshot; }
     Ctrl+Print { screenshot-screen; }
