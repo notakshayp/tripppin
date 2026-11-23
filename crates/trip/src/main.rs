@@ -24,7 +24,11 @@ enum Command {
         json: bool,
     },
     /// The AI shell: type anything to ask. Starts automatically in a terminal.
-    Shell,
+    Shell {
+        /// Pick up a session from the history (the orb's "continue in terminal").
+        #[arg(long = "continue", value_name = "SESSION")]
+        resume: Option<String>,
+    },
     /// Ask one question and print the answer (for scripts and testing).
     #[command(hide = true)]
     Ask {
@@ -75,7 +79,7 @@ struct HwReport<'a> {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Hw { json } => hw(json),
-        Command::Shell => shell::run(),
+        Command::Shell { resume } => shell::run(resume.as_deref()),
         Command::Ask { words } => model::ask(&words.join(" ")),
         Command::Do { words } => agent::once(&words.join(" ")),
         Command::Model(ModelCommand::List) => model::list(),

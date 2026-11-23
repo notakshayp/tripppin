@@ -1,12 +1,18 @@
 //! The agent loop: the model asks for tools, trip checks each call, runs it and sends the
 //! result back, until the model answers in plain text.
 //!
+//! The work is recorded in a [`Session`]: each step, its outcome and the end of its output.
+//! The session's notebook (the request, the model's own notes and one line per step) is shown to
+//! the model at every step, so small models with small context windows keep track of the task
+//! even after old messages are dropped to make room.
+//!
 //! Every call goes through `verify` first. A call with an unknown tool, arguments that aren't
 //! JSON, or missing or mistyped fields isn't run; the model gets the exact problem back and
 //! another try, up to `MAX_RETRIES` times in a row.
 
 use crate::jobs;
 use crate::model::{self, ContextFull, Message, ToolCall};
+use crate::session::Session;
 use crate::term::{ACCENT, DIM, RESET};
 use anyhow::{Result, bail};
 use serde_json::{Value, json};
@@ -32,6 +38,8 @@ const MAX_REPEATS: usize = 2;
 const CHARS_PER_TOKEN: usize = 3;
 /// Context kept free for the tool definitions and the model's reply, in tokens.
 const CONTEXT_RESERVE: usize = 3000;
+/// Room for the notebook, which is added to what the model sees, in characters.
+const NOTEBOOK_RESERVE: usize = 3000;
 const TRIMMED: &str = "[earlier output removed to save space; run the command again if you need it]";
 
 /// The tools the model can call, as JSON schemas.
@@ -98,6 +106,20 @@ pub fn tools() -> Value {
         {
             "type": "function",
             "function": {
+                "name": "note",
+                "description": "Write a short note in your task notebook: your plan, a fact you found, what worked or \
+    what failed. The notebook is shown to you at every step, even after old messages are dropped, so note anything \
+    you'll need later. Start a task of more than two steps by noting your plan.",
+                "parameters": {
+                    "type": "object",
+                    "properties": { "text": { "type": "string", "description": "The note, one or two lines." } },
+                    "required": ["text"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "read_file",
                 "description": "Read a text file.",
                 "parameters": {
@@ -125,7 +147,7 @@ pub fn tools() -> Value {
     ])
 }
 
-const TOOL_NAMES: &str = "exec, job_wait, job_output, job_stop, read_file and write_file";
+const TOOL_NAMES: &str = "exec, job_wait, job_output, job_stop, note, read_file and write_file";
 
 /// A tool call that passed the checks.
 #[derive(Debug, PartialEq)]
@@ -134,6 +156,7 @@ pub enum Action {
     JobWait { job: usize, wait_secs: u64 },
     JobOutput { job: usize },
     JobStop { job: usize },
+    Note { text: String },
     ReadFile { path: String },
     WriteFile { path: String, content: String },
 }
@@ -214,6 +237,7 @@ pub fn verify(call: &ToolCall) -> Result<Action, String> {
         "job_wait" => Ok(Action::JobWait { job: job()?, wait_secs: seconds("wait_secs", DEFAULT_JOB_WAIT_SECS)? }),
         "job_output" => Ok(Action::JobOutput { job: job()? }),
         "job_stop" => Ok(Action::JobStop { job: job()? }),
+        "note" => Ok(Action::Note { text: text("text", false)? }),
         "read_file" => Ok(Action::ReadFile { path: text("path", false)? }),
         "write_file" => Ok(Action::WriteFile { path: text("path", false)?, content: text("content", true)? }),
         "" => Err(format!("The tool call has no tool name. The tools are {TOOL_NAMES}.")),
@@ -226,6 +250,7 @@ fn example(tool: &str) -> &'static str {
         "read_file" => r#"{"path": "~/notes.txt"}"#,
         "write_file" => r#"{"path": "~/notes.txt", "content": "hello"}"#,
         "job_wait" | "job_output" | "job_stop" => r#"{"job": 1}"#,
+        "note" => r#"{"text": "plan: 1. find the package 2. install it 3. check it runs"}"#,
         _ => r#"{"command": "ls -la ~"}"#,
     }
 }
@@ -289,23 +314,43 @@ impl Ui for Terminal {
 /// How a task ended.
 pub struct Done {
     pub stats: Option<String>,
+    /// The model's final answer.
+    pub answer: String,
 }
 
-/// Works on the conversation in `history` until the model answers without calling a tool.
-/// The model's text streams to the terminal; each tool call shows as a line, with its output.
-pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<Done> {
+/// Works on the session's newest request until the model answers without calling a tool.
+/// The model's text streams to `ui`; each tool call shows as a step, with its output. The
+/// session records every step and is saved as it goes; a request that fails leaves no
+/// half-finished tool turns in the conversation.
+pub fn run(session: &mut Session, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<Done> {
+    let result = work(session, cancel, ui);
+    match &result {
+        Ok(done) => session.finish(Ok(&done.answer)),
+        Err(e) => {
+            session.finish(Err(&format!("{e:#}")));
+            session.forget_unfinished();
+            session.save();
+        }
+    }
+    result
+}
+
+fn work(session: &mut Session, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<Done> {
     let tools = tools();
-    let budget = model::context_tokens().saturating_sub(CONTEXT_RESERVE).max(2000) * CHARS_PER_TOKEN;
+    let budget = (model::context_tokens().saturating_sub(CONTEXT_RESERVE).max(2000) * CHARS_PER_TOKEN)
+        .saturating_sub(NOTEBOOK_RESERVE);
     let mut runs: HashMap<String, usize> = HashMap::new();
     let mut retries = 0;
     for step in 0..MAX_STEPS {
-        compact(history, budget);
-        let reply = match ask(history, &tools, cancel, ui) {
+        if compact(session, budget) {
+            ui.note("memory nearly full: older steps were dropped; the task notebook keeps track of them");
+        }
+        let reply = match ask(session, &tools, cancel, ui) {
             Err(e) if e.downcast_ref::<ContextFull>().is_some() => {
-                // The estimate was off; keep only the newest output and try once more.
-                ui.note("the conversation got too long for the model's memory; trimming old output");
-                compact(history, 0);
-                ask(history, &tools, cancel, ui).map_err(|e| match e.downcast_ref::<ContextFull>() {
+                // The estimate was off; keep only the newest steps and try once more.
+                ui.note("the conversation got too long for the model's memory; dropping older steps");
+                compact(session, 0);
+                ask(session, &tools, cancel, ui).map_err(|e| match e.downcast_ref::<ContextFull>() {
                     Some(_) => anyhow::anyhow!("this task got too long for the model's memory. try a smaller step."),
                     None => e,
                 })?
@@ -322,6 +367,7 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool, ui: &mut dyn Ui) -> 
             // A runaway reply; its half-written tool calls can't be trusted.
             bail!("the model's reply ran on too long, so it was cut off. try asking again, more specifically.");
         }
+        let history = &mut session.history;
         if reply.calls.is_empty() {
             history.push(Message::assistant(&reply.text));
             if looks_like_text_call(&reply.text) {
@@ -335,7 +381,7 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool, ui: &mut dyn Ui) -> 
                 history.push(Message::user(FIX_TEXT_CALL));
                 continue;
             }
-            return Ok(Done { stats: reply.stats() });
+            return Ok(Done { stats: reply.stats(), answer: reply.text });
         }
         let mut calls = reply.calls;
         for (i, call) in calls.iter_mut().enumerate() {
@@ -354,11 +400,24 @@ pub fn run(history: &mut Vec<Message>, cancel: &AtomicBool, ui: &mut dyn Ui) -> 
 Don't repeat it. Try a different approach, or tell the person what's blocking you."
                     )
                 }
+                Ok(Action::Note { text }) => {
+                    show_step(ui, "note", &text);
+                    session.step_started("note", &text);
+                    session.step_finished(Some(true), "");
+                    session.notes.push(one_line_full(&text));
+                    ui.step_done(true);
+                    "Noted. It's in your notebook.".to_string()
+                }
                 Ok(action) => {
+                    let (label, detail) = describe_action(&action);
+                    session.step_started(&label, &detail);
+                    session.save();
                     let result = perform(&action, cancel, ui);
-                    if let Some(ok) = outcome(&result) {
+                    let ok = outcome(&result);
+                    if let Some(ok) = ok {
                         ui.step_done(ok);
                     }
+                    session.step_finished(ok, &result);
                     result
                 }
                 Err(problem) => {
@@ -367,7 +426,8 @@ Don't repeat it. Try a different approach, or tell the person what's blocking yo
                     format!("Error: this call was not run. {problem} Fix the call and send it again.")
                 }
             };
-            history.push(Message::tool(&call.id, &result));
+            session.history.push(Message::tool(&call.id, &result));
+            session.save();
             if cancel.load(Ordering::Relaxed) {
                 bail!("stopped");
             }
@@ -399,15 +459,29 @@ fn outcome(result: &str) -> Option<bool> {
     }
 }
 
-fn ask(history: &[Message], tools: &Value, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<model::Reply> {
+/// Sends the conversation with the notebook added to its newest message, so the model always
+/// sees its request, notes and steps right before it decides (the notebook isn't kept in the
+/// history, so the conversation itself stays unchanged and cacheable).
+fn ask(session: &Session, tools: &Value, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<model::Reply> {
     ui.thinking();
-    model::stream(history, Some(tools), cancel, |piece| ui.text(piece))
+    let mut messages = session.history.clone();
+    let has_work = session.turns.last().is_some_and(|t| !t.steps.is_empty()) || !session.notes.is_empty();
+    if has_work && let Some(last) = messages.last_mut() {
+        let content = last.0["content"].as_str().unwrap_or("").to_string();
+        last.0["content"] = Value::String(format!("{content}\n\n---\n{}", session.notebook()));
+    }
+    model::stream(&messages, Some(tools), cancel, |piece| ui.text(piece))
 }
 
 fn bump(runs: &mut HashMap<String, usize>, command: &str) -> usize {
     let n = runs.entry(command.trim().to_string()).or_default();
     *n += 1;
     *n
+}
+
+/// The first line, whole (a note).
+fn one_line_full(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn one_line(text: &str) -> String {
@@ -419,14 +493,41 @@ fn one_line(text: &str) -> String {
     }
 }
 
-/// Keeps the conversation under `budget` characters by replacing the oldest tool outputs with a
-/// short note. The newest tool result always stays, so the model can see what just happened.
-fn compact(history: &mut [Message], budget: usize) {
+/// Keeps the conversation under `budget` characters, in three passes, stopping as soon as it fits:
+/// 1. earlier requests keep only what was asked and answered (their steps go);
+/// 2. old command output is replaced with a short note (the newest result always stays);
+/// 3. the current request's oldest steps go altogether, keeping the newest two.
+///
+/// Every step stays in the session's notebook, which the model sees each time. Returns whether
+/// whole steps were dropped (passes 1 and 3).
+fn compact(session: &mut Session, budget: usize) -> bool {
     let size = |h: &[Message]| h.iter().map(|m| m.0.to_string().len()).sum::<usize>();
-    let mut total = size(history);
-    if total <= budget {
-        return;
+    if size(&session.history) <= budget {
+        return false;
     }
+    let start = session.turns.last().map_or(1, |t| t.start).min(session.history.len());
+    let mut dropped = false;
+
+    // 1. Earlier requests: only the questions and the final answers.
+    let before = session.history.len();
+    let mut kept = Vec::with_capacity(before);
+    for (i, m) in session.history.drain(..).enumerate() {
+        let role = m.0["role"].as_str().unwrap_or("");
+        if i == 0 || i >= start || role == "user" || (role == "assistant" && m.0.get("tool_calls").is_none()) {
+            kept.push(m);
+        }
+    }
+    let removed = before - kept.len();
+    session.history = kept;
+    let start = start - removed;
+    if let Some(t) = session.turns.last_mut() {
+        t.start = start;
+    }
+    dropped |= removed > 0;
+
+    // 2. Old output.
+    let history = &mut session.history;
+    let mut total = size(history);
     let newest = history.iter().rposition(|m| m.0["role"] == "tool");
     for (i, msg) in history.iter_mut().enumerate() {
         if total <= budget {
@@ -440,6 +541,26 @@ fn compact(history: &mut [Message], budget: usize) {
         m["content"] = Value::String(TRIMMED.into());
         total = total - before + m.to_string().len();
     }
+
+    // 3. The current request's oldest steps (a call and its results go together).
+    while total > budget {
+        let groups: Vec<usize> = (start + 1..history.len())
+            .filter(|&i| history[i].0["role"] == "assistant" && history[i].0.get("tool_calls").is_some())
+            .collect();
+        if groups.len() <= 2 {
+            break;
+        }
+        let from = groups[0];
+        let to = groups[1];
+        let gone: usize = history[from..to].iter().map(|m| m.0.to_string().len()).sum();
+        history.drain(from..to);
+        total -= gone;
+        dropped = true;
+    }
+    if dropped {
+        session.compactions += 1;
+    }
+    dropped
 }
 
 /// Shows the step on one line, cut to a readable length.
@@ -450,8 +571,24 @@ fn show_step(ui: &mut dyn Ui, tool: &str, detail: &str) {
     ui.step(tool, &format!("{line}{}", if more { "…" } else { "" }));
 }
 
+/// What a step is and what it works on, as the history shows it.
+fn describe_action(action: &Action) -> (String, String) {
+    match action {
+        Action::Exec { command, background, .. } => {
+            ((if *background { "exec in the background" } else { "exec" }).into(), command.clone())
+        }
+        Action::JobWait { job, .. } => (format!("waiting on job {job}"), jobs::command(*job).unwrap_or_default()),
+        Action::JobOutput { job } => (format!("checking job {job}"), jobs::command(*job).unwrap_or_default()),
+        Action::JobStop { job } => (format!("stopping job {job}"), jobs::command(*job).unwrap_or_default()),
+        Action::Note { text } => ("note".into(), text.clone()),
+        Action::ReadFile { path } => ("read".into(), path.clone()),
+        Action::WriteFile { path, .. } => ("write".into(), path.clone()),
+    }
+}
+
 fn perform(action: &Action, cancel: &AtomicBool, ui: &mut dyn Ui) -> String {
     match action {
+        Action::Note { .. } => "Noted.".into(),
         Action::Exec { command, wait_secs, background } => {
             show_step(ui, if *background { "exec in the background" } else { "exec" }, command);
             let id = match jobs::start(command, !*background) {
@@ -544,8 +681,9 @@ fn clip(text: &str) -> String {
 /// `trip do <task>`: one task without the interactive shell, for scripts and testing.
 pub fn once(task: &str) -> Result<()> {
     let cancel = AtomicBool::new(false);
-    let mut history = vec![Message::system(), Message::user(task)];
-    let done = run(&mut history, &cancel, &mut Terminal)?;
+    let mut session = Session::new("terminal");
+    session.ask(task);
+    let done = run(&mut session, &cancel, &mut Terminal)?;
     if let Some(stats) = done.stats {
         eprintln!("{DIM}{stats}{RESET}");
     }
@@ -578,6 +716,7 @@ mod tests {
         assert_eq!(verify(&call("job_output", r##"{"job":"#3"}"##)), Ok(Action::JobOutput { job: 3 }));
         assert_eq!(verify(&call("job_stop", r#"{"job":"job 4"}"#)), Ok(Action::JobStop { job: 4 }));
         assert_eq!(verify(&call("read_file", r#"{"path":"~/a"}"#)), Ok(Action::ReadFile { path: "~/a".into() }));
+        assert_eq!(verify(&call("note", r#"{"text":"plan"}"#)), Ok(Action::Note { text: "plan".into() }));
         assert_eq!(
             verify(&call("write_file", r#"{"path":"a","content":""}"#)),
             Ok(Action::WriteFile { path: "a".into(), content: String::new() })
@@ -599,6 +738,7 @@ mod tests {
         assert!(err("job_wait", "{}").contains("needs a \"job\" field"));
         assert!(err("job_stop", r#"{"job": 0}"#).contains("job number"));
         assert!(err("exec", r#"{"command": "ls", "background": 1}"#).contains("true or false"));
+        assert!(err("note", "{}").contains("needs a \"text\" field"));
     }
 
     #[test]
@@ -613,24 +753,58 @@ mod tests {
         assert_eq!(outcome("Wrote 5 bytes to a."), Some(true));
     }
 
+    fn session_with(messages: Vec<Message>) -> Session {
+        let mut s = Session::new("test");
+        s.history = messages;
+        s.turns.push(crate::session::Turn { request: "task".into(), start: 1, ..Default::default() });
+        s
+    }
+
     #[test]
     fn compacts_old_tool_output_first() {
         let big = "x".repeat(5000);
-        let mut h = vec![
+        let mut s = session_with(vec![
             Message::system(),
             Message::user("task"),
             Message::tool("a", &big),
             Message::tool("b", &big),
             Message::tool("c", &big),
-        ];
-        compact(&mut h, 8000);
+        ]);
+        assert!(!compact(&mut s, 8000), "only output was trimmed");
+        let h = &s.history;
         assert_eq!(h[2].0["content"], TRIMMED);
         assert_eq!(h[3].0["content"], TRIMMED);
         assert_eq!(h[4].0["content"], big.as_str(), "the newest output stays");
         assert_eq!(h[1].0["content"], "task", "the request stays");
-        let mut small = vec![Message::user("hi"), Message::tool("a", "ok")];
+        let mut small = session_with(vec![Message::user("hi"), Message::tool("a", "ok")]);
         compact(&mut small, 10_000);
-        assert_eq!(small[1].0["content"], "ok");
+        assert_eq!(small.history[1].0["content"], "ok");
+    }
+
+    #[test]
+    fn compacts_whole_steps_when_output_is_not_enough() {
+        let call = |id: &str| ToolCall { id: id.into(), name: "exec".into(), arguments: "x".repeat(3000) };
+        let mut h = vec![
+            Message::system(),
+            Message::user("earlier question"),
+            Message::assistant_calls("", &[call("old")]),
+            Message::tool("old", "old output"),
+            Message::assistant("earlier answer"),
+            Message::user("task"),
+        ];
+        for id in ["a", "b", "c", "d"] {
+            h.push(Message::assistant_calls("", &[call(id)]));
+            h.push(Message::tool(id, "ok"));
+        }
+        let mut s = session_with(h);
+        s.turns[0].start = 5;
+        assert!(compact(&mut s, 8000));
+        let roles: Vec<String> = s.history.iter().map(|m| m.0["role"].as_str().unwrap().to_string()).collect();
+        assert_eq!(roles, ["system", "user", "assistant", "user", "assistant", "tool", "assistant", "tool"]);
+        assert_eq!(s.history[3].0["content"], "task");
+        assert_eq!(s.turns[0].start, 3);
+        assert_eq!(s.history[5].0["tool_call_id"], "c", "the newest two steps stay");
+        assert_eq!(s.compactions, 1);
     }
 
     #[test]

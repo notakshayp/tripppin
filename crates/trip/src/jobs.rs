@@ -7,13 +7,15 @@
 
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
+/// The password pop-up sudo uses when there's no terminal (`tripppin-ui askpass`).
+const ASKPASS: &str = "/usr/libexec/tripppin-askpass";
 /// Lines kept in memory per job; the log file has all of them.
 const KEEP_LINES: usize = 400;
 /// Lines of new output shown to the model per report.
@@ -60,9 +62,20 @@ fn log_dir() -> Option<PathBuf> {
 pub fn start(command: &str, foreground: bool) -> Result<usize, String> {
     let mut list = jobs().lock().unwrap_or_else(|e| e.into_inner());
     let id = list.last().map_or(1, |j| j.id + 1);
-    let mut child = Command::new("bash")
+    let mut bash = Command::new("bash");
+    // With no terminal to type into (the orb, or a background job), sudo asks for the password
+    // in a pop-up that says which command wants it. Settings → AI can allow some commands
+    // without a password instead.
+    let terminal = foreground && std::io::stdin().is_terminal();
+    let script = if !terminal && std::path::Path::new(ASKPASS).exists() {
+        bash.env("SUDO_ASKPASS", ASKPASS).env("TRIPPPIN_SUDO_FOR", command);
+        format!("sudo() {{ command sudo -A \"$@\"; }}\n{command}")
+    } else {
+        command.to_string()
+    };
+    let mut child = bash
         .arg("-c")
-        .arg(command)
+        .arg(script)
         .stdin(if foreground { Stdio::inherit() } else { Stdio::null() })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

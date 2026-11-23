@@ -28,23 +28,38 @@
   "hide-on-action": true,
   "script-fail-notify": true,
   "text-empty": "no notifications",
-  "widgets": ["title", "buttons-grid", "slider#volume", "backlight", "mpris", "dnd", "notifications"],
+  "widgets": [
+    "title",
+    "buttons-grid",
+    "menubar",
+    "slider#volume",
+    "backlight",
+    "mpris",
+    "dnd",
+    "notifications"
+  ],
   "widget-config": {
-    "title": { "text": "quick settings", "clear-all-button": true, "button-text": "clear all" },
-    "dnd": { "text": "do not disturb" },
+    "title": {
+      "text": "quick settings",
+      "clear-all-button": true,
+      "button-text": "clear all"
+    },
+    "dnd": {
+      "text": "do not disturb"
+    },
     "buttons-grid": {
       "buttons-per-row": 2,
       "actions": [
         {
           "label": "\ue1ae   wi-fi",
           "type": "toggle",
-          "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && nmcli radio wifi on || nmcli radio wifi off'",
-          "update-command": "sh -c '[ \"$(nmcli radio wifi)\" = enabled ] && echo true || echo false'"
+          "command": "sh -c 'if ! nmcli -t -f TYPE device | grep -qx wifi; then notify-send -a \"quick settings\" -i network-wireless-disabled \"no wi-fi on this computer\" \"there is no wi-fi adapter, so it uses a wired connection.\"; exit 0; fi; [ \"$SWAYNC_TOGGLE_STATE\" = true ] && nmcli radio wifi on || nmcli radio wifi off'",
+          "update-command": "sh -c 'nmcli -t -f TYPE device | grep -qx wifi && [ \"$(nmcli radio wifi)\" = enabled ] && echo true || echo false'"
         },
         {
           "label": "\ue05c   bluetooth",
           "type": "toggle",
-          "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && bluetoothctl power on || bluetoothctl power off'",
+          "command": "sh -c 'if ! bluetoothctl list | grep -q Controller; then notify-send -a \"quick settings\" -i bluetooth-disabled \"no bluetooth on this computer\" \"there is no bluetooth adapter.\"; exit 0; fi; [ \"$SWAYNC_TOGGLE_STATE\" = true ] && bluetoothctl power on || bluetoothctl power off'",
           "update-command": "sh -c 'bluetoothctl show | grep -q \"Powered: yes\" && echo true || echo false'"
         },
         {
@@ -59,20 +74,63 @@
           "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && (pgrep -x wlsunset || setsid wlsunset -T 4500 -t 3500 >/dev/null 2>&1 &) || pkill -x wlsunset'",
           "update-command": "sh -c 'pgrep -x wlsunset >/dev/null && echo true || echo false'"
         },
-        { "label": "\ue14e   screenshot", "command": "sh -c 'swaync-client -cp; sleep 0.4; grim -g \"$(slurp)\" - | swappy -f -'" },
-        { "label": "\ue10b   lock", "command": "sh -c 'swaync-client -cp; tripppin-ui lock'" },
-        { "label": "\ue154   settings", "command": "sh -c 'swaync-client -cp; tripppin-ui settings'" },
-        { "label": "\ue140   power", "command": "sh -c 'swaync-client -cp; tripppin-power'" }
+        {
+          "label": "\ue14e   screenshot",
+          "command": "sh -c 'swaync-client -cp; sleep 0.4; grim -g \"$(slurp)\" - | swappy -f -'"
+        },
+        {
+          "label": "\ue10b   lock",
+          "command": "sh -c 'swaync-client -cp; tripppin-ui lock'"
+        },
+        {
+          "label": "\ue154   settings",
+          "command": "sh -c 'swaync-client -cp; tripppin-ui settings'"
+        },
+        {
+          "label": "\ue140   power",
+          "command": "sh -c 'swaync-client -cp; tripppin-power'"
+        }
       ]
     },
     "slider#volume": {
       "label": "\ue1ab",
-      "cmd_getter": "sh -c 'wpctl get-volume @DEFAULT_AUDIO_SINK@ | sed -E \"s/.* ([0-9])\\.([0-9]{2}).*/\\1\\2/\"'",
-      "cmd_setter": "wpctl set-volume @DEFAULT_AUDIO_SINK@ $value%",
+      "cmd_getter": "/usr/libexec/tripppin-volume get",
+      "cmd_setter": "/usr/libexec/tripppin-volume set $value",
       "min": 0,
-      "max": 100
+      "max": 100,
+      "min_limit": 0,
+      "max_limit": 100
     },
-    "backlight": { "label": "\ue178", "min": 5 },
-    "mpris": { "image-size": 48, "image-radius": 10 }
+    "backlight": {
+      "label": "\ue178",
+      "min": 5
+    },
+    "mpris": {
+      "image-size": 48,
+      "image-radius": 10
+    },
+    "menubar": {
+      "buttons#settings": {
+        "position": "left",
+        "actions": [
+          {
+            "label": "\ue1ae  networks",
+            "command": "sh -c 'swaync-client -cp; tripppin-ui settings wifi'"
+          },
+          {
+            "label": "\ue05c  devices",
+            "command": "sh -c 'swaync-client -cp; tripppin-ui settings bluetooth'"
+          },
+          {
+            "label": "\ue1ab  sound",
+            "command": "sh -c 'swaync-client -cp; tripppin-ui settings sound'"
+          },
+          {
+            "label": "\ue11d  display",
+            "command": "sh -c 'swaync-client -cp; tripppin-ui settings display'"
+          }
+        ]
+      }
+    }
   }
 }

@@ -5,18 +5,24 @@
 //! command's latest output) and the answer. The same agent as the terminal does the work.
 //! Drag the orb and it springs to the nearest corner; right-click tucks it away to a small
 //! dot. The card minimises back into the orb.
+//!
+//! Each step in the card opens on a click to show the command and what it printed. A follow-up
+//! continues the same conversation; the history button lists earlier conversations (the orb's
+//! and the terminal's) to read or continue; "continue in terminal" opens the conversation in
+//! the AI shell.
 
 use crate::common::{self, icons, label};
 use gtk::prelude::*;
 use gtk::{gdk, gio, glib};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use trip::agent::{self, Ui};
-use trip::model::Message;
+use trip::session::Session;
 
 const SUGGESTIONS: [&str; 3] = ["free up some space", "connect my headphones", "what changed today?"];
 
@@ -25,6 +31,9 @@ const EDGE: i32 = 6;
 const BELOW_BAR: i32 = 46;
 /// The glow around the orb, inside its window (clicks pass through it).
 const GLOW: i32 = 14;
+/// The conversation's height in the card: room for a few steps from the start, then it scrolls.
+const MIN_LIST: i32 = 120;
+const MAX_LIST: i32 = 360;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Corner {
@@ -118,7 +127,8 @@ enum Event {
     Note(String),
     StepDone(bool),
     Thinking,
-    Done(Result<(), String>),
+    /// Finished, with the session back from the agent's thread.
+    Done(Result<(), String>, Box<Session>),
 }
 
 /// The agent's progress, sent across to the GTK thread.
@@ -238,17 +248,23 @@ fn tick(glyph: char, failed: bool) -> gtk::Label {
     t
 }
 
-/// One row in the working card.
+/// Lines of a step's output kept to show when it's opened.
+const OUTPUT_LINES: usize = 60;
+
+/// One row in the card: a step, which opens on a click to show the whole command and the end
+/// of its output.
 struct StepRow {
     root: gtk::Box,
-    done: std::cell::Cell<bool>,
+    done: Cell<bool>,
     mark: gtk::Stack,
     title: gtk::Label,
     detail: gtk::Label,
+    output: gtk::Label,
+    lines: RefCell<VecDeque<String>>,
 }
 
 impl StepRow {
-    fn new(title: &str, detail: &str) -> Self {
+    fn new(title: &str, full: &str) -> Rc<Self> {
         let mark = gtk::Stack::new();
         mark.set_valign(gtk::Align::Start);
         mark.set_margin_top(1);
@@ -261,17 +277,106 @@ impl StepRow {
 
         let title = label(title, &["step-title", "running"]);
         title.set_wrap(true);
-        let detail = label(detail, &["step-detail"]);
+        title.set_hexpand(true);
+        let chevron = common::icon(icons::CHEVRON_RIGHT, &["step-chevron"]);
+        chevron.set_valign(gtk::Align::Start);
+        let head = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        head.append(&title);
+        head.append(&chevron);
+        let detail = label(full.lines().next().unwrap_or(""), &["step-detail"]);
         detail.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        detail.set_max_width_chars(48);
+        detail.set_max_width_chars(46);
+
+        // Opened: the whole command, then what it printed.
+        let command = label(full, &["step-command"]);
+        command.set_wrap(true);
+        command.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        command.set_selectable(true);
+        let output = label("", &["step-output"]);
+        output.set_wrap(true);
+        output.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        output.set_selectable(true);
+        output.set_visible(false);
+        let more = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        more.add_css_class("step-more");
+        more.append(&command);
+        more.append(&output);
+        let revealer = gtk::Revealer::new();
+        revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
+        revealer.set_transition_duration(220);
+        revealer.set_child(Some(&more));
+
+        // Only the step's own lines open and close it; the opened part is for selecting text.
+        let line = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        line.add_css_class("step-line");
+        line.append(&head);
+        line.append(&detail);
         let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
-        text.append(&title);
-        text.append(&detail);
+        text.set_hexpand(true);
+        text.append(&line);
+        text.append(&revealer);
         let root = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        root.add_css_class("step");
+        root.set_tooltip_text(Some("click to see the command and what it printed"));
         root.append(&mark);
         root.append(&text);
         common::play(&root, "rise");
-        StepRow { root, done: std::cell::Cell::new(false), mark, title, detail }
+        let row = Rc::new(StepRow {
+            root,
+            done: Cell::new(false),
+            mark,
+            title,
+            detail,
+            output,
+            lines: RefCell::new(VecDeque::new()),
+        });
+        let click = gtk::GestureClick::new();
+        {
+            let (row, revealer, chevron) = (Rc::downgrade(&row), revealer.clone(), chevron.clone());
+            click.connect_released(move |_, _, _, _| {
+                let open = !revealer.reveals_child();
+                if open && let Some(row) = row.upgrade() {
+                    row.show_output();
+                }
+                revealer.set_reveal_child(open);
+                chevron.set_text(&(if open { icons::CHEVRON_DOWN } else { icons::CHEVRON_RIGHT }).to_string());
+            });
+        }
+        line.add_controller(click);
+        row
+    }
+
+    /// A finished step from the history, with what it printed.
+    fn past(step: &trip::session::Step) -> Rc<Self> {
+        let row = StepRow::new(&describe(&step.tool, &step.detail), &step.detail);
+        row.root.remove_css_class("rise-a");
+        row.root.remove_css_class("rise-b");
+        row.lines.borrow_mut().extend(step.output.lines().map(String::from));
+        match step.ok {
+            Some(ok) => row.finish(ok),
+            None => {
+                row.mark.set_visible_child_name("done");
+                row.title.remove_css_class("running");
+            }
+        }
+        row
+    }
+
+    fn add_line(&self, line: &str) {
+        self.detail.set_text(line);
+        let mut lines = self.lines.borrow_mut();
+        lines.push_back(line.to_string());
+        if lines.len() > OUTPUT_LINES {
+            lines.pop_front();
+        }
+    }
+
+    fn show_output(&self) {
+        let lines = self.lines.borrow();
+        let skip = lines.len().saturating_sub(OUTPUT_LINES);
+        let text = lines.iter().skip(skip).cloned().collect::<Vec<_>>().join("\n");
+        self.output.set_text(text.trim());
+        self.output.set_visible(!text.trim().is_empty());
     }
 
     fn finish(&self, ok: bool) {
@@ -283,13 +388,71 @@ impl StepRow {
     }
 }
 
+/// One request in the card: what was asked (for follow-ups), its steps and the answer.
+struct TurnView {
+    root: gtk::Box,
+    steps_box: gtk::Box,
+    answer: gtk::Label,
+    steps: RefCell<Vec<Rc<StepRow>>>,
+}
+
+impl TurnView {
+    fn new(request: Option<&str>) -> Rc<Self> {
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        root.add_css_class("turn");
+        if let Some(q) = request {
+            let you = label(q, &["follow-up"]);
+            you.set_wrap(true);
+            you.set_halign(gtk::Align::End);
+            you.set_xalign(0.0);
+            you.set_max_width_chars(36);
+            root.append(&you);
+            common::play(&you, "rise");
+        }
+        let steps_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        let answer = label("", &["answer"]);
+        answer.set_wrap(true);
+        answer.set_max_width_chars(42);
+        answer.set_selectable(true);
+        answer.set_visible(false);
+        root.append(&steps_box);
+        root.append(&answer);
+        Rc::new(TurnView { root, steps_box, answer, steps: RefCell::new(Vec::new()) })
+    }
+
+    fn add_step(&self, row: Rc<StepRow>) {
+        self.steps_box.append(&row.root);
+        self.steps.borrow_mut().push(row);
+    }
+
+    fn last(&self) -> Option<Rc<StepRow>> {
+        self.steps.borrow().last().cloned()
+    }
+
+    fn set_answer(&self, text: &str) {
+        let shown = text.trim();
+        self.answer.set_markup(&markup(shown));
+        if !shown.is_empty() && !self.answer.is_visible() {
+            self.answer.set_visible(true);
+            common::play(&self.answer, "fade");
+        }
+        if shown.is_empty() {
+            self.answer.set_visible(false);
+        }
+    }
+}
+
 struct State {
     cancel: Arc<AtomicBool>,
     busy: bool,
     started: Option<Instant>,
     phase: &'static str,
     answer: String,
-    steps: Vec<StepRow>,
+    /// The conversation in the card; away in the agent's thread while it works.
+    session: Option<Session>,
+    /// Its id, also while the agent has it.
+    session_id: Option<String>,
+    turn: Option<Rc<TurnView>>,
 }
 
 struct Orb {
@@ -298,21 +461,28 @@ struct Orb {
     logo: gtk::DrawingArea,
     hint: gtk::Label,
     row: gtk::Box,
-    corner: std::cell::Cell<Corner>,
-    tucked: std::cell::Cell<bool>,
+    corner: Cell<Corner>,
+    tucked: Cell<bool>,
     model: gtk::Label,
     ask: gtk::Window,
     entry: gtk::Entry,
     card: gtk::Window,
     body: gtk::Box,
+    pages: gtk::Stack,
+    caption: gtk::Label,
     asked: gtk::Label,
     status: gtk::Label,
     working: gtk::DrawingArea,
     scroller: gtk::ScrolledWindow,
     inner: gtk::Box,
-    steps_box: gtk::Box,
-    answer: gtk::Label,
+    follow: gtk::Entry,
+    follow_row: gtk::Box,
+    terminal: gtk::Button,
     stop: gtk::Button,
+    sessions: gtk::ListBox,
+    chips: gtk::Box,
+    found: gtk::Box,
+    apps: RefCell<Vec<crate::apps::App>>,
     shade: gtk::Box,
     column: gtk::Box,
     state: RefCell<State>,
@@ -332,6 +502,7 @@ pub fn run() -> glib::ExitCode {
         write_status("");
         watch_caps_lock();
         crate::watch::start();
+        crate::keeper::start();
     });
     app.connect_command_line(move |_, cmd| {
         let toggle = cmd.arguments().iter().any(|a| a.to_str() == Some("--toggle"));
@@ -433,7 +604,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     entry.add_css_class("ask");
     entry.set_hexpand(true);
     entry.set_valign(gtk::Align::Center);
-    entry.set_placeholder_text(Some("tell your computer what you want"));
+    entry.set_placeholder_text(Some("tell your computer what you want, or open an app"));
     let send = gtk::Button::new();
     send.add_css_class("send");
     send.set_valign(gtk::Align::Center);
@@ -461,10 +632,21 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let keys = label("enter to send · esc to close", &["hint"]);
     keys.set_hexpand(true);
     footer.append(&keys);
+    let ask_history = gtk::Button::with_label("history");
+    ask_history.add_css_class("link");
+    ask_history.add_css_class("hint-link");
+    ask_history.set_margin_end(12);
+    ask_history.set_tooltip_text(Some("earlier requests and their steps"));
+    footer.append(&ask_history);
     let model = label(&model_line(), &["hint"]);
     footer.append(&model);
     column.append(&pill);
     column.append(&chips);
+    // Typing an app's name offers to open it, like a launcher (the AI gets everything else).
+    let found = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    found.set_margin_start(8);
+    found.set_visible(false);
+    column.append(&found);
     column.append(&footer);
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&shade));
@@ -473,80 +655,107 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     overlay.add_overlay(&column);
     ask.set_child(Some(&overlay));
 
-    // ---- the working card, next to the orb ----
+    // ---- the card, next to the orb: the conversation, or the history ----
     let card = layer_window(app, "tripppin-orb-card");
     card.set_layer(Layer::Top);
     card.set_exclusive_zone(-1);
     card.set_keyboard_mode(KeyboardMode::OnDemand);
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 10);
     body.add_css_class("card");
-    body.set_size_request(380, -1);
+    body.set_size_request(400, -1);
     // Room for the card's shadow inside its window.
     body.set_margin_top(24);
     body.set_margin_bottom(24);
     body.set_margin_start(24);
     body.set_margin_end(24);
-    let you = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    let top = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let top = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     let caption = label("you asked", &["caption"]);
     caption.set_hexpand(true);
     caption.set_valign(gtk::Align::Center);
     let status = label("", &["caption", "live"]);
     status.set_valign(gtk::Align::Center);
+    status.set_margin_end(4);
     // Moving while it works, so it never looks stuck, even before the first step.
     let working = common::spinner(12);
     working.set_valign(gtk::Align::Center);
     working.set_visible(false);
-    let minimise = gtk::Button::with_label(&icons::MINIMIZE.to_string());
-    minimise.add_css_class("icon-button");
-    minimise.set_tooltip_text(Some("minimise into the orb"));
+    let history = icon_button(icons::HISTORY, "earlier requests");
+    let new = icon_button(icons::NEW, "ask something new");
+    let minimise = icon_button(icons::MINIMIZE, "minimise into the orb");
     top.append(&caption);
     top.append(&working);
     top.append(&status);
+    top.append(&new);
+    top.append(&history);
     top.append(&minimise);
-    you.append(&top);
+
+    // The conversation: the first request as a title, then each request's steps and answer.
+    let talk = gtk::Box::new(gtk::Orientation::Vertical, 10);
     let asked = label("", &["asked"]);
     asked.set_wrap(true);
     asked.set_max_width_chars(44);
-    you.append(&asked);
-    let steps_box = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    let answer = label("", &["answer"]);
-    answer.set_wrap(true);
-    answer.set_max_width_chars(42);
-    answer.set_selectable(true);
-    answer.set_visible(false);
+    let inner = gtk::Box::new(gtk::Orientation::Vertical, 14);
+    // Steps and answers scroll once they outgrow the card; the newest stays in view.
+    let scroller = gtk::ScrolledWindow::new();
+    scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    scroller.set_propagate_natural_height(true);
+    scroller.set_max_content_height(MAX_LIST);
+    scroller.set_child(Some(&inner));
+    let follow_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    follow_row.add_css_class("follow-row");
+    let follow = gtk::Entry::new();
+    follow.add_css_class("follow");
+    follow.set_hexpand(true);
+    follow.set_placeholder_text(Some("ask a follow-up"));
+    let follow_send = gtk::Button::new();
+    follow_send.add_css_class("send");
+    follow_send.add_css_class("small");
+    follow_send.set_valign(gtk::Align::Center);
+    follow_send.set_child(Some(&common::arrow(true)));
+    follow_send.set_tooltip_text(Some("send"));
+    follow_row.append(&follow);
+    follow_row.append(&follow_send);
+    follow_row.set_visible(false);
+    talk.append(&asked);
+    talk.append(&scroller);
+    talk.append(&follow_row);
+
+    // The history: earlier sessions, newest first.
+    let sessions = gtk::ListBox::new();
+    sessions.add_css_class("sessions");
+    sessions.set_selection_mode(gtk::SelectionMode::None);
+    let past = gtk::ScrolledWindow::new();
+    past.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    past.set_propagate_natural_height(true);
+    past.set_max_content_height(MAX_LIST + 60);
+    past.set_child(Some(&sessions));
+
+    let pages = gtk::Stack::new();
+    pages.set_transition_type(gtk::StackTransitionType::Crossfade);
+    pages.set_transition_duration(180);
+    pages.set_vhomogeneous(false);
+    pages.set_interpolate_size(true);
+    pages.add_named(&talk, Some("talk"));
+    pages.add_named(&past, Some("history"));
+
     let foot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     foot.add_css_class("card-foot");
-    let terminal = gtk::Button::with_label("continue in terminal");
+    let terminal = gtk::Button::new();
+    let terminal_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    terminal_box.append(&common::icon(icons::TERMINAL, &["link-icon"]));
+    terminal_box.append(&gtk::Label::new(Some("continue in terminal")));
+    terminal.set_child(Some(&terminal_box));
     terminal.set_valign(gtk::Align::Center);
-    terminal.set_tooltip_text(Some("open this request in the terminal and keep talking about it"));
+    terminal.set_tooltip_text(Some("open this conversation in the terminal, with every step, and keep going there"));
     terminal.add_css_class("link");
     terminal.set_hexpand(true);
     terminal.set_halign(gtk::Align::Start);
-    // The terminal picks up this request as a chat: what was asked, the steps, the answer.
-    terminal.connect_clicked(|_| {
-        let mut foot = std::process::Command::new("foot");
-        let saved = conversation_file();
-        if saved.exists() {
-            foot.env("TRIPPPIN_CONTINUE", saved);
-        }
-        let _ = foot.spawn();
-    });
     let stop = gtk::Button::with_label("stop");
     stop.add_css_class("stop");
     foot.append(&terminal);
     foot.append(&stop);
-    // Steps and the answer scroll once they outgrow the card; the newest stays in view.
-    let inner = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    inner.append(&steps_box);
-    inner.append(&answer);
-    let scroller = gtk::ScrolledWindow::new();
-    scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    scroller.set_propagate_natural_height(true);
-    scroller.set_max_content_height(340);
-    scroller.set_child(Some(&inner));
-    body.append(&you);
-    body.append(&scroller);
+    body.append(&top);
+    body.append(&pages);
     body.append(&foot);
     card.set_child(Some(&body));
 
@@ -556,21 +765,28 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
         logo,
         hint: hint.clone(),
         row,
-        corner: std::cell::Cell::new(corner_at),
-        tucked: std::cell::Cell::new(tucked),
+        corner: Cell::new(corner_at),
+        tucked: Cell::new(tucked),
         model,
         ask,
         entry,
         card,
         body,
+        pages,
+        caption,
         asked,
         status,
         working,
         scroller,
         inner,
-        steps_box,
-        answer,
+        follow,
+        follow_row,
+        terminal,
         stop,
+        sessions,
+        chips: chips.clone(),
+        found: found.clone(),
+        apps: RefCell::new(Vec::new()),
         shade: shade.clone(),
         column: column.clone(),
         state: RefCell::new(State {
@@ -579,7 +795,9 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
             started: None,
             phase: "",
             answer: String::new(),
-            steps: Vec::new(),
+            session: None,
+            session_id: None,
+            turn: None,
         }),
     });
 
@@ -591,6 +809,25 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     {
         let o = orb.clone();
         minimise.connect_clicked(move |_| o.minimise());
+    }
+    {
+        let o = orb.clone();
+        history.connect_clicked(move |_| o.show_history());
+    }
+    {
+        let o = orb.clone();
+        ask_history.connect_clicked(move |_| {
+            o.close_ask();
+            o.show_history();
+        });
+    }
+    {
+        let o = orb.clone();
+        new.connect_clicked(move |_| o.start_new());
+    }
+    {
+        let o = orb.clone();
+        orb.terminal.connect_clicked(move |_| o.continue_in_terminal());
     }
     // Clicking the dim area closes the bar.
     let close_click = gtk::GestureClick::new();
@@ -614,7 +851,19 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     }
     {
         let o = orb.clone();
+        orb.entry.connect_changed(move |e| o.match_apps(&e.text()));
+    }
+    {
+        let o = orb.clone();
         send.connect_clicked(move |_| o.submit());
+    }
+    {
+        let o = orb.clone();
+        orb.follow.connect_activate(move |_| o.follow_up());
+    }
+    {
+        let o = orb.clone();
+        follow_send.connect_clicked(move |_| o.follow_up());
     }
     {
         let o = orb.clone();
@@ -633,9 +882,30 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
         });
     }
     orb.ask.add_controller(keys);
+    let card_keys = gtk::EventControllerKey::new();
+    {
+        let o = orb.clone();
+        card_keys.connect_key_pressed(move |_, key, _, _| {
+            if key == gdk::Key::Escape {
+                o.minimise();
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
+    }
+    orb.card.add_controller(card_keys);
 
     corner.present();
     orb
+}
+
+fn icon_button(glyph: char, tip: &str) -> gtk::Button {
+    let b = gtk::Button::with_label(&glyph.to_string());
+    b.add_css_class("icon-button");
+    b.set_valign(gtk::Align::Center);
+    b.set_tooltip_text(Some(tip));
+    b
 }
 
 /// Only the orb itself takes clicks; the glow and hint let them through. Run again whenever
@@ -682,7 +952,7 @@ fn model_line() -> String {
 /// niri has no caps-lock event, so the orb (always running) watches the keyboards' caps-lock
 /// light and shows the pop-up when it changes.
 fn watch_caps_lock() {
-    let last = std::cell::Cell::new(crate::osd::caps_lock());
+    let last = Cell::new(crate::osd::caps_lock());
     if last.get().is_none() {
         return;
     }
@@ -705,11 +975,6 @@ fn used_file() -> std::path::PathBuf {
         .join("tripppin/orb-used")
 }
 
-/// The last request's whole conversation, for "continue in terminal".
-fn conversation_file() -> std::path::PathBuf {
-    common::runtime_dir().join("orb-conversation.json")
-}
-
 fn write_status(text: &str) {
     let _ = std::fs::write(common::runtime_dir().join("orb-status"), text);
 }
@@ -717,7 +982,7 @@ fn write_status(text: &str) {
 impl Orb {
     fn toggle(self: &Rc<Self>) {
         let busy = self.state.borrow().busy;
-        let has_result = !self.state.borrow().steps.is_empty() || !self.state.borrow().answer.is_empty();
+        let has_result = self.state.borrow().session_id.is_some();
         if busy || (has_result && self.card.is_visible()) {
             if self.card.is_visible() {
                 self.minimise();
@@ -733,6 +998,8 @@ impl Orb {
             self.entry.set_text("");
             // The model may have arrived since the orb started (first boot downloads it).
             self.model.set_text(&model_line());
+            *self.apps.borrow_mut() = crate::apps::installed();
+            self.match_apps("");
             self.ask.present();
             common::play(&self.shade, "fade");
             common::play(&self.column, "pop");
@@ -812,8 +1079,8 @@ impl Orb {
     /// Dragging moves the orb with the pointer; letting go springs it into the nearest corner.
     fn drag_to_corners(self: &Rc<Self>) {
         let drag = gtk::GestureDrag::new();
-        let start: Rc<std::cell::Cell<(i32, i32)>> = Rc::new(std::cell::Cell::new((0, 0)));
-        let moved = Rc::new(std::cell::Cell::new(false));
+        let start: Rc<Cell<(i32, i32)>> = Rc::new(Cell::new((0, 0)));
+        let moved = Rc::new(Cell::new(false));
         {
             let (o, start, moved) = (self.clone(), start.clone(), moved.clone());
             drag.connect_drag_begin(move |_, _, _| {
@@ -889,7 +1156,7 @@ impl Orb {
         self.place_card();
         let (rest_side, rest_end) = to.rest();
         let (w, b) = (w.clone(), self.button.clone());
-        let begun = std::cell::Cell::new(None::<i64>);
+        let begun = Cell::new(None::<i64>);
         w.add_tick_callback(move |w, clock| {
             let now = clock.frame_time();
             let t0 = *begun.get().get_or_insert(now);
@@ -909,20 +1176,99 @@ impl Orb {
         });
     }
 
+    /// Apps whose name starts a word with what's typed, best first, at most three.
+    fn match_apps(self: &Rc<Self>, text: &str) {
+        while let Some(child) = self.found.first_child() {
+            self.found.remove(&child);
+        }
+        let matches = app_matches(&self.apps.borrow(), text);
+        self.found.set_visible(!matches.is_empty());
+        self.chips.set_visible(matches.is_empty());
+        for app in matches.into_iter().take(3) {
+            let b = gtk::Button::new();
+            b.add_css_class("chip");
+            b.add_css_class("app-chip");
+            let inner = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            let image = gtk::Image::from_icon_name(&app.icon);
+            image.set_pixel_size(18);
+            inner.append(&image);
+            let name = gtk::Label::new(Some(&format!("open {}", app.name.to_lowercase())));
+            name.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            name.set_max_width_chars(22);
+            inner.append(&name);
+            b.set_child(Some(&inner));
+            let o = self.clone();
+            b.connect_clicked(move |_| o.open_app(&app));
+            self.found.append(&b);
+        }
+    }
+
+    fn open_app(&self, app: &crate::apps::App) {
+        let id = app.id.trim_end_matches(".desktop");
+        let _ = std::process::Command::new("gtk4-launch").arg(id).spawn();
+        self.close_ask();
+    }
+
+    /// A new request from the ask bar: a new conversation. An app's exact name opens the app.
     fn submit(self: &Rc<Self>) {
         let text = self.entry.text().trim().to_string();
         if text.is_empty() || self.state.borrow().busy {
             return;
         }
+        let exact = self.apps.borrow().iter().find(|a| a.name.eq_ignore_ascii_case(&text)).cloned();
+        if let Some(app) = exact {
+            self.open_app(&app);
+            return;
+        }
         self.ask.set_visible(false);
-        while let Some(child) = self.steps_box.first_child() {
-            self.steps_box.remove(&child);
+        self.clear_talk();
+        self.asked.set_text(&text);
+        self.caption.set_text("you asked");
+        let session = Session::new("orb");
+        self.state.borrow_mut().session_id = Some(session.id.clone());
+        self.begin(session, text, TurnView::new(None));
+    }
+
+    /// A follow-up in the card: the same conversation, so the model knows what came before.
+    fn follow_up(self: &Rc<Self>) {
+        let text = self.follow.text().trim().to_string();
+        if text.is_empty() || self.state.borrow().busy {
+            return;
+        }
+        let Some(session) = self.state.borrow_mut().session.take() else { return };
+        self.follow.set_text("");
+        self.begin(session, text.clone(), TurnView::new(Some(&text)));
+    }
+
+    fn clear_talk(&self) {
+        while let Some(child) = self.inner.first_child() {
+            self.inner.remove(&child);
         }
         self.scroller.set_min_content_height(0);
-        self.asked.set_text(&text);
-        self.answer.set_text("");
-        self.answer.set_visible(false);
+        self.pages.set_visible_child_name("talk");
+    }
+
+    /// Back to the ask bar for something unrelated.
+    fn start_new(self: &Rc<Self>) {
+        if self.state.borrow().busy {
+            return;
+        }
+        {
+            let mut st = self.state.borrow_mut();
+            st.session = None;
+            st.session_id = None;
+            st.turn = None;
+        }
+        self.card.set_visible(false);
+        self.toggle();
+    }
+
+    fn begin(self: &Rc<Self>, mut session: Session, text: String, view: Rc<TurnView>) {
+        self.inner.append(&view.root);
+        self.pages.set_visible_child_name("talk");
         self.stop.set_label("stop");
+        self.follow_row.set_visible(false);
+        self.terminal.set_sensitive(true);
         let cancel = Arc::new(AtomicBool::new(false));
         {
             let mut st = self.state.borrow_mut();
@@ -930,14 +1276,15 @@ impl Orb {
             st.started = Some(Instant::now());
             st.phase = "thinking";
             st.answer.clear();
-            st.steps.clear();
             st.cancel = cancel.clone();
+            st.turn = Some(view);
         }
         self.button.add_css_class("working");
         self.working.set_visible(true);
         write_status("● working");
         self.show_card();
         self.tick();
+        self.scroll_to_end();
         // A live status with a running clock, so it's clear the orb is still at it.
         let weak = Rc::downgrade(self);
         glib::timeout_add_seconds_local(1, move || match weak.upgrade() {
@@ -950,16 +1297,15 @@ impl Orb {
 
         let (tx, rx) = async_channel::unbounded::<Event>();
         std::thread::spawn(move || {
-            let mut history = vec![Message::system(), Message::user(&text)];
+            session.ask(&text);
             let mut ui = Sender(tx.clone());
-            let result = agent::run(&mut history, &cancel, &mut ui).map(|_| ()).map_err(|e| format!("{e:#}"));
-            let _ = std::fs::write(conversation_file(), trip::model::save_conversation(&history));
-            let _ = tx.send_blocking(Event::Done(result));
+            let result = agent::run(&mut session, &cancel, &mut ui).map(|_| ()).map_err(|e| format!("{e:#}"));
+            let _ = tx.send_blocking(Event::Done(result, Box::new(session)));
         });
         let orb = self.clone();
         glib::spawn_future_local(async move {
             while let Ok(event) = rx.recv().await {
-                let done = matches!(event, Event::Done(_));
+                let done = matches!(event, Event::Done(..));
                 orb.apply(event);
                 if done {
                     break;
@@ -981,12 +1327,9 @@ impl Orb {
     /// Grows the list with its content up to `MAX_LIST`, then it scrolls; keeps the newest in view.
     /// (A layer-shell window doesn't grow on its own when its content does.)
     fn scroll_to_end(&self) {
-        // Room for a few steps from the start, so the list reads as a list.
-        const MIN_LIST: i32 = 120;
-        const MAX_LIST: i32 = 340;
         let (scroller, inner) = (self.scroller.clone(), self.inner.clone());
         glib::idle_add_local_once(move || {
-            let width = scroller.width().max(396);
+            let width = scroller.width().max(360);
             let (_, natural, _, _) = inner.measure(gtk::Orientation::Vertical, width);
             scroller.set_min_content_height(natural.clamp(MIN_LIST, MAX_LIST));
             glib::idle_add_local_once(move || {
@@ -998,69 +1341,63 @@ impl Orb {
 
     fn apply(&self, event: Event) {
         let mut st = self.state.borrow_mut();
+        let Some(turn) = st.turn.clone() else { return };
         match event {
             Event::Text(piece) => {
                 st.phase = "answering";
                 st.answer.push_str(&piece);
+                turn.set_answer(&st.answer);
                 self.scroll_to_end();
-                let shown = st.answer.trim().to_string();
-                self.answer.set_markup(&markup(&shown));
-                if !shown.is_empty() && !self.answer.is_visible() {
-                    self.answer.set_visible(true);
-                    common::play(&self.answer, "fade");
-                }
             }
             Event::Thinking => st.phase = "thinking",
             Event::StepDone(ok) => {
-                if let Some(last) = st.steps.last() {
+                if let Some(last) = turn.last() {
                     last.finish(ok);
                 }
             }
             Event::Step(kind, detail) => {
                 st.phase = "working";
-                if let Some(last) = st.steps.last() {
+                if let Some(last) = turn.last() {
                     last.finish(true);
                 }
                 // Text before a tool call is the model thinking aloud; the steps say it better.
                 st.answer.clear();
-                self.answer.set_visible(false);
-                let row = StepRow::new(&describe(&kind, &detail), &detail);
-                self.steps_box.append(&row.root);
-                st.steps.push(row);
+                turn.set_answer("");
+                turn.add_step(StepRow::new(&describe(&kind, &detail), &detail));
                 self.scroll_to_end();
             }
             Event::Output(line) => {
                 // Progress bars redraw with carriage returns; show the latest state of the line.
                 let line = line.rsplit('\r').find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string();
-                if let Some(last) = st.steps.last()
+                if let Some(last) = turn.last()
                     && !line.is_empty()
                 {
-                    last.detail.set_text(&line);
+                    last.add_line(&line);
                 }
             }
             Event::Note(text) => {
-                if let Some(last) = st.steps.last()
+                if let Some(last) = turn.last()
                     && text.contains("background as job")
                 {
                     let job = text.rsplit(' ').next().unwrap_or("");
                     last.title.set_text(&format!("{} · job {job}", last.title.text()));
                 }
             }
-            Event::Done(result) => {
+            Event::Done(result, session) => {
                 st.busy = false;
+                st.session = Some(*session);
                 let ok = result.is_ok();
-                if let Some(last) = st.steps.last() {
+                if let Some(last) = turn.last() {
                     last.finish(ok);
                 }
                 let took = st.started.map_or(0, |t| t.elapsed().as_secs());
                 let verb = if ok { "done in" } else { "stopped after" };
                 self.status.set_text(&format!("{verb} {}:{:02}", took / 60, took % 60));
-                self.scroll_to_end();
                 if let Err(e) = result {
                     let msg = if e == "stopped" { "stopped.".to_string() } else { e };
-                    self.answer.set_text(&msg);
-                    self.answer.set_visible(true);
+                    turn.set_answer(&msg);
                 }
+                self.scroll_to_end();
                 // Finished while minimised: come back to show the answer.
                 if !self.card.is_visible() {
                     self.show_card();
@@ -1068,17 +1405,164 @@ impl Orb {
                 self.button.remove_css_class("working");
                 self.working.set_visible(false);
                 self.stop.set_label("close");
+                self.follow_row.set_visible(true);
                 write_status("");
                 let summary = st.answer.trim().lines().next().unwrap_or("done").to_string();
                 let _ = std::fs::write(common::runtime_dir().join("last-done"), summary);
             }
         }
     }
+
+    /// Earlier conversations, newest first; one click opens it here to read or continue.
+    fn show_history(self: &Rc<Self>) {
+        self.caption.set_text("earlier requests");
+        while let Some(child) = self.sessions.first_child() {
+            self.sessions.remove(&child);
+        }
+        let list = trip::session::list(40);
+        if list.is_empty() {
+            let empty = label("nothing yet. what you ask here and in the terminal shows up in this list.", &["hint"]);
+            empty.set_wrap(true);
+            empty.set_margin_top(12);
+            empty.set_margin_bottom(12);
+            self.sessions.append(&empty);
+        }
+        let now = trip::session::now_secs();
+        for s in list {
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            row.add_css_class("session-row");
+            let mark = match s.ok {
+                Some(true) => tick(icons::CHECK, false),
+                Some(false) => tick(icons::ALERT, true),
+                None => tick(icons::HISTORY, false),
+            };
+            mark.set_valign(gtk::Align::Start);
+            mark.set_margin_top(2);
+            let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+            text.set_hexpand(true);
+            let title = label(&s.title, &["step-title"]);
+            title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            title.set_max_width_chars(40);
+            let mut words = vec![trip::session::when(s.started, now), s.source.clone()];
+            words.push(format!("{} step{}", s.steps, if s.steps == 1 { "" } else { "s" }));
+            if s.turns > 1 {
+                words.push(format!("{} requests", s.turns));
+            }
+            text.append(&title);
+            text.append(&label(&words.join(" · "), &["step-detail"]));
+            row.append(&mark);
+            row.append(&text);
+            let click = gtk::GestureClick::new();
+            {
+                let (o, id) = (self.clone(), s.id.clone());
+                click.connect_released(move |_, _, _, _| o.open_session(&id));
+            }
+            row.add_controller(click);
+            self.sessions.append(&row);
+        }
+        self.pages.set_visible_child_name("history");
+        self.terminal.set_sensitive(false);
+        self.follow_row.set_visible(false);
+        if !self.state.borrow().busy {
+            self.stop.set_label("close");
+        }
+        self.show_card();
+    }
+
+    /// Shows an earlier conversation with all its steps; a follow-up continues it.
+    fn open_session(self: &Rc<Self>, id: &str) {
+        if self.state.borrow().busy {
+            // The running request stays; it can be read once it's done.
+            self.pages.set_visible_child_name("talk");
+            self.caption.set_text("you asked");
+            return;
+        }
+        let Some(session) = trip::session::load(id) else { return };
+        self.clear_talk();
+        self.caption.set_text(&trip::session::when(session.started, trip::session::now_secs()));
+        self.asked.set_text(session.title());
+        let mut last = None;
+        for (i, t) in session.turns.iter().enumerate() {
+            let view = TurnView::new((i > 0).then_some(t.request.as_str()));
+            for step in &t.steps {
+                view.add_step(StepRow::past(step));
+            }
+            let answer = if t.answer.is_empty() && !t.error.is_empty() {
+                format!("stopped: {}", t.error)
+            } else {
+                t.answer.clone()
+            };
+            view.set_answer(&answer);
+            self.inner.append(&view.root);
+            last = Some(view);
+        }
+        self.status.set_text("");
+        {
+            let mut st = self.state.borrow_mut();
+            st.session_id = Some(session.id.clone());
+            st.session = Some(session);
+            st.turn = last;
+        }
+        self.terminal.set_sensitive(true);
+        self.follow_row.set_visible(true);
+        self.stop.set_label("close");
+        self.scroll_to_end();
+    }
+
+    /// Opens the conversation in the terminal (`trip shell --continue`), with every step, where
+    /// it carries on as a chat.
+    fn continue_in_terminal(&self) {
+        let Some(id) = self.state.borrow().session_id.clone() else { return };
+        // While it works, the terminal shows what's done so far.
+        if let Some(s) = self.state.borrow().session.as_ref() {
+            s.save();
+        }
+        let spawned = std::process::Command::new("foot")
+            .args(["--title", "tripppin", "--", "trip", "shell", "--continue", &id])
+            .env("TRIPPPIN_IN_SHELL", "1")
+            .spawn();
+        if spawned.is_ok() {
+            self.minimise();
+        }
+    }
+}
+
+/// Installed apps matching typed text: the name starts with it first, then a word in the name
+/// does. Nothing for under two letters.
+fn app_matches(apps: &[crate::apps::App], text: &str) -> Vec<crate::apps::App> {
+    let t = text.trim().to_lowercase();
+    if t.chars().count() < 2 {
+        return Vec::new();
+    }
+    let mut starts: Vec<_> = apps.iter().filter(|a| a.name.to_lowercase().starts_with(&t)).cloned().collect();
+    let words = apps.iter().filter(|a| {
+        let n = a.name.to_lowercase();
+        !n.starts_with(&t) && n.split(|c: char| !c.is_alphanumeric()).any(|w| w.starts_with(&t))
+    });
+    starts.extend(words.cloned());
+    starts
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Corner, describe, markup, parse_prefs};
+    use super::{Corner, app_matches, describe, markup, parse_prefs};
+
+    #[test]
+    fn finds_apps_by_name() {
+        let app = |name: &str| crate::apps::App {
+            id: name.to_lowercase(),
+            name: name.into(),
+            icon: String::new(),
+            flatpak: false,
+            mime: Vec::new(),
+        };
+        let apps = [app("Firefox"), app("Text Editor"), app("Files"), app("System Monitor")];
+        let names = |t: &str| app_matches(&apps, t).into_iter().map(|a| a.name).collect::<Vec<_>>();
+        assert_eq!(names("fi"), ["Firefox", "Files"]);
+        assert_eq!(names("edi"), ["Text Editor"]);
+        assert!(names("f").is_empty());
+        assert!(names("free up some space").is_empty());
+    }
 
     #[test]
     fn remembers_where_the_orb_rests() {

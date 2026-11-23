@@ -18,29 +18,38 @@ const MAX_REPLY_TOKENS: u32 = 2048;
 const MODELS_DIR: &str = "/var/lib/tripppin/models";
 const LLAMA_SERVER: &str = "/usr/bin/llama-server";
 const IDLE_UNLOAD_SECS: u32 = 900;
-const SYSTEM_PROMPT: &str = "You are the assistant built into Tripppin, a Linux operating system based on Fedora. \
-The person types to you in their terminal. You have tools: use exec to run shell commands on their machine, \
-and read_file / write_file for files. When they ask you to do something, do it with the tools instead of \
-explaining how, check the result, and keep going until it's done or you're truly stuck. \
-Then answer briefly and plainly, in a few short lines.
+const SYSTEM_PROMPT: &str = "You are the assistant built into Tripppin, a Linux operating system based on Fedora \
+with its own desktop. The person asks you from the orb (a pop-up on the desktop) or from the terminal. You have tools: \
+exec runs shell commands on their machine, read_file / write_file work with files, and note writes in your task \
+notebook. When they ask you to do something, do it with the tools instead of explaining how, check the result, and \
+keep going until it's done or you're truly stuck. Then answer briefly and plainly, in a few short lines.
+
+How to work:
+- For a task of more than two steps, first write a short plan with note. Note important facts as you find them.
+- Your task notebook (the request, your notes and every step with its result) is shown to you after the newest \
+message. Read it before each step; don't redo steps marked ok.
+- One command per step; check its output before the next. If something fails twice the same way, stop and tell the \
+person what's blocking you.
 
 About this system:
 - The core system (/usr) is a read-only image; updates replace it whole. /etc, /var and the home folder are writable.
 - For free disk space, check /var (df -h /var): / is the read-only system image and always looks full.
 - To install any app (vlc, firefox, spotify, gimp…): flatpak search <name>, then flatpak install -y flathub <app id>. \
-No sudo; it works as is. Open apps with: flatpak run <app id>. Never use dnf to install apps: it doesn't work here.
+No sudo; it works as is. Open apps with: flatpak run <app id> (run it in the background). Never use dnf for apps.
 - Only for a command-line tool with no Flatpak: sudo dnf install --transient -y <package>, which lasts until reboot.
-- You may be running with no terminal to type a password into, so sudo can fail. If a command fails with \
-\"a password is required\", don't retry it: tell the person the exact command to run in the terminal.
+- sudo may ask the person for their password in a pop-up, or be allowed without one (Settings → AI). If sudo fails \
+with \"a password is required\" or the person cancels, don't retry: tell them the exact command to run themselves.
 - Use non-interactive flags (-y, --noconfirm) and avoid commands that open an editor or a pager.
-- There is no graphical desktop yet: Tripppin is text-only for now, so windowed (GUI) apps can't be shown. \
-If asked for a GUI, a desktop or a windowed app, say that plainly instead of trying to install one.
+- The desktop is niri (Wayland). Windowed apps open on the desktop; start them in the background.
 - Long commands (big installs, downloads) keep running as background jobs; use job_wait to wait for them \
-instead of starting them again.
-- If something fails twice the same way, stop and tell the person what's blocking you.";
+instead of starting them again.";
 
 /// An HTTP client that trusts the operating system's certificate store, so CA updates
 /// arrive with system updates rather than with a new build of trip.
+pub fn http_agent() -> ureq::Agent {
+    http()
+}
+
 fn http() -> ureq::Agent {
     use ureq::tls::{RootCerts, TlsConfig};
     let tls = TlsConfig::builder().root_certs(RootCerts::PlatformVerifier).build();
@@ -358,7 +367,8 @@ fn exec(bin: &str, _args: &[String]) -> Result<()> {
 }
 
 /// One message in a conversation, in the OpenAI chat format llama.cpp speaks.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct Message(pub serde_json::Value);
 
 impl Message {
@@ -389,19 +399,6 @@ impl Message {
     pub fn tool(id: &str, content: &str) -> Self {
         Message(serde_json::json!({ "role": "tool", "tool_call_id": id, "content": content }))
     }
-}
-
-/// Saves a conversation as JSON, for another program to pick up (the orb hands its request
-/// to the terminal this way).
-pub fn save_conversation(history: &[Message]) -> String {
-    serde_json::Value::Array(history.iter().map(|m| m.0.clone()).collect()).to_string()
-}
-
-/// Reads a saved conversation; `None` unless it's a list of messages.
-pub fn load_conversation(text: &str) -> Option<Vec<Message>> {
-    let list = serde_json::from_str::<serde_json::Value>(text).ok()?;
-    let messages: Vec<Message> = list.as_array()?.iter().cloned().map(Message).collect();
-    messages.iter().all(|m| m.0["role"].is_string()).then_some(messages)
 }
 
 /// A tool call as the model sent it, before it's been checked.
@@ -455,16 +452,15 @@ pub fn stream(
         "messages": msgs,
         // Answers and tool calls don't need the model's long thinking pass.
         "chat_template_kwargs": { "enable_thinking": false },
-        // Qwen's recommended sampling without thinking; the presence penalty keeps small models
-        // from repeating themselves.
-        "temperature": 0.7,
-        "top_p": 0.8,
-        "top_k": 20,
-        "min_p": 0.0,
-        "presence_penalty": 1.5,
         // A reply is a few lines or a tool call; anything longer has gone wrong.
         "max_tokens": MAX_REPLY_TOKENS
     });
+    if remote.is_none() {
+        let family = Catalog::builtin().ok().and_then(|c| active_tier(&c, &models_dir()).map(|t| t.model.clone()));
+        for (k, v) in sampling(family.as_deref().unwrap_or("")) {
+            body[k] = v.into();
+        }
+    }
     if let Some(tools) = tools {
         body["tools"] = tools.clone();
     }
@@ -534,6 +530,19 @@ pub fn stream(
     let tokens_per_sec =
         first.map_or(0.0, |t: Duration| f64::from(pieces) / start.elapsed().saturating_sub(t).as_secs_f64().max(0.001));
     Ok(Reply { text, cut_off, calls, first_word: first, tokens_per_sec, cancelled })
+}
+
+/// Each model family's recommended sampling for answers without a thinking pass. Qwen's presence
+/// penalty keeps small models from repeating themselves; Gemma and Granite do better without.
+pub fn sampling(model: &str) -> Vec<(&'static str, f64)> {
+    let m = model.to_lowercase();
+    if m.starts_with("gemma") {
+        vec![("temperature", 1.0), ("top_p", 0.95), ("top_k", 64.0), ("min_p", 0.0)]
+    } else if m.starts_with("granite") {
+        vec![("temperature", 0.0)]
+    } else {
+        vec![("temperature", 0.7), ("top_p", 0.8), ("top_k", 20.0), ("min_p", 0.0), ("presence_penalty", 1.5)]
+    }
 }
 
 /// The conversation no longer fits in the model's context; drop old material and try again.
@@ -629,13 +638,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn conversations_round_trip() {
-        let history = vec![Message::system(), Message::user("free up space"), Message::assistant("done")];
-        let back = load_conversation(&save_conversation(&history)).unwrap();
-        assert_eq!(back.len(), 3);
-        assert_eq!(back[1].0["content"], "free up space");
-        assert!(load_conversation("{\"role\":\"user\"}").is_none());
-        assert!(load_conversation("not json").is_none());
+    fn samples_each_family_its_own_way() {
+        assert!(sampling("Qwen3.5 4B").contains(&("presence_penalty", 1.5)));
+        assert!(sampling("Gemma 4 E4B").contains(&("top_k", 64.0)));
+        assert_eq!(sampling("Granite 4.1 8B"), [("temperature", 0.0)]);
     }
 
     #[test]

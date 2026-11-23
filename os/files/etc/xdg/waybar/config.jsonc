@@ -13,7 +13,13 @@
     "modules-center": ["custom/clock"],
     "modules-right": ["custom/recording", "privacy", "custom/orb", "niri/language", "network", "bluetooth", "pulseaudio", "battery", "tray", "custom/notifications", "custom/power"],
 
-    "image#logo": { "path": "/usr/share/tripppin/logo-bar.png", "size": 16 },
+    "image#logo": {
+        "path": "/usr/share/tripppin/logo-bar.png",
+        "size": 16,
+        "tooltip": true,
+        "tooltip-format": "apps (super + a)",
+        "on-click": "fuzzel"
+    },
     "niri/workspaces": { "format": "{icon}", "format-icons": { "default": "", "active": "" } },
     "niri/window": {
         "format": "{app_id}",

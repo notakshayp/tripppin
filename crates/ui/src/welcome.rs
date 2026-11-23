@@ -34,7 +34,7 @@ const CARDS: [Card; 4] = [
     ),
     (
         "find your way around",
-        "apps are on super + d. quick settings and notifications are on super + n. alt + tab switches windows, super + arrows snap them. super + / shows every shortcut.",
+        "apps are on super + a, or type an app's name after super + space. quick settings and notifications are on super + n. alt + tab switches windows, super + arrows snap them. super + / shows every shortcut.",
         "super + /",
         Some(("show the shortcuts", &["tripppin-ui", "keys"])),
     ),

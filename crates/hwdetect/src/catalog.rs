@@ -29,6 +29,12 @@ pub struct Tier {
     pub sha256: String,
     /// Context window to run it with, in tokens.
     pub context: u32,
+    /// Offered in Settings as another choice, never picked automatically.
+    #[serde(default)]
+    pub choice: bool,
+    /// One line for Settings: who made it and what it's good at.
+    #[serde(default)]
+    pub about: String,
 }
 
 impl Tier {
@@ -65,7 +71,7 @@ impl Catalog {
     /// The first tier this machine qualifies for, or `None` when it should use
     /// a cloud key or its own server instead.
     pub fn recommend(&self, hw: &Hardware) -> Option<&Tier> {
-        self.tiers.iter().find(|t| {
+        self.tiers.iter().filter(|t| !t.choice).find(|t| {
             t.min_vram_gib.is_none_or(|need| hw.max_vram_gib() >= need)
                 && t.min_ram_gib.is_none_or(|need| hw.memory_gib() >= need)
         })

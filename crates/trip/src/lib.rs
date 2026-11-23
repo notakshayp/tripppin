@@ -4,4 +4,6 @@
 pub mod agent;
 pub mod jobs;
 pub mod model;
+pub mod providers;
+pub mod session;
 pub mod term;

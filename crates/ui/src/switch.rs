@@ -48,7 +48,7 @@ fn niri(args: &[&str]) -> Option<String> {
 // ---- snapping -------------------------------------------------------------------------------
 
 /// The bar's reserved height (its margin plus height in /etc/xdg/waybar) and niri's gaps.
-const BAR: i32 = 47;
+pub const BAR: i32 = 40;
 const GAP: i32 = 16;
 
 /// Size and position (width, height, x, y) for a spot on a screen of `w` × `h`. niri places
@@ -259,9 +259,9 @@ mod tests {
                       {"id":5,"title":"terminal","app_id":"foot","focus_timestamp":{"secs":840,"nanos":0}}]"#;
         let w = parse_windows(json);
         assert_eq!(w.iter().map(|w| w.id).collect::<Vec<_>>(), vec![5, 6]);
-        assert_eq!(snap_rect("left", 1280, 800), Some((616, 721, 16, 16)));
-        assert_eq!(snap_rect("right", 1280, 800), Some((616, 721, 648, 16)));
-        assert_eq!(snap_rect("bottom-right", 1280, 800), Some((616, 352, 648, 384)));
+        assert_eq!(snap_rect("left", 1280, 800), Some((616, 728, 16, 16)));
+        assert_eq!(snap_rect("right", 1280, 800), Some((616, 728, 648, 16)));
+        assert_eq!(snap_rect("bottom-right", 1280, 800), Some((616, 356, 648, 388)));
         assert_eq!(snap_rect("middle", 1280, 800), None);
     }
 }

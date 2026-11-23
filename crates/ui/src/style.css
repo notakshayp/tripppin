@@ -796,7 +796,8 @@ picture.wall-pic {
 }
 
 button.segment {
-    min-height: 34px;
+    min-height: 32px;
+    padding: 0 12px;
     border-radius: 10px;
     background: #141b19;
     border: 1px solid #222d2a;
@@ -1263,4 +1264,216 @@ button.wall-tile:hover {
 .icon.tick {
     font-size: 10px;
     padding: 0;
+}
+
+/* ---- the orb's conversation: steps that open, follow-ups, history ---- */
+.step {
+    padding: 5px 6px;
+    margin: 0 -6px;
+    border-radius: 10px;
+    transition: background 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.step:hover {
+    background: rgba(242, 245, 239, 0.035);
+}
+
+.step-chevron {
+    font-size: 11px;
+    color: #4d5c56;
+    margin-top: 2px;
+}
+
+.step:hover .step-chevron {
+    color: #9fb0a8;
+}
+
+.step-more {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #0b100f;
+    border: 1px solid #1d2825;
+}
+
+.step-command {
+    font-family: "DM Mono", monospace;
+    font-size: 11px;
+    color: #57d99a;
+}
+
+.step-output {
+    font-family: "DM Mono", monospace;
+    font-size: 10px;
+    color: #9fb0a8;
+}
+
+.turn {
+    padding-top: 2px;
+}
+
+.follow-up {
+    padding: 7px 12px;
+    border-radius: 14px 14px 4px 14px;
+    background: #1f6b45;
+    color: #f2f5ef;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.follow-row {
+    padding: 4px 4px 4px 12px;
+    border-radius: 20px;
+    background: #0b100f;
+    border: 1px solid #2a3632;
+    transition: border-color 180ms ease;
+}
+
+.follow-row:focus-within {
+    border-color: #57d99a;
+}
+
+entry.follow {
+    min-height: 28px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    font-size: 13px;
+    color: #f2f5ef;
+    caret-color: #57d99a;
+}
+
+button.send.small {
+    min-width: 28px;
+    min-height: 28px;
+}
+
+list.sessions {
+    background: transparent;
+}
+
+list.sessions > row {
+    background: transparent;
+    outline: none;
+    border-radius: 10px;
+}
+
+.session-row {
+    padding: 8px 6px;
+    border-radius: 10px;
+    transition: background 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.session-row:hover {
+    background: rgba(242, 245, 239, 0.04);
+}
+
+.link-icon {
+    font-size: 13px;
+}
+
+button.link.hint-link {
+    font-family: "DM Mono", monospace;
+    font-size: 11px;
+    color: #6b7a74;
+}
+
+button.link.hint-link:hover {
+    color: #57d99a;
+}
+
+button.link:disabled {
+    color: #3d4a45;
+}
+
+button.chip.app-chip {
+    border-color: #3d4a45;
+    color: #f2f5ef;
+}
+
+/* ---- the administrator password pop-up ---- */
+.askpass {
+    padding: 20px 22px;
+}
+
+.askpass-icon {
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 9999px;
+    background: #1f6b45;
+    color: #f2f5ef;
+    font-size: 15px;
+}
+
+.askpass .step-command {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #0b100f;
+    border: 1px solid #1d2825;
+    font-size: 12px;
+}
+
+/* ---- Settings → AI ---- */
+.segment-icon {
+    font-size: 15px;
+}
+
+flowbox > flowboxchild {
+    padding: 0;
+}
+
+button.segment.provider {
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 12px;
+}
+
+.guide .row-title {
+    margin-top: 4px;
+}
+
+.guide {
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #141b19;
+    border: 1px solid #222d2a;
+}
+
+button.pill.quiet {
+    min-height: 30px;
+    padding: 0 14px;
+    background: #1d2825;
+    color: #d9e1dd;
+    font-weight: 500;
+}
+
+button.pill.quiet:hover {
+    background: #26332f;
+}
+
+list.menu-list {
+    background: transparent;
+    min-width: 260px;
+}
+
+button.menu-item {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #d9e1dd;
+    font-family: "DM Mono", monospace;
+    font-size: 12px;
+}
+
+button.menu-item:hover {
+    background: #1f6b45;
+    color: #f2f5ef;
+}
+
+.menu-note {
+    padding: 8px 10px;
 }
