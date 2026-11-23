@@ -58,7 +58,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [ ] Window controls: snap halves/quarters, maximise, minimise, always on top, move to workspace
 - [x] Keyboard shortcuts cheat sheet (Super+/), in our style
 - [x] Clipboard history (cliphist) with a picker (Super + V; checked in the VM: text and images, picking puts it back)
-- [~] Emoji and symbol picker (Super + .; Unicode's names, typed with wtype and copied; checked once the next image brings unicode-emoji and wtype)
+- [~] Emoji and symbol picker (Super + .; Unicode's names, typed with wtype and copied; search checked in the VM; the colour emoji font comes with the next image)
 - [x] Screenshots (grim + slurp + swappy): area, window, screen; annotate; copy or save (niri's own capture: print, ctrl/alt + print, saved and copied; super + shift + s draws on the last one in swappy; checked in the VM)
 - [x] Screen recording (wf-recorder) with a bar indicator (super + shift + r, alt for an area; red "● rec" in the bar stops it; checked in the VM)
 - [~] Password prompts for admin actions (lxpolkit), styled (mate-polkit, GTK3: appears in our theme with the green action button, checked in the VM; entering the password checked with a real keyboard on the laptop; its own sentences stay capitalised)
