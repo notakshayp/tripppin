@@ -38,7 +38,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [x] Login screen (ours): clock, avatar, password pill, power menu
 - [x] Login: several people, switching user, caps-lock warning, "forgot password" help (a chip per person plus "other"; caps-lock warning from the keyboard light; honest help text; checked in the VM with two people)
 - [~] Lock screen (ours): clock, what finished while you were away, password
-- [ ] Lock: media controls, notifications count, battery, wake from sleep cleanly
+- [~] Lock: media controls, notifications count, battery, wake from sleep cleanly (media card with back/play/next, notification count, battery and caps-lock warning built and checked in a preview in the VM; waking from sleep checked on the laptop)
 - [ ] Idle: dim before locking, screen off, sleep (configurable in Settings)
 
 ## The shell

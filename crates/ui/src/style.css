@@ -946,6 +946,38 @@ button.person.selected {
     color: #e8c26e;
 }
 
+/* ---- lock: what's playing --------------------------------------------- */
+
+.media-card {
+    padding: 14px 16px 14px 22px;
+    min-width: 380px;
+    border-radius: 18px;
+    background: rgba(20, 27, 25, 0.85);
+    border: 1px solid #2a3632;
+}
+
+.media-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f2f5ef;
+}
+
+button.media-button {
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 9999px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: #c9d4ce;
+    font-size: 14px;
+}
+
+button.media-button:hover {
+    background: rgba(87, 217, 154, 0.14);
+    color: #f2f5ef;
+}
+
 /* ---- volume and brightness pop-ups ------------------------------------- */
 
 .osd {
