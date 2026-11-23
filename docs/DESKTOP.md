@@ -24,12 +24,8 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [~] GTK 3: adw-gtk3 as the base, recoloured with our palette (`gtk-3.0/gtk.css`)
 - [~] Qt 5 / 6: qt6ct + qt5ct with a Tripppin colour scheme, Fusion style, Inter
 - [~] Flatpak apps: system override exposing the GTK config; the GTK 3 theme as a Flatpak extension
-- [ ] Electron and Firefox: dark mode through the portal (`color-scheme`), Inter as the sans font
 - [x] Fonts: Inter (interface), DM Mono (code), fallbacks for Indic scripts and emoji
 - [~] Icons: Papirus, folders recoloured to forest green
-- [ ] Cursor: a Tripppin cursor theme (or Adwaita, recoloured)
-- [ ] Sounds: a small Tripppin sound set (login, notification, error, screenshot)
-- [ ] Dark and light: every component switches together
 
 ## Boot, login, lock
 
@@ -62,7 +58,6 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [x] Screenshots (grim + slurp + swappy): area, window, screen; annotate; copy or save (niri's own capture: print, ctrl/alt + print, saved and copied; super + shift + s draws on the last one in swappy; checked in the VM)
 - [x] Screen recording (wf-recorder) with a bar indicator (super + shift + r, alt for an area; red "● rec" in the bar stops it; checked in the VM)
 - [~] Password prompts for admin actions (lxpolkit), styled (mate-polkit, GTK3: appears in our theme with the green action button, checked in the VM; entering the password checked with a real keyboard on the laptop; its own sentences stay capitalised)
-- [ ] On-screen keyboard (for touchscreens)
 - [x] Wallpaper
 
 ## The orb (ours)
@@ -70,10 +65,6 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [x] Resting in the corner; Super+Space opens the ask bar
 - [~] Working card: live steps, status and clock, scrolling, stop
 - [x] The full logo in the orb instead of the spark
-- [ ] Voice input (hold Super+Space and talk)
-- [ ] Ask about the screen or a selected file ("summarise this pdf")
-- [ ] History of past requests; continue a conversation
-- [ ] Permission prompts before risky steps (M4)
 - [x] The "super + space" hint shows only until the orb has been used once (it draws over windows near the corner)
 
 ## Settings (ours, one window with a sidebar)
@@ -120,7 +111,6 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] Low battery warning, critical battery sleep (warnings at 10% and 5% from the orb; UPower's critical action; checked on the laptop)
 - [x] Update available notification; restart into the new version; automatic rollback if it fails (the orb notifies when an update is staged; greenboot health check and rollback trigger on)
 - [x] Crash: "app quit unexpectedly" with restart, not a silent close (from systemd-coredump, with "open it again")
-- [ ] App not responding: "wait or force quit"
 - [x] Out of memory: the AI model unloads first (OOMScoreAdjust=800 on the model service)
 - [x] First-boot welcome: model download (done), then a short tour
 
@@ -129,6 +119,22 @@ Simple sections are ours; deep ones open the themed specialist tool.
 - [~] Installer ISO (Fedora's, interactive); ours in M8
 - [x] First boot: model download with progress
 - [x] First boot: a short tour, Wi-Fi if not connected, Firefox installed (the tour opens once at the first login, with a wi-fi card first when offline; Firefox installs once online)
+
+## Later (after this desktop lands)
+
+Not blockers for the desktop: bigger features, things niri can't do yet, and checks that need
+real hardware.
+
+- [ ] Electron apps: dark mode through the portal and Inter (Firefox is checked; an Electron app like Discord is checked on the laptop)
+- [ ] Cursor: a Tripppin cursor theme (Adwaita for now)
+- [ ] Sounds: a small Tripppin sound set (login, notification, error, screenshot)
+- [ ] Light mode: every component switching together (dark only for now; Appearance says so)
+- [ ] On-screen keyboard for touchscreens
+- [ ] Voice input: hold Super + Space and talk (with a local speech model)
+- [ ] Ask about the screen or a selected file ("summarise this pdf")
+- [ ] History of past requests in the orb; continue a conversation
+- [ ] Permission prompts before risky steps (M4, with the safety work)
+- [ ] App not responding: "wait or force quit" (niri has no hang detection yet; System Monitor can end a stuck app)
 
 ## Website (trippp.in, tripppin-web repo)
 
