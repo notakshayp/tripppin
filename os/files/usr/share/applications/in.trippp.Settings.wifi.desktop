@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=wi-fi settings
+Comment=settings → wi-fi
+Exec=tripppin-ui settings wifi
+Icon=network-wireless
+Keywords=wifi;wireless;internet;network;hotspot;airplane;
+Categories=Settings;

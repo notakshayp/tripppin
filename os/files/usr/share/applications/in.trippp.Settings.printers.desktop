@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=printers & scanners settings
+Comment=settings → printers & scanners
+Exec=tripppin-ui settings printers
+Icon=printer
+Keywords=print;printer;scanner;scan;
+Categories=Settings;

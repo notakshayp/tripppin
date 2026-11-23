@@ -53,7 +53,7 @@ details still open · `[ ]` not started. Everything is verified by screenshot in
 - [x] Power menu (wlogout): lock, log out, sleep, restart, shut down
 - [x] Volume, brightness, keyboard-light, caps-lock and mic-mute pop-ups (ours) (caps lock watched by the orb from the keyboard light, checked in the VM; the keyboard light keys checked on the laptop)
 - [x] Launcher (fuzzel): apps
-- [ ] Launcher: settings pages, files, calculator, "ask tripppin" handing over to the orb
+- [~] Launcher: settings pages, files, calculator, "ask tripppin" handing over to the orb (settings and every page, with search words, and "ask tripppin" are in the launcher; sums go to the orb; searching files to do)
 - [x] Window switcher (Alt+Tab) with previews; overview of all windows and workspaces (alt + tab: our switcher, most recent first, app icons; super + tab: niri's overview with live previews; checked in the VM)
 - [~] Window controls: snap halves/quarters, maximise, minimise, always on top, move to workspace (halves, quarters, fill, centre and move to workspace done; niri has no minimise or always-on-top; Settings is too wide for half of a small screen)
 - [x] Keyboard shortcuts cheat sheet (Super+/), in our style

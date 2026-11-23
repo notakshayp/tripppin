@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=privacy settings
+Comment=settings → privacy
+Exec=tripppin-ui settings privacy
+Icon=preferences-system-privacy
+Keywords=location;camera;firewall;recent files;
+Categories=Settings;

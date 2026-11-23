@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=appearance settings
+Comment=settings → appearance
+Exec=tripppin-ui settings appearance
+Icon=preferences-desktop-wallpaper
+Keywords=wallpaper;background;theme;dark;text size;
+Categories=Settings;

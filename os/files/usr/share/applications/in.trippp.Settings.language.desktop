@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=language & region settings
+Comment=settings → language & region
+Exec=tripppin-ui settings language
+Icon=preferences-desktop-locale
+Keywords=language;region;locale;formats;hindi;
+Categories=Settings;
