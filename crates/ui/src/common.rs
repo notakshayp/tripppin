@@ -236,6 +236,9 @@ pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
             ("power menu", "super + escape"),
             ("screenshot of an area", "print"),
             ("screenshot of the screen", "ctrl + print"),
+            ("screenshot of a window", "alt + print"),
+            ("draw on the last screenshot", "super + shift + s"),
+            ("record the screen", "super + shift + r"),
         ],
     ),
 ];

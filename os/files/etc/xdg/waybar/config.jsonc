@@ -10,7 +10,7 @@
     "spacing": 0,
     "modules-left": ["image#logo", "niri/workspaces", "niri/window"],
     "modules-center": ["custom/clock"],
-    "modules-right": ["custom/orb", "network", "pulseaudio", "battery", "custom/notifications", "custom/power"],
+    "modules-right": ["custom/recording", "custom/orb", "network", "pulseaudio", "battery", "custom/notifications", "custom/power"],
 
     "image#logo": { "path": "/usr/share/tripppin/logo-bar.png", "size": 18 },
     "niri/workspaces": { "format": "{icon}", "format-icons": { "default": "", "active": "" } },
@@ -19,6 +19,7 @@
         "max-length": 32,
         "rewrite": {
             "foot": "terminal",
+            "swappy": "screenshot",
             "footclient": "terminal",
             "org\\.mozilla\\.firefox|firefox": "firefox",
             "org\\.videolan\\.VLC": "vlc",
@@ -38,6 +39,12 @@
         "interval": 15,
         "tooltip": false,
         "on-click": "tripppin-ui calendar"
+    },
+    "custom/recording": {
+        "exec": "pgrep -x wf-recorder >/dev/null && echo '● rec' || echo ''",
+        "interval": 1,
+        "tooltip": false,
+        "on-click": "pkill -INT -x wf-recorder"
     },
     "custom/orb": {
         "exec": "cat \"$XDG_RUNTIME_DIR/tripppin/orb-status\" 2>/dev/null",

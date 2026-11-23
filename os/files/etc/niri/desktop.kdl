@@ -100,6 +100,10 @@ binds {
     Mod+Shift+E { quit; }
     Print { screenshot; }
     Ctrl+Print { screenshot-screen; }
+    Alt+Print { screenshot-window; }
+    Mod+Shift+S { spawn "tripppin-annotate"; }
+    Mod+Shift+R { spawn "tripppin-record"; }
+    Mod+Shift+Alt+R { spawn "tripppin-record" "area"; }
 
     XF86AudioRaiseVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ && tripppin-ui osd volume"; }
     XF86AudioLowerVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- && tripppin-ui osd volume"; }
