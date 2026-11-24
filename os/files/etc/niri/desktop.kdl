@@ -19,8 +19,8 @@ layout {
 
     focus-ring {
         width 1
-        // A muted green hairline, not a neon frame: it says which window has focus, quietly.
-        active-color "#57d99a80"
+        // A neutral hairline: it says which window has focus without a coloured frame.
+        active-color "#f2f5ef3d"
         inactive-color "#f2f5ef1a"
     }
     border {
