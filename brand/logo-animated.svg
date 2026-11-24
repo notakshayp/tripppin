@@ -4,11 +4,9 @@
   .ink{fill:#182423;stroke:#182423} .green{fill:#1f6b45}
   @media (prefers-color-scheme: dark){ .ink{fill:#f2f5ef;stroke:#f2f5ef} .green{fill:#57d99a} }
   .arc{fill:none;stroke-width:22;stroke-linecap:round;stroke-dasharray:1;animation:draw 6s cubic-bezier(.3,0,.2,1) infinite}
-  .spark{transform-box:fill-box;transform-origin:center;animation:spin 6s infinite}
-  @keyframes draw{0%{stroke-dashoffset:1}9%,100%{stroke-dashoffset:0}}
-  @keyframes spin{0%,7%{transform:scale(0) rotate(-180deg);animation-timing-function:cubic-bezier(.2,.7,.3,1)}
-    15%{transform:scale(1.08) rotate(-20deg)}18%{transform:none}
-    52%{transform:none;animation-timing-function:ease-in-out}62%,100%{transform:rotate(90deg)}}
+  .spark{animation:appear 6s ease infinite}
+  @keyframes draw{0%,5%{stroke-dashoffset:1}16%,100%{stroke-dashoffset:0}}
+  @keyframes appear{0%{opacity:0}6%,100%{opacity:1}}
   @media (prefers-reduced-motion: reduce){ .arc,.spark{animation:none} .arc{stroke-dashoffset:0} }
 </style>
 <path class="arc ink" pathLength="1" d="M58.32 70.84 A60 60 0 1 0 141.68 70.84"/>

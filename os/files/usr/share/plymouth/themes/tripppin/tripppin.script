@@ -1,4 +1,4 @@
-// Tripppin's boot screen: on ink, the ring draws itself, the green × spins in and settles,
+// Tripppin's boot screen: on ink, the green spark appears, then the ring draws itself,
 // then makes a gentle quarter turn every couple of seconds while the computer starts; and a
 // password prompt for encrypted disks. Colours from the brand: ink #0d1211, paper #f2f5ef.
 // The images come from scripts/brand-assets.sh (2x, the mark's 146 x 175 box at 292 x 350);
@@ -55,35 +55,24 @@ resting = 0;
 fun refresh() {
     frame++;
     t = frame / 50;
-    // The ring over the first 0.55 s, from its left end down and round.
-    n = Math.Int(ease_out(t / 0.55) * RING_FRAMES + 0.5);
-    if (n < 1) n = 1;
-    if (n > RING_FRAMES) n = RING_FRAMES;
-    if (n != shown_ring) {
-        ring.SetImage(ring_frames[n]);
-        shown_ring = n;
-    }
-    // The × spins in half a turn from 0.42 s to 1 s, settling from just past full size.
-    if (t < 1.05) {
-        u = (t - 0.42) / 0.58;
-        if (u < 0) u = 0;
+    // The spark first, growing into place over 0.35 s without turning.
+    if (t < 0.4) {
+        u = t / 0.35;
         if (u > 1) u = 1;
-        e = ease_out(u);
-        show_spark(e * (1 + 0.12 * Math.Sin(3.14159 * u)), -3.14159 * (1 - e));
-        return;
-    }
-    // Then a quarter turn every 2.4 s, taking 0.7 s: the waiting motion.
-    waited = t - 1.3;
-    if (waited < 0) waited = 0;
-    k = Math.Int(waited / 2.4);
-    s = smooth((waited - k * 2.4 - 1.7) / 0.7);
-    if (s > 0 && s < 1) {
-        show_spark(1, 1.570795 * s);
-        resting = 0;
+        show_spark(ease_out(u), 0);
     } else if (resting == 0) {
-        // A quarter-turned × is the same ×: back to the resting image, drawn once.
         show_spark(1, 0);
         resting = 1;
+    }
+    // Then the ring, from 0.3 s to 0.95 s, from its left end down and round.
+    u = (t - 0.3) / 0.65;
+    if (u < 0) u = 0;
+    n = Math.Int(ease_out(u) * RING_FRAMES + 0.5);
+    if (n < 1) n = 1;
+    if (n > RING_FRAMES) n = RING_FRAMES;
+    if (u > 0 && n != shown_ring) {
+        ring.SetImage(ring_frames[n]);
+        shown_ring = n;
     }
 }
 Plymouth.SetRefreshFunction(refresh);
