@@ -2,8 +2,8 @@
 //!
 //! Plain text goes to the model as a single question. `/chat` starts a conversation
 //! with memory, `/terminal` opens a normal shell, and `!command` runs one command
-//! exactly as typed. Started with TRIPPPIN_CONTINUE set to a saved conversation (the
-//! orb's "continue in terminal"), it picks that conversation up as a chat.
+//! exactly as typed. Every request is saved as a session; `/history` lists them and
+//! `trip shell --continue <session>` (the orb's "continue in terminal") picks one up as a chat.
 
 use anyhow::Result;
 use reedline::{
@@ -16,13 +16,15 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use trip::agent;
-use trip::model::Message;
+use trip::session::{self, Session};
 use trip::term::{ACCENT, DIM, RESET};
 
 const HELP: &str = "\
   type anything     ask, or tell it what to do; it can run commands
   /chat             start a conversation with memory (/exit to leave it)
   /terminal         open a normal shell (exit to come back)
+  /history          what you asked before, and the steps it took
+  /history <n>      show one in full, and continue it as a chat
   !command          run one command exactly as typed
   /wifi             connect to a wi-fi network
   /setup            download the model for this machine and start it
@@ -37,6 +39,7 @@ pub enum Input<'a> {
     Raw(&'a str),
     Chat,
     Terminal,
+    History(Option<usize>),
     Wifi,
     Setup,
     Help,
@@ -55,6 +58,11 @@ pub fn parse(line: &str) -> Input<'_> {
     match line {
         "/chat" => Input::Chat,
         "/terminal" | "/term" => Input::Terminal,
+        "/history" => Input::History(None),
+        _ if line.starts_with("/history ") => match line["/history ".len()..].trim().parse() {
+            Ok(n) => Input::History(Some(n)),
+            Err(_) => Input::Unknown(line),
+        },
         "/wifi" => Input::Wifi,
         "/setup" => Input::Setup,
         "/help" | "/?" => Input::Help,
@@ -102,7 +110,7 @@ fn history_path() -> Option<PathBuf> {
     Some(dir.join("shell-history.txt"))
 }
 
-pub fn run() -> Result<()> {
+pub fn run(resume: Option<&str>) -> Result<()> {
     let cancel = Arc::new(AtomicBool::new(false));
     {
         // Ctrl-C while an answer is streaming stops the answer, not the shell.
@@ -117,7 +125,7 @@ pub fn run() -> Result<()> {
     }
     println!("{DIM}type anything to ask · /chat for a conversation · /terminal for a normal shell · /help{RESET}");
 
-    let mut chat: Option<Vec<Message>> = continued();
+    let mut chat: Option<Session> = resume.and_then(continued);
     loop {
         let prompt = ShellPrompt { chat: chat.is_some() };
         let line = match editor.read_line(&prompt)? {
@@ -141,10 +149,16 @@ pub fn run() -> Result<()> {
             }
             Input::Exit => return Ok(()),
             Input::Chat => {
-                chat = Some(vec![Message::system()]);
+                chat = Some(Session::new("terminal"));
                 println!("{DIM}conversation started. it remembers what you say until you type /exit.{RESET}");
             }
             Input::Terminal => terminal(),
+            Input::History(None) => history(),
+            Input::History(Some(n)) => {
+                if let Some(s) = pick(n) {
+                    chat = Some(s);
+                }
+            }
             Input::Raw(cmd) => raw(cmd),
             Input::Wifi => wifi(),
             Input::Setup => setup(),
@@ -152,16 +166,14 @@ pub fn run() -> Result<()> {
             Input::Ask(text) => {
                 cancel.store(false, Ordering::Relaxed);
                 match &mut chat {
-                    Some(history) => {
-                        // A task that fails part-way leaves half-finished tool turns; drop them.
-                        let before = history.len();
-                        history.push(Message::user(text));
-                        if !respond(history, &cancel) {
-                            history.truncate(before);
-                        }
+                    Some(session) => {
+                        session.ask(text);
+                        respond(session, &cancel);
                     }
                     None => {
-                        respond(&mut vec![Message::system(), Message::user(text)], &cancel);
+                        let mut session = Session::new("terminal");
+                        session.ask(text);
+                        respond(&mut session, &cancel);
                     }
                 }
             }
@@ -169,48 +181,89 @@ pub fn run() -> Result<()> {
     }
 }
 
-/// The conversation the orb handed over (TRIPPPIN_CONTINUE), shown as a short recap and
-/// kept as a chat so follow-ups know what happened.
-fn continued() -> Option<Vec<Message>> {
-    let path = std::env::var_os("TRIPPPIN_CONTINUE")?;
-    let history = crate::model::load_conversation(&std::fs::read_to_string(path).ok()?)?;
-    let said = |role: &str| {
-        history.iter().rev().find_map(|m| {
-            (m.0["role"] == role && m.0.get("tool_calls").is_none())
-                .then(|| m.0["content"].as_str().unwrap_or("").trim().to_string())
-                .filter(|t| !t.is_empty())
-        })
+/// A session from the history, shown as a recap and kept as a chat so follow-ups know
+/// what happened.
+fn continued(id: &str) -> Option<Session> {
+    let Some(s) = session::load(id) else {
+        println!("{DIM}couldn't find that conversation; starting fresh{RESET}");
+        return None;
     };
-    let steps = history.iter().filter(|m| m.0["role"] == "tool").count();
-    println!("{DIM}continuing from the orb · it remembers this until /exit{RESET}");
-    if let Some(q) = said("user") {
-        println!("\n{DIM}you asked{RESET}  {q}");
+    println!("{DIM}continuing · it remembers this until /exit{RESET}");
+    recap(&s);
+    Some(s)
+}
+
+/// Every request in a session with its steps (and how each went) and the answer.
+fn recap(s: &Session) {
+    for t in &s.turns {
+        println!("\n{DIM}you asked{RESET}  {}", t.request);
+        for step in &t.steps {
+            let mark = match step.ok {
+                Some(true) => format!("{ACCENT}✓{RESET}"),
+                Some(false) => "\x1b[31m✗\x1b[0m".to_string(),
+                None => format!("{DIM}·{RESET}"),
+            };
+            let detail: String = step.detail.lines().next().unwrap_or("").chars().take(90).collect();
+            println!("  {mark} {DIM}{}{RESET} {detail}", step.tool);
+        }
+        if !t.answer.is_empty() {
+            // The answer was written for the orb's light Markdown; plain text reads better here.
+            println!("\n{}", t.answer.replace("**", "").replace('`', ""));
+        } else if !t.error.is_empty() {
+            println!("\n{DIM}stopped: {}{RESET}", t.error);
+        }
     }
-    println!("{DIM}{steps} step{} taken{RESET}", if steps == 1 { "" } else { "s" });
-    if let Some(a) = said("assistant") {
-        println!("\n{a}\n");
+    println!();
+}
+
+/// The recent sessions, numbered for `/history <n>`.
+fn history() {
+    let list = session::list(15);
+    if list.is_empty() {
+        println!("{DIM}nothing yet. what you ask here and in the orb shows up in this list.{RESET}");
+        return;
     }
-    Some(history)
+    let now = session::now_secs();
+    for (i, s) in list.iter().enumerate() {
+        let mark = match s.ok {
+            Some(true) => format!("{ACCENT}✓{RESET}"),
+            Some(false) => "\x1b[31m✗\x1b[0m".to_string(),
+            None => " ".to_string(),
+        };
+        let title: String = s.title.chars().take(56).collect();
+        println!(
+            "{DIM}{:>3}{RESET} {mark} {title}  {DIM}{} · {} · {} step{}{RESET}",
+            i + 1,
+            session::when(s.started, now),
+            s.source,
+            s.steps,
+            if s.steps == 1 { "" } else { "s" }
+        );
+    }
+    println!("{DIM}/history <number> shows one and continues it as a chat{RESET}");
+}
+
+fn pick(n: usize) -> Option<Session> {
+    let list = session::list(n.max(15));
+    let Some(s) = n.checked_sub(1).and_then(|i| list.get(i)).and_then(|s| session::load(&s.id)) else {
+        println!("{DIM}there's no number {n}. /history lists them.{RESET}");
+        return None;
+    };
+    recap(&s);
+    println!("{DIM}continuing this conversation · /exit to leave it{RESET}");
+    Some(s)
 }
 
 /// Works on one request with the agent, which streams its answer and shows each step.
-/// Returns whether it finished.
-fn respond(history: &mut Vec<Message>, cancel: &AtomicBool) -> bool {
-    match agent::run(history, cancel, &mut agent::Terminal) {
+fn respond(session: &mut Session, cancel: &AtomicBool) {
+    match agent::run(session, cancel, &mut agent::Terminal) {
         Ok(done) => {
             if let Some(stats) = done.stats {
                 println!("{DIM}{stats}{RESET}");
             }
-            true
         }
-        Err(e) if e.to_string() == "stopped" => {
-            println!("{DIM}stopped{RESET}");
-            false
-        }
-        Err(e) => {
-            println!("{ACCENT}!{RESET} {e:#}");
-            false
-        }
+        Err(e) if e.to_string() == "stopped" => println!("{DIM}stopped{RESET}"),
+        Err(e) => println!("{ACCENT}!{RESET} {e:#}"),
     }
 }
 
@@ -284,6 +337,9 @@ mod tests {
         assert_eq!(parse("/setup"), Input::Setup);
         assert_eq!(parse("/wifi"), Input::Wifi);
         assert_eq!(parse("/exit"), Input::Exit);
+        assert_eq!(parse("/history"), Input::History(None));
+        assert_eq!(parse("/history 3"), Input::History(Some(3)));
+        assert_eq!(parse("/history x"), Input::Unknown("/history x"));
         assert_eq!(parse("/nope"), Input::Unknown("/nope"));
     }
 

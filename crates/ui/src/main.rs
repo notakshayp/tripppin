@@ -6,10 +6,12 @@
 //! - `first-boot`: fetches the model the first time someone logs in.
 //! - `osd`: the volume, mic and brightness pop-ups.
 //! - `settings`: the Settings app.
+//! - `askpass`: the password pop-up for administrator commands the AI runs.
 //! - `displays`: gives each screen a whole-number scale at login, so text stays sharp.
 
 mod accounts;
 mod apps;
+mod askpass;
 mod bt;
 mod calendar;
 mod common;
@@ -18,6 +20,7 @@ mod display;
 mod firstboot;
 mod greetd;
 mod greeter;
+mod keeper;
 mod keyboard;
 mod keys;
 mod lock;
@@ -75,12 +78,13 @@ fn main() -> ExitCode {
         Some("calendar") => calendar::run(),
         Some("keys") => keys::run(),
         Some("dim") => dim::run(),
+        Some("askpass") => askpass::run(),
         Some("welcome") => welcome::run(),
         Some("switch") => switch::run(),
         Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | displays"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | askpass | displays"
             );
             ExitCode::from(2)
         }

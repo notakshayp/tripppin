@@ -136,6 +136,9 @@ animations {
 binds {
     Mod+Space { spawn "tripppin-ui" "orb" "--toggle"; }
     Mod+Return { spawn "foot"; }
+    // The apps. (niri can't bind a tap of Super on its own; typing an app's name after
+    // Super + Space opens it too.)
+    Mod+A { spawn "fuzzel"; }
     Mod+D { spawn "fuzzel"; }
     Mod+N { spawn "swaync-client" "-t" "-sw"; }
     Mod+Escape { spawn "tripppin-power"; }
@@ -152,6 +155,7 @@ binds {
     Mod+Right { spawn "tripppin-ui" "snap" "right"; }
     Mod+Up { spawn "tripppin-ui" "snap" "max"; }
     Mod+Down { center-window; }
+    Mod+C { center-window; }
     Mod+Alt+Left { spawn "tripppin-ui" "snap" "top-left"; }
     Mod+Alt+Up { spawn "tripppin-ui" "snap" "top-right"; }
     Mod+Alt+Down { spawn "tripppin-ui" "snap" "bottom-left"; }

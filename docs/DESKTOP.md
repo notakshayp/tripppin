@@ -132,6 +132,18 @@ From the owner's first hands-on test: sluggish, soft text, too large, no icons, 
 - [x] Motion: niri springs for every window movement, open and close shaders (grow from 92% with a slight settle, shrink away), one easing curve in every stylesheet, press-in on buttons, entrances for every pop-up and page, exits that fade toward where things came from, a frame-clock spinner, gliding pop-up bars. Reduce motion turns it all off
 - [ ] Checked on the laptop: sharpness and scale on a real panel, animation smoothness on a real GPU
 
+## Second round (owner's notes, 2026-11-24)
+
+- [x] Windows stay usable: a floating window is never left under the bar, bigger than the screen or dragged off it (`keeper.rs` watches niri's event stream and nudges it back once it settles). Super + drag moves, Super + right-drag resizes, Super + C or ↓ centres; all in the shortcuts sheet
+- [x] Apps: Super + A (niri can't bind a tap of Super alone), the logo in the bar, or type an app's name after Super + Space and pick it (an exact name and Enter opens it)
+- [x] Quick settings: Wi-Fi and Bluetooth tiles say so when the computer has no adapter instead of looking on; a row of shortcuts to the Settings pages (networks, devices, sound, display)
+- [x] Orb: every step opens on a click (the whole command and the end of its output); follow-up questions in the card; earlier requests (the orb's and the terminal's) listed, readable step by step and continued; "continue in terminal" opens that conversation in the AI shell with every step
+- [x] AI: a task notebook the model sees at every step (its plan and notes, one line per step with the result), and compaction that drops old steps instead of failing when the context fills; sessions saved as JSON and Markdown in ~/.local/state/tripppin/sessions
+- [x] AI administrator commands: a password pop-up that shows the command (sudo askpass), or Settings → AI lets installs, services or updates run without a password
+- [x] Settings → AI: guided cloud providers (OpenAI, Anthropic, Gemini, DeepSeek, Sarvam AI, OpenRouter, Groq, your own server) with a key link and the provider's model list; other local models (Gemma 4 E4B, 12B, 26B-A4B, Granite 4.1 8B)
+- [x] Checked in the VM: oversized windows shrink back on screen, maximise and restore, app matches in the ask bar, the new card with a two-step request, "continue in terminal" and `/history`, the Wi-Fi tile with no adapter, the Settings shortcuts row, the volume slider (now reads the real level), Settings → AI (local and cloud views), the sudo pop-up end to end (`sudo id -u` from the AI with no terminal), passwordless groups on and off
+- [ ] Needs a pointer (not testable over ssh): opening a step, sending a follow-up, the history list, dragging a window under the bar
+
 ## Later (after this desktop lands)
 
 Not blockers for the desktop: bigger features, things niri can't do yet, and checks that need

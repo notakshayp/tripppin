@@ -1,0 +1,40 @@
+#!/bin/sh
+# Settings → AI → administrator commands. Run through pkexec, so the person types their
+# password once. Lets the groups given run with sudo without a password, for the person who
+# asked (and so for the AI working for them):
+#   install    dnf, flatpak
+#   services   systemctl
+#   updates    bootc
+# "off" (or no groups) goes back to asking every time.
+set -eu
+[ -n "${PKEXEC_UID:-}" ] || { echo "run this through pkexec" >&2; exit 2; }
+user=$(id -nu "$PKEXEC_UID")
+rules=/etc/sudoers.d/tripppin-ai
+state=/etc/tripppin/ai-sudo
+cmds=""
+groups=""
+for g in "$@"; do
+    case $g in
+        install) cmds="$cmds /usr/bin/dnf, /usr/bin/flatpak," ;;
+        services) cmds="$cmds /usr/bin/systemctl," ;;
+        updates) cmds="$cmds /usr/bin/bootc," ;;
+        off) continue ;;
+        *) echo "unknown group: $g" >&2; exit 2 ;;
+    esac
+    groups="$groups $g"
+done
+mkdir -p /etc/tripppin
+if [ -z "$cmds" ]; then
+    rm -f "$rules"
+    : > "$state"
+    chmod 644 "$state"
+    exit 0
+fi
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+printf '# Written by Settings → AI → administrator commands. Change it there.\n%s ALL=(root) NOPASSWD:%s\n' \
+    "$user" "${cmds%,}" > "$tmp"
+visudo -cqf "$tmp"
+install -m 0440 -o root -g root "$tmp" "$rules"
+echo "${groups# }" > "$state"
+chmod 644 "$state"

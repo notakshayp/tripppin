@@ -1,0 +1,4 @@
+#!/bin/sh
+# sudo's password pop-up (SUDO_ASKPASS) when the AI runs an administrator command with no
+# terminal to type into. Prints the password, or exits 1 when cancelled.
+exec tripppin-ui askpass

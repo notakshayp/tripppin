@@ -159,6 +159,15 @@ pub mod icons {
     pub const ALERT: char = '\u{e077}';
     pub const MINIMIZE: char = '\u{e11b}';
     pub const CAPS: char = '\u{e04a}';
+    pub const HISTORY: char = '\u{e1f5}';
+    pub const CHEVRON_DOWN: char = '\u{e06d}';
+    pub const CHEVRON_RIGHT: char = '\u{e06f}';
+    pub const TERMINAL: char = '\u{e181}';
+    pub const NEW: char = '\u{e172}';
+    pub const KEY: char = '\u{e4a3}';
+    pub const EXTERNAL: char = '\u{e0b9}';
+    pub const CLOUD: char = '\u{e088}';
+    pub const CPU: char = '\u{e0a9}';
 }
 
 /// An icon (see `icons`) as a label with the given CSS classes.
@@ -305,7 +314,7 @@ pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
         &[
             ("ask tripppin", "super + space"),
             ("terminal", "super + return"),
-            ("apps", "super + d"),
+            ("apps", "super + a, or type its name after super + space"),
             ("quick settings", "super + n"),
             ("clipboard history", "super + v"),
             ("emoji", "super + ."),
@@ -316,12 +325,15 @@ pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
         "windows",
         &[
             ("close a window", "super + q"),
+            ("move a window", "super + drag"),
+            ("resize a window", "super + right-drag"),
             ("full screen", "super + f"),
             ("float or tile a window", "super + t"),
             ("switch windows", "alt + tab"),
             ("see every window", "super + tab"),
             ("snap left or right", "super + ← →"),
-            ("fill the screen", "super + ↑"),
+            ("fill the screen", "super + ↑ (again to undo)"),
+            ("centre a window", "super + ↓"),
             ("snap to a corner", "super + alt + arrows"),
             ("workspace 1, 2, 3", "super + 1, 2, 3"),
             ("move a window to 1, 2, 3", "super + shift + 1, 2, 3"),

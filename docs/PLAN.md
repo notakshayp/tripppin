@@ -81,11 +81,19 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [x] The AI shell (`trip shell`), default for interactive terminals: plain text goes to the model as a single question, `/chat` keeps a conversation, `/terminal` opens a normal shell, `!cmd` runs one command, `/setup` downloads the model; streaming and Ctrl-C
 - [x] Agent loop in `trip`: the model calls tools until it answers in plain text (25-step cap, Ctrl-C stops it)
 - [x] Tools: `exec` (bash, live output, timeout, sudo prompts work), `read_file`, `write_file`
+- [x] Task notebook and compaction for small models: the model's plan and notes plus one line per step, shown at every step; old steps dropped when the context fills (the notebook keeps them); every session saved and listed (`/history`, the orb's history), continued in the terminal
+- [x] Administrator commands: sudo asks through a pop-up showing the command; Settings → AI can allow installs, services or updates without a password
 - [x] Tool-call verifier: unknown tools, bad JSON, missing or mistyped fields and calls written as text go back to the model with the exact problem; 3 retries before giving up
 - [x] Flatpak with Flathub in the image, so the agent can install apps
 - [ ] Safety: permission modes, a second check on risky steps, undo (M4)
 - [ ] Record/replay tests; eval gate on PRs
 - [ ] ISO 2
+
+## M7: Agents + bring your own model (started early)
+
+- [x] Settings → AI: guided cloud providers (OpenAI, Anthropic, Google Gemini, DeepSeek, Sarvam AI, OpenRouter, Groq) or your own server, with the provider's model list
+- [x] Other local models with native tool calling: Gemma 4 (E4B, 12B, 26B-A4B), Granite 4.1 8B; each family gets its own sampling
+- [ ] Background jobs that outlive the request
 
 ## M5: Desktop + orb
 

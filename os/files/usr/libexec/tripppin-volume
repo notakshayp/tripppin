@@ -1,0 +1,8 @@
+#!/bin/sh
+# The volume slider in quick settings: `get` prints the speaker volume as a whole percent,
+# `set N` sets it.
+case ${1:-} in
+    get) wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{ printf "%d", $2 * 100 + 0.5 }' ;;
+    set) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${2:-50}%" ;;
+    *) echo "usage: tripppin-volume get | set <percent>" >&2; exit 2 ;;
+esac

@@ -5,7 +5,7 @@
 use crate::accounts;
 use crate::apps;
 use crate::bt;
-use crate::common::{icons, label};
+use crate::common::{self, icons, label};
 use crate::display;
 use crate::keyboard;
 use crate::nm;
@@ -1517,65 +1517,218 @@ fn ai_page() -> gtk::ScrolledWindow {
     body.append(&caption("where it runs"));
     let modes = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     modes.set_homogeneous(true);
-    let here = gtk::Button::with_label("this computer");
-    let there = gtk::Button::with_label("another server");
-    for b in [&here, &there] {
-        b.add_css_class("segment");
-        modes.append(b);
-    }
+    let here = icon_segment(icons::CPU, "this computer");
+    let there = icon_segment(icons::CLOUD, "cloud or another server");
+    modes.append(&here);
+    modes.append(&there);
     body.append(&modes);
     let error = label("", &["error"]);
+    error.set_wrap(true);
+    error.set_xalign(0.0);
     error.set_visible(false);
 
     // This computer: the models and the service that runs them.
-    let local = gtk::Box::new(gtk::Orientation::Vertical, 22);
-    local.append(&caption("models"));
+    let local = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    local.append(&caption("models for this computer"));
     let models = gtk::ListBox::new();
     models.add_css_class("list-card");
     models.set_selection_mode(gtk::SelectionMode::None);
     local.append(&models);
+    let others_caption = caption("other models");
+    others_caption.set_margin_top(10);
+    local.append(&others_caption);
+    let others_about = label(
+        "other open models that call tools well. they download once and run here, like the one above.",
+        &["row-sub"],
+    );
+    others_about.set_wrap(true);
+    others_about.set_xalign(0.0);
+    local.append(&others_about);
+    let others = gtk::ListBox::new();
+    others.add_css_class("list-card");
+    others.set_selection_mode(gtk::SelectionMode::None);
+    local.append(&others);
     let service = gtk::ListBox::new();
     service.add_css_class("list-card");
     service.set_selection_mode(gtk::SelectionMode::None);
+    service.set_margin_top(10);
     local.append(&service);
 
-    // Another server: any OpenAI-style chat API.
+    // Cloud or another server: pick a provider, then a guided key, model and test.
     let remote = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    remote.append(&caption("another server"));
-    let about = label(
-        "a cloud provider with a key, or your own llama.cpp or ollama machine. anything that speaks the openai chat api.",
-        &["row-sub"],
-    );
+    remote.append(&caption("provider"));
+    let grid = gtk::FlowBox::new();
+    grid.set_selection_mode(gtk::SelectionMode::None);
+    grid.set_homogeneous(true);
+    grid.set_max_children_per_line(4);
+    grid.set_min_children_per_line(2);
+    grid.set_column_spacing(8);
+    grid.set_row_spacing(8);
+    let mut chips = Vec::new();
+    for p in trip::providers::PROVIDERS.iter() {
+        let b = gtk::Button::with_label(&p.name.to_lowercase());
+        b.add_css_class("segment");
+        b.add_css_class("provider");
+        grid.insert(&b, -1);
+        chips.push((p, b));
+    }
+    remote.append(&grid);
+    let about = label("", &["row-sub"]);
     about.set_wrap(true);
     about.set_xalign(0.0);
     remote.append(&about);
-    let url = gtk::Entry::builder().placeholder_text("address, like https://api.example.com/v1").build();
-    let model = gtk::Entry::builder().placeholder_text("model name").build();
-    let key = gtk::PasswordEntry::builder()
-        .placeholder_text("key (leave empty for your own server)")
-        .show_peek_icon(true)
-        .build();
-    url.add_css_class("field");
-    model.add_css_class("field");
+
+    let steps = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    steps.add_css_class("guide");
+    let key_step = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let key_words = label("1 · make a key on the provider's site", &["row-title"]);
+    key_words.set_hexpand(true);
+    let get_key = gtk::Button::new();
+    let get_key_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    get_key_box.append(&gtk::Label::new(Some("get a key")));
+    get_key_box.append(&common::icon(icons::EXTERNAL, &["link-icon"]));
+    get_key.set_child(Some(&get_key_box));
+    get_key.add_css_class("link");
+    get_key.add_css_class("accent");
+    key_step.append(&key_words);
+    key_step.append(&get_key);
+    let key_label = label("2 · paste it here", &["row-title"]);
+    let key = gtk::PasswordEntry::builder().placeholder_text("api key").show_peek_icon(true).build();
     key.add_css_class("field");
+    let url_label = label("address of the server, ending in /v1", &["row-title"]);
+    let url = gtk::Entry::builder().placeholder_text("http://192.168.1.20:8080/v1").build();
+    url.add_css_class("field");
+    let model_label = label("3 · pick a model", &["row-title"]);
+    let model_line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let model = gtk::Entry::builder().placeholder_text("model name").build();
+    model.add_css_class("field");
+    model.set_hexpand(true);
+    let list_models = gtk::MenuButton::new();
+    list_models.set_label("list models");
+    list_models.add_css_class("pill");
+    list_models.add_css_class("quiet");
+    list_models.set_valign(gtk::Align::Center);
+    let model_list = gtk::ListBox::new();
+    model_list.add_css_class("menu-list");
+    model_list.set_selection_mode(gtk::SelectionMode::None);
+    let model_scroll = gtk::ScrolledWindow::new();
+    model_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    model_scroll.set_max_content_height(320);
+    model_scroll.set_propagate_natural_height(true);
+    model_scroll.set_child(Some(&model_list));
+    let popover = gtk::Popover::new();
+    popover.set_child(Some(&model_scroll));
+    list_models.set_popover(Some(&popover));
+    model_line.append(&model);
+    model_line.append(&list_models);
     let save = gtk::Button::with_label("test and use");
     save.add_css_class("pill");
     save.set_halign(gtk::Align::Start);
-    remote.append(&url);
-    remote.append(&model);
-    remote.append(&key);
-    remote.append(&save);
+    let privacy = label(
+        "with a cloud provider, what you ask and what the commands print are sent to it. the key stays in your home folder, readable only by you.",
+        &["row-sub"],
+    );
+    privacy.set_wrap(true);
+    privacy.set_xalign(0.0);
+    for w in [
+        key_step.upcast_ref::<gtk::Widget>(),
+        key_label.upcast_ref(),
+        key.upcast_ref(),
+        url_label.upcast_ref(),
+        url.upcast_ref(),
+        model_label.upcast_ref(),
+        model_line.upcast_ref(),
+        save.upcast_ref(),
+        privacy.upcast_ref(),
+    ] {
+        w.set_halign(if w.is::<gtk::Button>() { gtk::Align::Start } else { gtk::Align::Fill });
+        if let Some(l) = w.downcast_ref::<gtk::Label>() {
+            l.set_xalign(0.0);
+        }
+        steps.append(w);
+    }
+    remote.append(&steps);
     body.append(&local);
     body.append(&remote);
     body.append(&error);
 
-    body.append(&caption("what it may do alone"));
-    let alone = gtk::ListBox::new();
-    alone.add_css_class("list-card");
-    alone.set_selection_mode(gtk::SelectionMode::None);
-    alone.append(&setting_row("run commands and change files", &label("yes, and it checks its work", &["row-sub"])));
-    alone.append(&setting_row("ask before risky steps", &label("comes in a later update", &["row-sub"])));
-    body.append(&alone);
+    // Administrator commands: a password pop-up each time, or some without asking.
+    body.append(&caption("administrator commands"));
+    let admin = gtk::ListBox::new();
+    admin.add_css_class("list-card");
+    admin.set_selection_mode(gtk::SelectionMode::None);
+    let admin_about = label(
+        "when it needs sudo, it asks for your password in a pop-up that shows the command. you can let these run without asking:",
+        &["row-sub"],
+    );
+    admin_about.set_wrap(true);
+    admin_about.set_xalign(0.0);
+    admin_about.set_margin_top(10);
+    admin_about.set_margin_bottom(4);
+    admin_about.set_margin_start(16);
+    admin_about.set_margin_end(16);
+    admin.append(&admin_about);
+    let groups: Vec<(&str, gtk::Switch)> = [
+        ("install", "install and remove software · dnf, flatpak"),
+        ("services", "start and stop services · systemctl"),
+        ("updates", "system updates · bootc"),
+    ]
+    .into_iter()
+    .map(|(id, words)| {
+        let s = gtk::Switch::new();
+        admin.append(&setting_row(words, &s));
+        (id, s)
+    })
+    .collect();
+    body.append(&admin);
+    let admin_note = label(
+        "these then run without a password for you too, in any terminal. turn on only what you're comfortable with.",
+        &["row-sub"],
+    );
+    admin_note.set_wrap(true);
+    admin_note.set_xalign(0.0);
+    body.append(&admin_note);
+    let groups = Rc::new(groups);
+    let quiet = Rc::new(std::cell::Cell::new(true));
+    let load_admin = {
+        let (groups, quiet) = (groups.clone(), quiet.clone());
+        move || {
+            quiet.set(true);
+            let on = std::fs::read_to_string(AI_SUDO_FILE).unwrap_or_default();
+            for (id, s) in groups.iter() {
+                s.set_active(on.split_whitespace().any(|w| w == *id));
+            }
+            quiet.set(false);
+        }
+    };
+    load_admin();
+    for (_, s) in groups.iter() {
+        let (groups, quiet, error) = (groups.clone(), quiet.clone(), error.clone());
+        let load_admin = load_admin.clone();
+        s.connect_active_notify(move |_| {
+            if quiet.get() {
+                return;
+            }
+            let on: Vec<String> = groups.iter().filter(|(_, s)| s.is_active()).map(|(id, _)| id.to_string()).collect();
+            for (_, s) in groups.iter() {
+                s.set_sensitive(false);
+            }
+            let (groups, error, load_admin) = (groups.clone(), error.clone(), load_admin.clone());
+            background(
+                move || set_ai_sudo(&on),
+                move |r| {
+                    for (_, s) in groups.iter() {
+                        s.set_sensitive(true);
+                    }
+                    if let Err(e) = r {
+                        error.set_text(&e);
+                        error.set_visible(true);
+                    }
+                    load_admin();
+                },
+            );
+        });
+    }
 
     let show_remote = {
         let (here, there, local, remote) = (here.clone(), there.clone(), local.clone(), remote.clone());
@@ -1592,6 +1745,109 @@ fn ai_page() -> gtk::ScrolledWindow {
         })
     };
 
+    // Choosing a provider fills in its address and a model to start with, and shows its steps.
+    let chosen: Rc<std::cell::Cell<&'static trip::providers::Provider>> =
+        Rc::new(std::cell::Cell::new(&trip::providers::PROVIDERS[0]));
+    let pick = {
+        let chips: Vec<_> = chips.iter().map(|(p, b)| (*p, b.clone())).collect();
+        let (chosen, about, key_step, key_label, key, url_label, url, model) = (
+            chosen.clone(),
+            about.clone(),
+            key_step.clone(),
+            key_label.clone(),
+            key.clone(),
+            url_label.clone(),
+            url.clone(),
+            model.clone(),
+        );
+        let model_label = model_label.clone();
+        Rc::new(move |p: &'static trip::providers::Provider, saved: Option<&trip::model::Endpoint>| {
+            chosen.set(p);
+            for (q, b) in &chips {
+                if q.id == p.id {
+                    b.add_css_class("selected");
+                } else {
+                    b.remove_css_class("selected");
+                }
+            }
+            about.set_text(p.about);
+            let own = p.id == "own";
+            key_step.set_visible(!own);
+            key_label.set_text(if own { "key, if your server needs one" } else { "2 · paste it here" });
+            url_label.set_visible(own);
+            url.set_visible(own);
+            model_label.set_text(if own { "model name, as the server calls it" } else { "3 · pick a model" });
+            match saved.filter(|e| trip::providers::for_url(&e.url).id == p.id) {
+                Some(e) => {
+                    url.set_text(&e.url);
+                    model.set_text(&e.model);
+                    key.set_text(&e.key);
+                }
+                None => {
+                    url.set_text(p.url);
+                    model.set_text(p.model);
+                    key.set_text("");
+                }
+            }
+        })
+    };
+    for (p, b) in &chips {
+        let (pick, p) = (pick.clone(), *p);
+        b.connect_clicked(move |_| pick(p, trip::model::endpoint().as_ref()));
+    }
+    {
+        let chosen = chosen.clone();
+        get_key.connect_clicked(move |b| {
+            let uri = chosen.get().keys;
+            let window = b.root().and_downcast::<gtk::Window>();
+            gtk::UriLauncher::new(uri).launch(window.as_ref(), gio::Cancellable::NONE, |_| {});
+        });
+    }
+    {
+        // Opening the list asks the provider which models this key can use.
+        let (url, key, model, model_list, error) =
+            (url.clone(), key.clone(), model.clone(), model_list.clone(), error.clone());
+        popover.connect_show(move |popover| {
+            clear(&model_list);
+            model_list.append(&label("asking the provider…", &["row-sub", "menu-note"]));
+            let e = trip::model::Endpoint {
+                url: url.text().trim().trim_end_matches('/').to_string(),
+                model: String::new(),
+                key: key.text().trim().to_string(),
+            };
+            let (model, model_list, error, popover) =
+                (model.clone(), model_list.clone(), error.clone(), popover.clone());
+            background(
+                move || trip::providers::models(&e).map_err(|e| format!("{e:#}")),
+                move |r| {
+                    clear(&model_list);
+                    match r {
+                        Ok(ids) if !ids.is_empty() => {
+                            for id in ids {
+                                let b = gtk::Button::with_label(&id);
+                                b.add_css_class("menu-item");
+                                let (model, popover) = (model.clone(), popover.clone());
+                                b.connect_clicked(move |_| {
+                                    model.set_text(&id);
+                                    popover.popdown();
+                                });
+                                model_list.append(&b);
+                            }
+                        }
+                        Ok(_) => {
+                            model_list.append(&label("it didn't list any; type the name", &["row-sub", "menu-note"]))
+                        }
+                        Err(e) => {
+                            model_list.append(&label("couldn't get the list", &["row-sub", "menu-note"]));
+                            error.set_text(&format!("{}. check the key, or type the model name.", e.to_lowercase()));
+                            error.set_visible(true);
+                        }
+                    }
+                },
+            );
+        });
+    }
+
     let load: LoadSlot = Rc::new(RefCell::new(None));
     let reload = {
         let load = load.clone();
@@ -1602,36 +1858,41 @@ fn ai_page() -> gtk::ScrolledWindow {
         }
     };
     {
-        let (models, service, status, error, show_remote, url, model, key) = (
+        let (models, others, others_caption, others_about, service, status, error, show_remote, pick) = (
             models.clone(),
+            others.clone(),
+            others_caption.clone(),
+            others_about.clone(),
             service.clone(),
             status.clone(),
             error.clone(),
             show_remote.clone(),
-            url.clone(),
-            model.clone(),
-            key.clone(),
+            pick.clone(),
         );
         let reload = reload.clone();
         *load.borrow_mut() = Some(Rc::new(move || {
-            let (models, service, status, error, show_remote, url, model, key) = (
+            let (models, others, others_caption, others_about, service, status, error, show_remote, pick) = (
                 models.clone(),
+                others.clone(),
+                others_caption.clone(),
+                others_about.clone(),
                 service.clone(),
                 status.clone(),
                 error.clone(),
                 show_remote.clone(),
-                url.clone(),
-                model.clone(),
-                key.clone(),
+                pick.clone(),
             );
             let reload = reload.clone();
             background(ai_state, move |st| {
                 if let Some(e) = &st.endpoint {
-                    let host = e.url.split("://").nth(1).unwrap_or(&e.url).split('/').next().unwrap_or("").to_string();
-                    status.set_text(&format!("{} · on {host}", e.model.to_lowercase()));
-                    url.set_text(&e.url);
-                    model.set_text(&e.model);
-                    key.set_text(&e.key);
+                    let p = trip::providers::for_url(&e.url);
+                    let place = if p.id == "own" {
+                        e.url.split("://").nth(1).unwrap_or(&e.url).split('/').next().unwrap_or("").to_string()
+                    } else {
+                        p.name.to_lowercase()
+                    };
+                    status.set_text(&format!("{} · on {place}", e.model.to_lowercase()));
+                    pick(p, Some(e));
                 } else {
                     let name = st
                         .active
@@ -1643,12 +1904,19 @@ fn ai_page() -> gtk::ScrolledWindow {
                         (Some(n), false) => format!("{n} · on this computer · stopped"),
                         (None, _) => "no model downloaded yet".to_string(),
                     });
+                    pick(&trip::providers::PROVIDERS[0], None);
                 }
                 show_remote(st.endpoint.is_some());
                 clear(&models);
+                clear(&others);
                 for (i, t) in st.tiers.iter().enumerate() {
-                    models.append(&model_row(t, &st, st.installed[i], &error, reload.clone()));
+                    let row = model_row(t, &st, st.installed[i], &error, reload.clone());
+                    if t.choice { others.append(&row) } else { models.append(&row) }
                 }
+                let any_other = st.tiers.iter().any(|t| t.choice);
+                others_caption.set_visible(any_other);
+                others_about.set_visible(any_other);
+                others.set_visible(any_other);
                 clear(&service);
                 let restart = gtk::Button::with_label(if st.running { "restart" } else { "start" });
                 restart.add_css_class("link");
@@ -1700,8 +1968,14 @@ fn ai_page() -> gtk::ScrolledWindow {
                 model: model.text().trim().to_string(),
                 key: key.text().trim().to_string(),
             };
-            if e.url.is_empty() || e.model.is_empty() {
-                error.set_text("fill in the address and the model name");
+            let missing = match (e.url.is_empty(), e.key.is_empty() && chosen.get().id != "own", e.model.is_empty()) {
+                (true, _, _) => Some("type the server's address"),
+                (_, true, _) => Some("paste the key from the provider first"),
+                (_, _, true) => Some("pick a model (list models shows what the key can use)"),
+                _ => None,
+            };
+            if let Some(m) = missing {
+                error.set_text(m);
                 error.set_visible(true);
                 return;
             }
@@ -1735,6 +2009,38 @@ fn ai_page() -> gtk::ScrolledWindow {
     scroll
 }
 
+/// A big choice button with an icon over its words.
+fn icon_segment(glyph: char, words: &str) -> gtk::Button {
+    let b = gtk::Button::new();
+    let inner = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    inner.set_halign(gtk::Align::Center);
+    inner.append(&common::icon(glyph, &["segment-icon"]));
+    inner.append(&gtk::Label::new(Some(words)));
+    b.set_child(Some(&inner));
+    b.add_css_class("segment");
+    b
+}
+
+/// Which groups of administrator commands run without a password (written by tripppin-ai-sudo).
+const AI_SUDO_FILE: &str = "/etc/tripppin/ai-sudo";
+
+/// Sets the groups of commands sudo runs without a password; asks for the password once.
+fn set_ai_sudo(groups: &[String]) -> Result<(), String> {
+    let mut args = vec!["/usr/libexec/tripppin-ai-sudo".to_string()];
+    if groups.is_empty() {
+        args.push("off".into());
+    } else {
+        args.extend(groups.iter().cloned());
+    }
+    let out = std::process::Command::new("pkexec").args(&args).output().map_err(|e| format!("couldn't ask: {e}"))?;
+    match out.status.code() {
+        Some(0) => Ok(()),
+        // pkexec: 126 is a cancelled or refused password, 127 a failed check.
+        Some(126 | 127) => Err("not changed: the password wasn't given".into()),
+        _ => Err(format!("couldn't change it: {}", String::from_utf8_lossy(&out.stderr).trim().to_lowercase())),
+    }
+}
+
 enum Pull {
     Bytes(u64, u64),
     Done(Result<(), String>),
@@ -1758,6 +2064,9 @@ fn model_row(
     text.set_valign(gtk::Align::Center);
     text.append(&label(&t.model.to_lowercase(), &[if in_use { "row-title-strong" } else { "row-title" }]));
     let mut words = vec![format!("{:.1} gb", t.download_gb())];
+    if !t.about.is_empty() {
+        words.push(t.about.clone());
+    }
     if st.recommended.as_deref() == Some(t.id.as_str()) {
         words.push("best for this computer".into());
     }

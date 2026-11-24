@@ -9,6 +9,9 @@
 # checked by SHA-256 after download. Qwen does not publish GGUF files for 3.5;
 # later we quantize the official weights ourselves and host the result.
 # The catalog will be signed before it ships.
+#
+# Entries with `choice = true` come after the tiers: other models with native tool
+# calling that people can pick in Settings → AI. They're never picked automatically.
 
 schema = 1
 
@@ -54,4 +57,58 @@ file = "Qwen3.5-4B-Q4_K_M.gguf"
 url = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf"
 size_bytes = 2740937888
 sha256 = "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4"
+context = 32768
+
+# ---- other choices (Settings → AI → other models) ----
+
+[[tier]]
+id = "gemma4-e4b"
+model = "Gemma 4 E4B"
+license = "Apache-2.0"
+min_ram_gib = 14.5
+choice = true
+about = "google · small and quick, good with tools"
+file = "gemma-4-E4B-it-Q4_K_M.gguf"
+url = "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/bfc15c382204943c3a8fff0c750b94ae2364d7a3/gemma-4-E4B-it-Q4_K_M.gguf"
+size_bytes = 4977171584
+sha256 = "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87"
+context = 32768
+
+[[tier]]
+id = "gemma4-12b"
+model = "Gemma 4 12B"
+license = "Apache-2.0"
+min_vram_gib = 9.5
+choice = true
+about = "google · stronger; wants a 10 gb graphics card"
+file = "gemma-4-12b-it-Q4_K_M.gguf"
+url = "https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/resolve/fc034cfff751157913579611efad8462ac1be606/gemma-4-12b-it-Q4_K_M.gguf"
+size_bytes = 7121861440
+sha256 = "0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42"
+context = 16384
+
+[[tier]]
+id = "gemma4-26b-a4b"
+model = "Gemma 4 26B-A4B"
+license = "Apache-2.0"
+min_ram_gib = 30.0
+choice = true
+about = "google · fast without a graphics card; wants 32 gb of memory"
+file = "gemma-4-26B-A4B-it-UD-Q4_K_M.gguf"
+url = "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/c099eb48e663fd284577b04978a94ffccb261841/gemma-4-26B-A4B-it-UD-Q4_K_M.gguf"
+size_bytes = 16947541728
+sha256 = "f2c28b3dc4776931ac6f879e11f203dec637ea0f14267a86ec8f6165f63f293f"
+context = 16384
+
+[[tier]]
+id = "granite41-8b"
+model = "Granite 4.1 8B"
+license = "Apache-2.0"
+min_ram_gib = 14.5
+choice = true
+about = "ibm · careful with tools and instructions"
+file = "granite-4.1-8b-Q4_K_M.gguf"
+url = "https://huggingface.co/unsloth/granite-4.1-8b-GGUF/resolve/6f9671f73eb03273bc09319194b8a4e810e03a8f/granite-4.1-8b-Q4_K_M.gguf"
+size_bytes = 5347915136
+sha256 = "0f45c1af986e9900bb3b6ba46a25937e1bb80426935bc242d88c9ca90e9f5c88"
 context = 32768
