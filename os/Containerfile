@@ -116,6 +116,8 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     && dnf clean all
 
 COPY os/files/ /
+# The desktop widgets reference, for people and for the AI (`tripppin-ui widgets guide`).
+COPY docs/WIDGETS.md /usr/share/doc/tripppin/WIDGETS.md
 
 # Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still
 # recognise the base; change only what people see.

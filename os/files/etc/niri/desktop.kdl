@@ -61,6 +61,9 @@ spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
 // USB drives and phones: mounted when plugged in, with a notification to open or eject.
 spawn-at-startup "udiskie" "--automount" "--notify" "--no-tray" "--file-manager" "thunar"
 spawn-at-startup "tripppin-ui" "orb"
+// Desktop widgets (~/.local/share/tripppin/widgets; none until one is added, see
+// /usr/share/doc/tripppin/WIDGETS.md). Idles when there are none.
+spawn-at-startup "tripppin-ui" "widgets"
 spawn-at-startup "tripppin-ui" "first-boot"
 spawn-at-startup "tripppin-ui" "welcome" "--first-time"
 // When the computer is left alone: the person's timings (Settings → Power), else ours
@@ -160,6 +163,20 @@ binds {
     Mod+Alt+Up { spawn "tripppin-ui" "snap" "top-right"; }
     Mod+Alt+Down { spawn "tripppin-ui" "snap" "bottom-left"; }
     Mod+Alt+Right { spawn "tripppin-ui" "snap" "bottom-right"; }
+    // Rectangle's keys (macOS): halves (again for 1/3, then 2/3), quarters on U I J K, fill,
+    // centre, and back to where it was before it was snapped. Dragging a window against an
+    // edge snaps it too (keeper.rs).
+    Ctrl+Alt+Left { spawn "tripppin-ui" "snap" "left"; }
+    Ctrl+Alt+Right { spawn "tripppin-ui" "snap" "right"; }
+    Ctrl+Alt+Up { spawn "tripppin-ui" "snap" "top"; }
+    Ctrl+Alt+Down { spawn "tripppin-ui" "snap" "bottom"; }
+    Ctrl+Alt+U { spawn "tripppin-ui" "snap" "top-left"; }
+    Ctrl+Alt+I { spawn "tripppin-ui" "snap" "top-right"; }
+    Ctrl+Alt+J { spawn "tripppin-ui" "snap" "bottom-left"; }
+    Ctrl+Alt+K { spawn "tripppin-ui" "snap" "bottom-right"; }
+    Ctrl+Alt+Return { spawn "tripppin-ui" "snap" "fill"; }
+    Ctrl+Alt+C { spawn "tripppin-ui" "snap" "centre"; }
+    Ctrl+Alt+BackSpace { spawn "tripppin-ui" "snap" "restore"; }
     Mod+1 { focus-workspace 1; }
     Mod+2 { focus-workspace 2; }
     Mod+3 { focus-workspace 3; }

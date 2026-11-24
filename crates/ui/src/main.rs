@@ -8,6 +8,8 @@
 //! - `settings`: the Settings app.
 //! - `askpass`: the password pop-up for administrator commands the AI runs.
 //! - `displays`: gives each screen a whole-number scale at login, so text stays sharp.
+//! - `snap`: puts the focused window in a half, a quarter, or fills the screen.
+//! - `widgets`: the desktop widgets host, and `widgets add/list/test/remove/pin` to manage them.
 
 mod accounts;
 mod apps;
@@ -33,12 +35,14 @@ mod printers;
 mod privacy;
 mod region;
 mod settings;
+mod snap;
 mod snd;
 mod storage;
 mod switch;
 mod system;
 mod watch;
 mod welcome;
+mod widgets;
 
 use gtk::glib::ExitCode;
 
@@ -81,10 +85,11 @@ fn main() -> ExitCode {
         Some("askpass") => askpass::run(),
         Some("welcome") => welcome::run(),
         Some("switch") => switch::run(),
-        Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
+        Some("snap") => snap::run(args.get(1).map(String::as_str).unwrap_or("")),
+        Some("widgets") => widgets::cli(&args[1..]),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | askpass | displays"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | askpass | displays"
             );
             ExitCode::from(2)
         }

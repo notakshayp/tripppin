@@ -256,6 +256,14 @@ pub fn pulse_dot(size: i32) -> gtk::DrawingArea {
     area
 }
 
+/// The monitor plugged into connector `name` (`eDP-1`, `HDMI-A-1`), as niri names outputs.
+pub fn monitor_named(name: &str) -> Option<gdk::Monitor> {
+    let monitors = gdk::Display::default()?.monitors();
+    (0..monitors.n_items())
+        .filter_map(|i| monitors.item(i).and_downcast::<gdk::Monitor>())
+        .find(|m| m.connector().as_deref() == Some(name))
+}
+
 pub fn clock() -> String {
     let format = if crate::region::twelve_hour() { "%-I:%M %p" } else { "%H:%M" };
     glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_lowercase()).unwrap_or_default()
@@ -361,6 +369,11 @@ pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
             ("fill the screen", "super + ↑ (again to undo)"),
             ("centre a window", "super + ↓"),
             ("snap to a corner", "super + alt + arrows"),
+            ("snap by dragging", "drag to an edge or a corner"),
+            ("halves (again for ⅓, ⅔)", "ctrl + alt + arrows"),
+            ("quarters", "ctrl + alt + u, i, j, k"),
+            ("fill or centre", "ctrl + alt + return, c"),
+            ("back to before snapping", "ctrl + alt + backspace"),
             ("workspace 1, 2, 3", "super + 1, 2, 3"),
             ("move a window to 1, 2, 3", "super + shift + 1, 2, 3"),
         ],

@@ -1,7 +1,6 @@
 //! Window switching. `tripppin-ui switch` (Alt + Tab) shows the open windows, most recently
 //! used first, with the one before selected; Tab moves on, letting go of Alt switches, Esc
-//! cancels. `tripppin-ui snap <where>` puts the focused window in half or a quarter of the
-//! screen (every window floats, so niri's own column layout doesn't apply).
+//! cancels. Snapping is in snap.rs.
 
 use crate::common::label;
 use gtk::prelude::*;
@@ -43,50 +42,6 @@ pub fn parse_windows(json: &str) -> Vec<Window> {
 fn niri(args: &[&str]) -> Option<String> {
     let out = Command::new("niri").arg("msg").args(args).output().ok()?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
-}
-
-// ---- snapping -------------------------------------------------------------------------------
-
-/// The bar's reserved height (its margin plus height in /etc/xdg/waybar) and niri's gaps.
-pub const BAR: i32 = 40;
-const GAP: i32 = 16;
-
-/// Size and position (width, height, x, y) for a spot on a screen of `w` × `h`. niri places
-/// floating windows relative to the area below the bar, so y starts there.
-pub fn snap_rect(spot: &str, w: i32, h: i32) -> Option<(i32, i32, i32, i32)> {
-    let area_h = h - BAR;
-    let half_w = (w - 3 * GAP) / 2;
-    let half_h = (area_h - 3 * GAP) / 2;
-    let full_h = area_h - 2 * GAP;
-    let right = 2 * GAP + half_w;
-    let lower = 2 * GAP + half_h;
-    Some(match spot {
-        "left" => (half_w, full_h, GAP, GAP),
-        "right" => (half_w, full_h, right, GAP),
-        "top-left" => (half_w, half_h, GAP, GAP),
-        "top-right" => (half_w, half_h, right, GAP),
-        "bottom-left" => (half_w, half_h, GAP, lower),
-        "bottom-right" => (half_w, half_h, right, lower),
-        _ => return None,
-    })
-}
-
-pub fn snap(spot: &str) -> glib::ExitCode {
-    if spot == "max" {
-        niri(&["action", "maximize-window-to-edges"]);
-        return glib::ExitCode::SUCCESS;
-    }
-    let out: Value = niri(&["-j", "focused-output"]).and_then(|o| serde_json::from_str(&o).ok()).unwrap_or_default();
-    let w = out["logical"]["width"].as_i64().unwrap_or(1280) as i32;
-    let h = out["logical"]["height"].as_i64().unwrap_or(800) as i32;
-    let Some((ww, wh, x, y)) = snap_rect(spot, w, h) else {
-        eprintln!("usage: tripppin-ui snap left|right|top-left|top-right|bottom-left|bottom-right|max");
-        return glib::ExitCode::FAILURE;
-    };
-    niri(&["action", "set-window-width", &ww.to_string()]);
-    niri(&["action", "set-window-height", &wh.to_string()]);
-    niri(&["action", "move-floating-window", "-x", &x.to_string(), "-y", &y.to_string()]);
-    glib::ExitCode::SUCCESS
 }
 
 // ---- the switcher --------------------------------------------------------------------------
@@ -254,14 +209,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn windows_and_snapping() {
+    fn windows_most_recent_first() {
         let json = r#"[{"id":6,"title":"settings","app_id":"in.trippp.Settings","focus_timestamp":{"secs":839,"nanos":5}},
                       {"id":5,"title":"terminal","app_id":"foot","focus_timestamp":{"secs":840,"nanos":0}}]"#;
         let w = parse_windows(json);
         assert_eq!(w.iter().map(|w| w.id).collect::<Vec<_>>(), vec![5, 6]);
-        assert_eq!(snap_rect("left", 1280, 800), Some((616, 728, 16, 16)));
-        assert_eq!(snap_rect("right", 1280, 800), Some((616, 728, 648, 16)));
-        assert_eq!(snap_rect("bottom-right", 1280, 800), Some((616, 356, 648, 388)));
-        assert_eq!(snap_rect("middle", 1280, 800), None);
     }
 }
