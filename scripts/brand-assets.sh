@@ -10,9 +10,9 @@
 set -eu
 
 # The mark, in logo units (the box is 146 x 175 from 27, 12). Keep in step with logo.rs.
-ARC='M52.72 77.06 A60 60 0 1 0 147.28 77.06'
-ARC_LEN=268.08 # 60 * (360 - 2 * 52) degrees, in radians
-SPARK='M129.70 16.30 109.24 46.00 129.70 75.70 100.00 55.24 70.30 75.70 90.76 46.00 70.30 16.30 100.00 36.76Z'
+ARC='M58.32 70.84 A60 60 0 1 0 141.68 70.84'
+ARC_LEN=284.84 # 60 * (360 - 2 * 44) degrees, in radians
+SPARK='M100.00 14.00 106.11 43.89 136.00 50.00 106.11 56.11 100.00 86.00 93.89 56.11 64.00 50.00 93.89 43.89Z'
 FEDORA=quay.io/fedora/fedora:45
 DM_MONO_REV=85f32a0254c400b643d7ce589b91a2ad29bea73b
 
@@ -41,10 +41,10 @@ mark() {
     printf '<g transform="translate(%s %s) scale(%s) translate(-27 -12)"><path d="%s" fill="none" stroke="%s" stroke-width="22" stroke-linecap="round"%s/><path d="%s" fill="%s"/></g>' \
         "$3" "$4" "$s" "$ARC" "$1" "${6:-}" "$SPARK" "$2"
 }
-# centred SIZE_W SIZE_H WIDTH: X and Y that centre the mark's drawn extent (y 16.3 to 185).
+# centred SIZE_W SIZE_H WIDTH: X and Y that centre the mark's drawn extent (y 14 to 185).
 centred() {
     s=$(calc "$3 / 146")
-    echo "$(calc "$1 / 2 - 73 * $s") $(calc "$2 / 2 - 88.65 * $s")"
+    echo "$(calc "$1 / 2 - 73 * $s") $(calc "$2 / 2 - 87.5 * $s")"
 }
 svg() { printf '<svg xmlns="http://www.w3.org/2000/svg" width="%s" height="%s">' "$1" "$2"; }
 png() { rsvg-convert "$tmp/$1.svg" -o "$2"; echo "  $2"; }
@@ -118,6 +118,6 @@ done
 echo "  $theme/ring-1..24.png"
 { svg 292 350; mark '#f2f5ef' none 0 0 292; echo '</svg>'; } > "$tmp/ring.svg"
 png ring "$theme/ring.png"
-{ svg 192 192; printf '<path transform="translate(96 96) scale(2) translate(-100 -46)" d="%s" fill="#57d99a"/>' "$SPARK"; echo '</svg>'; } > "$tmp/spark.svg"
+{ svg 192 192; printf '<path transform="translate(96 96) scale(2) translate(-100 -50)" d="%s" fill="#57d99a"/>' "$SPARK"; echo '</svg>'; } > "$tmp/spark.svg"
 png spark "$theme/spark.png"
 rm -rf "$tmp"

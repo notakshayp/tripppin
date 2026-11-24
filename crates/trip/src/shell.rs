@@ -296,7 +296,7 @@ fn warn(text: &str) {
 /// The power spark, three rows tall, for the header.
 fn mark(mode: Mode) -> [String; 3] {
     let ring = |s: &str| if mode.color { format!("{PAPER}{s}{RESET}") } else { s.to_string() };
-    let spark = if mode.color { format!("{ACCENT}{BOLD}✕{RESET}") } else { "x".to_string() };
+    let spark = if mode.color { format!("{ACCENT}{BOLD}✦{RESET}") } else { "*".to_string() };
     [format!(" {} {spark} {} ", ring("▄▀"), ring("▀▄")), ring("█       █"), ring(" ▀▄▄▄▄▄▀ ")]
 }
 

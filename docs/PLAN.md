@@ -119,7 +119,7 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 - [x] Rectangle-style snapping (drag to edges and corners with a preview, Ctrl + Alt shortcuts, cycling thirds, restore) and desktop widgets the AI can write ([WIDGETS.md](WIDGETS.md))
 - [x] A clean app launcher: helpers and duplicates of Settings pages hidden, "Terminal" and "Files", a quieter card
 - [x] Design system: sentence case, readable type, tokens with a quiet green accent, a Sharp / Default / Round corners setting, a real Settings title bar, the computer called "tripppin" (UX-REVIEW.md)
-- [x] The mark's spark is an × and the sparkle burst is gone everywhere; logging in goes from the login screen to a logo splash with no text console in between (DESKTOP.md, "The mark and the way in")
+- [x] The sparkle burst is gone everywhere (the mark keeps its upright spark); logging in goes from the login screen to a logo splash with no text console in between (DESKTOP.md, "The mark and the way in")
 - [x] Laptop fixes from the first test: the red lock screen (root cause and a self-restarting lock), icons-only bar, a battery ring, the logo opening the apps, quick settings as one pill with working on/off tiles (DESKTOP.md, "Laptop fixes")
 - [ ] Checked on the laptop: Wi-Fi, Bluetooth, sound devices, brightness, battery, the boot splash, a real USB stick and printer
 - [ ] Later: light mode, sounds, voice input, on-screen keyboard (see DESKTOP.md)
