@@ -269,7 +269,9 @@ fn signal_icon(signal: u8, connected: bool) -> gtk::DrawingArea {
 
 fn wifi_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Wi-Fi");
-    let switch = gtk::Switch::new();
+    // The radio's real state straight away (a quick query), so the switch never shows "off"
+    // while the slower network scan runs.
+    let switch = gtk::Switch::builder().active(nm::wifi_enabled()).build();
     right.append(&switch);
     let list = gtk::ListBox::new();
     list.add_css_class("list-card");

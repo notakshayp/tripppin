@@ -117,6 +117,7 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 - [x] Behaviour: USB automount, low battery, updates staged with rollback (greenboot), crash notices, the model freed first when memory runs low, a welcome tour
 - [x] Polish pass: sharp text at a whole-number scale, a compact layout, icons throughout, a movable orb, spring motion everywhere (DESKTOP.md, "Polish pass")
 - [x] Rectangle-style snapping (drag to edges and corners with a preview, Ctrl + Alt shortcuts, cycling thirds, restore) and desktop widgets the AI can write ([WIDGETS.md](WIDGETS.md))
+- [x] Laptop round 3: Wi-Fi switch shows the real radio state at once; no focus ring trailing clicks; Corners reshapes every GTK window (Sharp is square), niri's focus ring neutral
 - [x] A clean app launcher: helpers and duplicates of Settings pages hidden, "Terminal" and "Files", a quieter card
 - [x] Design system: sentence case, readable type, tokens with a quiet green accent, a Sharp / Default / Round corners setting, a real Settings title bar, the computer called "tripppin" (UX-REVIEW.md)
 - [x] The mark's spark is an × and the sparkle burst is gone everywhere; logging in goes from the login screen to a logo splash with no text console in between (DESKTOP.md, "The mark and the way in")
