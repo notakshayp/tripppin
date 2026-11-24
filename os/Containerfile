@@ -119,20 +119,32 @@ COPY os/files/ /
 # The desktop widgets reference, for people and for the AI (`tripppin-ui widgets guide`).
 COPY docs/WIDGETS.md /usr/share/doc/tripppin/WIDGETS.md
 
-# Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still
-# recognise the base; change only what people see.
-RUN sed -i \
+# Branding. Keep ID, ID_LIKE, VERSION_ID, CPE_NAME and the Fedora support fields: bootc,
+# bootc-image-builder, dnf ($releasever) and Anaconda read those to recognise the base.
+# Change only what people see: the name, a VARIANT (display only; no VARIANT_ID, which
+# Fedora's tooling uses to pick editions), the logo icon and colour, the home page, and
+# DEFAULT_HOSTNAME, the name systemd gives a machine with no /etc/hostname (Fedora's says
+# "fedora"). Machines that were already called "fedora" are renamed once by
+# tripppin-hostname.service.
+RUN set -e; f=/usr/lib/os-release; \
+    sed -i \
       -e 's/^NAME=.*/NAME="Tripppin"/' \
       -e 's/^PRETTY_NAME=.*/PRETTY_NAME="Tripppin 0.1 (Fedora 45 base)"/' \
-      -e 's/^VARIANT=.*/VARIANT="Tripppin"/' \
-      /usr/lib/os-release
+      -e 's/^DEFAULT_HOSTNAME=.*/DEFAULT_HOSTNAME="tripppin"/' \
+      -e 's/^LOGO=.*/LOGO=tripppin/' \
+      -e 's/^ANSI_COLOR=.*/ANSI_COLOR="0;38;2;87;217;154"/' \
+      -e 's|^HOME_URL=.*|HOME_URL="https://trippp.in/"|' \
+      "$f"; \
+    grep -q '^DEFAULT_HOSTNAME=' "$f" || echo 'DEFAULT_HOSTNAME="tripppin"' >> "$f"; \
+    grep -q '^VARIANT=' "$f" || echo 'VARIANT="Tripppin"' >> "$f"; \
+    grep -qx 'ID=fedora' "$f"; grep -qx 'DEFAULT_HOSTNAME="tripppin"' "$f"
 
 # The login banner: the logo in text, then the system name and terminal.
 RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } > /etc/issue
 
 # The desktop starts on tty1 through greetd; other consoles (Ctrl+Alt+F2…) are kmscon.
 RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service firewalld.service cups.socket \
-      tripppin-firefox.service greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
+      tripppin-firefox.service tripppin-hostname.service greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
     && systemctl set-default graphical.target \
     && dconf update \
     && fc-cache -f

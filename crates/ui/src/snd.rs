@@ -52,7 +52,7 @@ pub fn parse_streams(json: &str) -> Vec<Stream> {
         .iter()
         .map(|s| Stream {
             index: s["index"].as_u64().unwrap_or(0),
-            app: s["properties"]["application.name"].as_str().unwrap_or("an app").to_lowercase(),
+            app: s["properties"]["application.name"].as_str().unwrap_or("An app").to_lowercase(),
             volume: percent(&s["volume"]),
         })
         .collect()

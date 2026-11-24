@@ -53,7 +53,7 @@ fn build(app: &gtk::Application) -> gtk::Window {
     card.set_halign(gtk::Align::Center);
     card.set_valign(gtk::Align::Center);
     card.set_vexpand(true);
-    card.append(&label("shortcuts", &["keys-title"]));
+    card.append(&label("Shortcuts", &["keys-title"]));
     let columns = gtk::Box::new(gtk::Orientation::Horizontal, 40);
     for (group, list) in SHORTCUTS {
         let col = gtk::Box::new(gtk::Orientation::Vertical, 12);
@@ -67,7 +67,7 @@ fn build(app: &gtk::Application) -> gtk::Window {
         columns.append(&col);
     }
     card.append(&columns);
-    card.append(&label("press any key to close", &["hint"]));
+    card.append(&label("Press any key to close", &["hint"]));
     shade.append(&card);
     window.set_child(Some(&shade));
 

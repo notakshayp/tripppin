@@ -131,11 +131,11 @@ pub fn as_admin(password: &str, args: &[&str], input: &str) -> Result<(), String
     }
     let err = String::from_utf8_lossy(&out.stderr).to_lowercase();
     Err(if err.contains("incorrect password") || err.contains("try again") {
-        "that password isn't right".to_string()
+        "That password isn't right".to_string()
     } else if err.contains("not in the sudoers") || err.contains("not allowed") {
-        "only an administrator can do this".to_string()
+        "Only an administrator can do this".to_string()
     } else {
-        err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("it didn't work").trim().to_string()
+        err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("It didn't work").trim().to_string()
     })
 }
 
@@ -158,14 +158,14 @@ pub fn valid_login(login: &str) -> bool {
 
 pub fn set_password(your_password: &str, login: &str, new: &str) -> Result<(), String> {
     if new.contains(['\n', ':']) {
-        return Err("a password can't contain a colon or a new line".into());
+        return Err("A password can't contain a colon or a new line".into());
     }
     as_admin(your_password, &["chpasswd"], &format!("{login}:{new}\n"))
 }
 
 pub fn add_person(your_password: &str, name: &str, login: &str, password: &str, admin: bool) -> Result<(), String> {
     if !valid_login(login) {
-        return Err("a login is lower-case letters and numbers, starting with a letter".into());
+        return Err("A login is lower-case letters and numbers, starting with a letter".into());
     }
     let mut args = vec!["useradd", "-m", "-c", name];
     if admin {

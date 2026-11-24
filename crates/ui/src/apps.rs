@@ -111,7 +111,7 @@ fn flatpak(args: &[&str]) -> Result<String, String> {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
         let err = String::from_utf8_lossy(&out.stderr);
-        Err(err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("flatpak failed").trim().to_lowercase())
+        Err(err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("Flatpak failed").trim().to_lowercase())
     }
 }
 
@@ -190,7 +190,7 @@ pub fn install(id: &str) -> Result<(), String> {
 /// What a default is for, and the file types that make it up (the first decides which app
 /// shows as current).
 pub const DEFAULTS: [(&str, &[&str]); 6] = [
-    ("web browser", &["x-scheme-handler/https", "x-scheme-handler/http", "text/html"]),
+    ("Web browser", &["x-scheme-handler/https", "x-scheme-handler/http", "text/html"]),
     ("mail", &["x-scheme-handler/mailto"]),
     ("files", &["inode/directory"]),
     ("music", &["audio/mpeg", "audio/flac", "audio/ogg", "audio/x-wav"]),

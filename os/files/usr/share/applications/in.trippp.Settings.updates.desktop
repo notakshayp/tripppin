@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=updates settings
-Comment=settings → updates
+Name=Updates settings
+Comment=Settings → updates
 Exec=tripppin-ui settings updates
 Icon=system-software-update
 Keywords=update;upgrade;roll back;version;

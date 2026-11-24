@@ -18,7 +18,7 @@ pub fn run() -> glib::ExitCode {
 }
 
 fn machine() -> String {
-    let Ok(hw) = hwdetect::detect() else { return "this computer".into() };
+    let Ok(hw) = hwdetect::detect() else { return "This computer".into() };
     // Round to the marketing size: 15.3 GiB of usable memory is a "16 gb" machine.
     let mem = format!("{:.0} gb", (hw.memory_bytes as f64 / 1e9).ceil());
     match hw.gpus.iter().find(|g| g.vram_bytes.unwrap_or(0) > 0).or(hw.gpus.first()) {
@@ -34,9 +34,13 @@ enum Progress {
 
 fn build(app: &gtk::Application, tier: Tier) {
     common::load_css();
-    let window = gtk::Window::builder().application(app).title("welcome").default_width(620).build();
+    let window = gtk::Window::builder().application(app).title("Welcome").default_width(620).build();
     window.add_css_class("tripppin");
     window.add_css_class("fb");
+    // A plain title bar of ours, so the close button has its own row above the card.
+    let header = gtk::HeaderBar::new();
+    header.set_title_widget(Some(&gtk::Label::new(None)));
+    window.set_titlebar(Some(&header));
     let card = gtk::Box::new(gtk::Orientation::Vertical, 22);
     card.add_css_class("fb-card");
     card.set_size_request(620, -1);
@@ -50,12 +54,12 @@ fn build(app: &gtk::Application, tier: Tier) {
     s.set_halign(gtk::Align::Center);
     s.set_valign(gtk::Align::Center);
     orb.append(&s);
-    let name = common::display_name(&common::current_user()).to_lowercase();
+    let name = common::display_name(&common::current_user());
     head.append(&orb);
-    head.append(&label(&format!("welcome, {name}."), &["fb-title"]));
+    head.append(&label(&format!("Welcome, {name}."), &["fb-title"]));
 
     let body = label(
-        "one last thing: the ai. it runs on this computer, not in the cloud, so it needs a model sized for your hardware.",
+        "One last thing: the AI. It runs on this computer, not in the cloud, so it needs a model sized for your hardware.",
         &["body"],
     );
     body.set_wrap(true);
@@ -64,8 +68,8 @@ fn build(app: &gtk::Application, tier: Tier) {
     let stats = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     stats.set_homogeneous(true);
     for (k, v) in [
-        ("this computer", machine()),
-        ("the model", tier.model.to_lowercase()),
+        ("This computer", machine()),
+        ("The model", tier.model.clone()),
         ("download", format!("{:.1} gb", tier.download_gb())),
     ] {
         let stat = gtk::Box::new(gtk::Orientation::Vertical, 4);
@@ -77,7 +81,7 @@ fn build(app: &gtk::Application, tier: Tier) {
 
     let bar = gtk::ProgressBar::new();
     let notes = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    let left = label("starting…", &["progress-note"]);
+    let left = label("Starting…", &["progress-note"]);
     left.set_hexpand(true);
     let right = label("", &["progress-note"]);
     notes.append(&left);
@@ -87,7 +91,7 @@ fn build(app: &gtk::Application, tier: Tier) {
     progress.append(&notes);
 
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    let cloud = gtk::Button::with_label("use a cloud key instead");
+    let cloud = gtk::Button::with_label("Use a cloud key instead");
     cloud.add_css_class("link");
     cloud.set_hexpand(true);
     cloud.set_halign(gtk::Align::Start);
@@ -95,10 +99,10 @@ fn build(app: &gtk::Application, tier: Tier) {
         let left = left.clone();
         cloud.connect_clicked(move |b| {
             b.set_sensitive(false);
-            left.set_text("cloud keys arrive in a later update; the download keeps going.");
+            left.set_text("Cloud keys arrive in a later update; the download keeps going.");
         });
     }
-    let hide = gtk::Button::with_label("keep going in the background");
+    let hide = gtk::Button::with_label("Keep going in the background");
     hide.add_css_class("secondary");
     {
         let window = window.clone();
@@ -145,15 +149,15 @@ fn build(app: &gtk::Application, tier: Tier) {
                         text.push_str(&format!(" · {:.0} mb/s", rate / 1e6));
                         let secs = (total.saturating_sub(done)) as f64 / rate;
                         right.set_text(&if secs < 90.0 {
-                            format!("about {:.0} s", secs.max(1.0))
+                            format!("About {:.0} s", secs.max(1.0))
                         } else {
-                            format!("about {:.0} min", (secs / 60.0).ceil())
+                            format!("About {:.0} min", (secs / 60.0).ceil())
                         });
                     }
                     left.set_text(&text);
                 }
                 Progress::Done(Ok(())) => {
-                    left.set_text("checked and installed. starting the ai…");
+                    left.set_text("Checked and installed. Starting the AI…");
                     right.set_text("");
                     let _ = std::process::Command::new("systemctl").args(["restart", "tripppin-llm.service"]).status();
                     let _ = std::process::Command::new("notify-send")
@@ -162,14 +166,14 @@ fn build(app: &gtk::Application, tier: Tier) {
                             "tripppin",
                             "-i",
                             "tripppin",
-                            "the ai is ready",
-                            "press super + space and ask anything.",
+                            "The AI is ready",
+                            "Press Super + Space and ask anything.",
                         ])
                         .status();
                     app.quit();
                 }
                 Progress::Done(Err(e)) => {
-                    left.set_text(&format!("the download stopped: {}", e.to_lowercase()));
+                    left.set_text(&format!("The download stopped: {}", e));
                     right.set_text("");
                     shown.present();
                 }

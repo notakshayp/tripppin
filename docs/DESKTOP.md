@@ -2,7 +2,8 @@
 
 The rule: **nothing a person can open looks or behaves like a different OS.** Every screen,
 dialog, menu and app, ours or installed later, follows the Tripppin style: ink, paper and
-forest green; Inter and DM Mono; lowercase, sparse copy; rounded cards.
+forest green as a quiet accent; Inter and DM Mono; sentence case, sparse copy; one corner style
+(Sharp, Default or Round). The rules and the screen-by-screen review are in [UX-REVIEW.md](UX-REVIEW.md).
 
 How we get there:
 
@@ -177,6 +178,18 @@ niri shows red when the session is locked but no lock screen is drawing. In orde
 1. Press Super + L (or Ctrl + Super + L). It works while locked and starts a new lock screen, which takes over the dead one; type your password.
 2. Switch to a text console with Ctrl + Alt + F2, log in, and run `loginctl unlock-session $(loginctl show-user $USER -p Display --value)`. That opens a live lock screen. If no lock screen is running at all, run `XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-1 tripppin-ui lock --release`, which takes over the dead lock and opens it. Ctrl + Alt + F1 goes back to the desktop.
 3. Last resort (loses unsaved work): `loginctl terminate-session <id>` from the console, then log in again.
+
+## Design system (owner's third round, 2026-11-24)
+
+- [x] Sentence case everywhere (titles, buttons, tooltips, the bar, quick settings, power menu, launcher entries); names, dates and errors shown as written
+- [x] Tokens in style.css: colour roles, neutral hairlines and shadows, no glows; green only for selection, primary, on and live
+- [x] Readable type: 11 pt body (Inter 11 system-wide), 10 pt minimum, in points so Text size scales our screens; DM Mono only for commands and values
+- [x] Corners: Sharp / Default / Round in Settings → Appearance (`tripppin-ui corners`), live in our screens, niri, the bar, quick settings, power menu and launcher; Default much less round than before
+- [x] Settings title bar: app name, page name and window controls on one row; content never under them; checked at 696 and 1240 px wide
+- [x] The computer is called "tripppin": DEFAULT_HOSTNAME in os-release, the installer's kickstart, a one-time rename of machines still called "fedora"
+- [x] Headless screenshots of every screen: `scripts/screens.sh`
+- [ ] Open: a max content width for Settings pages on wide windows; hide empty list cards; corners for other GTK apps (skel gtk.css stays at 10 px)
+- [ ] Checked on the laptop
 
 ## Later (after this desktop lands)
 

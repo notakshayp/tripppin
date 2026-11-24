@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=display settings
-Comment=settings → display
+Name=Display settings
+Comment=Settings → display
 Exec=tripppin-ui settings display
 Icon=video-display
 Keywords=screen;monitor;resolution;scale;brightness;night light;

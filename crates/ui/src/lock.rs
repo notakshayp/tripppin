@@ -268,8 +268,8 @@ fn media_card() -> (gtk::Box, Box<dyn Fn()>) {
         let card = card.clone();
         move || match playing() {
             Some((on, t, a)) => {
-                title.set_text(&t.to_lowercase());
-                artist.set_text(&a.to_lowercase());
+                title.set_text(&t);
+                artist.set_text(&a);
                 artist.set_visible(!a.is_empty());
                 play.set_child(Some(&media_icon(if on { Shape::Pause } else { Shape::Play })));
                 card.set_visible(true);
@@ -297,7 +297,7 @@ fn password_ok(user: &str, password: &str) -> bool {
     child.wait().is_ok_and(|s| s.success())
 }
 
-/// "finished while you were away: …" when a task ended after `since`.
+/// "Finished while you were away: …" when a task ended after `since`.
 fn finished_since(since: SystemTime) -> Option<String> {
     let path = common::runtime_dir().join("last-done");
     let modified = std::fs::metadata(&path).ok()?.modified().ok()?;
@@ -306,7 +306,7 @@ fn finished_since(since: SystemTime) -> Option<String> {
     }
     let text = std::fs::read_to_string(path).ok()?;
     let text = text.trim().trim_end_matches('.').to_lowercase();
-    (!text.is_empty()).then(|| format!("finished while you were away: {text}."))
+    (!text.is_empty()).then(|| format!("Finished while you were away: {text}."))
 }
 
 fn system_bus() -> Option<gio::DBusConnection> {
@@ -501,11 +501,11 @@ fn lock_window(
     who.set_xalign(0.5);
     let entry = gtk::PasswordEntry::new();
     entry.add_css_class("pw-center");
-    entry.set_placeholder_text(Some("password"));
+    entry.set_placeholder_text(Some("Password"));
     let error = label("", &["error"]);
     error.set_xalign(0.5);
     error.set_visible(false);
-    let caps = label("caps lock is on", &["caps-warning"]);
+    let caps = label("Caps lock is on", &["caps-warning"]);
     caps.set_xalign(0.5);
     caps.set_visible(crate::osd::caps_lock() == Some(true));
     form.append(&who);
@@ -555,7 +555,7 @@ fn lock_window(
                 lock.unlock();
             } else {
                 e.set_text("");
-                error.set_text("that's not it. try again.");
+                error.set_text("That's not it. Try again.");
                 error.set_visible(true);
             }
         });
@@ -586,7 +586,7 @@ fn footer() -> (gtk::Box, Box<dyn Fn()>) {
             notes.set_visible(n > 0);
             match common::battery() {
                 Some(b) => {
-                    battery.set_text(&format!("battery {b}%"));
+                    battery.set_text(&format!("Battery {b}%"));
                     battery.set_visible(true);
                 }
                 None => battery.set_visible(false),
@@ -628,8 +628,8 @@ fn build_preview(app: &gtk::Application) {
     who.set_xalign(0.5);
     let entry = gtk::PasswordEntry::new();
     entry.add_css_class("pw-center");
-    entry.set_placeholder_text(Some("password"));
-    let caps = label("caps lock is on", &["caps-warning"]);
+    entry.set_placeholder_text(Some("Password"));
+    let caps = label("Caps lock is on", &["caps-warning"]);
     caps.set_xalign(0.5);
     caps.set_visible(crate::osd::caps_lock() == Some(true));
     form.append(&who);

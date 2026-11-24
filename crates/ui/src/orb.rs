@@ -34,9 +34,9 @@ use trip::agent::{self, Ui};
 use trip::model::{PlanStep, Usage};
 use trip::session::Session;
 
-const SUGGESTIONS: [&str; 3] = ["free up some space", "connect my headphones", "what changed today?"];
+const SUGGESTIONS: [&str; 3] = ["Free up some space", "Connect my headphones", "What changed today?"];
 
-const ORB_TIP: &str = "ask tripppin (super + space)\ndrag to move it · right-click to tuck it away";
+const ORB_TIP: &str = "Ask Tripppin (Super + Space)\ndrag to move it · right-click to tuck it away";
 
 /// Space between the orb's glow and the screen edge, and room for the bar at the top.
 const EDGE: i32 = 6;
@@ -196,8 +196,8 @@ impl Ui for Sender {
 pub fn describe(label: &str, detail: &str) -> String {
     if label != "exec" && label != "exec in the background" {
         return match label {
-            "read" => format!("reading {}", short(detail)),
-            "write" => format!("writing {}", short(detail)),
+            "read" => format!("Reading {}", short(detail)),
+            "write" => format!("Writing {}", short(detail)),
             other => other.to_string(),
         };
     }
@@ -209,29 +209,29 @@ pub fn describe(label: &str, detail: &str) -> String {
             words.remove(0);
         }
         if words.is_empty() {
-            return "asking for a password".into();
+            return "Asking for a password".into();
         }
     }
     let arg = |i: usize| words.iter().skip(i).find(|w| !w.starts_with('-')).copied().unwrap_or("");
     match (words.first().copied().unwrap_or(""), words.get(1).copied().unwrap_or("")) {
-        ("flatpak", "install") => format!("installing {}", words.last().copied().unwrap_or("an app")),
-        ("flatpak", "search") => format!("searching for {}", arg(2)),
-        ("flatpak", "uninstall") => format!("removing {}", words.last().copied().unwrap_or("an app")),
-        ("flatpak", "run") => format!("opening {}", arg(2)),
-        ("dnf", "install") => format!("installing {}", words.last().copied().unwrap_or("a package")),
-        ("df", _) | ("du", _) => "checking disk space".into(),
-        ("free", _) => "checking memory".into(),
-        ("ls", _) | ("find", _) => "looking through files".into(),
-        ("ps", _) | ("top", _) => "checking what's running".into(),
-        ("nmcli", _) => "checking the network".into(),
-        ("bluetoothctl", _) => "talking to bluetooth".into(),
+        ("flatpak", "install") => format!("Installing {}", words.last().copied().unwrap_or("An app")),
+        ("flatpak", "search") => format!("Searching for {}", arg(2)),
+        ("flatpak", "uninstall") => format!("Removing {}", words.last().copied().unwrap_or("An app")),
+        ("flatpak", "run") => format!("Opening {}", arg(2)),
+        ("dnf", "install") => format!("Installing {}", words.last().copied().unwrap_or("A package")),
+        ("df", _) | ("du", _) => "Checking disk space".into(),
+        ("free", _) => "Checking memory".into(),
+        ("ls", _) | ("find", _) => "Looking through files".into(),
+        ("ps", _) | ("top", _) => "Checking what's running".into(),
+        ("nmcli", _) => "Checking the network".into(),
+        ("bluetoothctl", _) => "Talking to Bluetooth".into(),
         ("curl", _) | ("wget", _) => "downloading".into(),
-        ("mkdir", _) => format!("making {}", short(arg(1))),
-        ("rm", _) => "deleting files".into(),
-        ("cp", _) | ("mv", _) | ("rsync", _) => "moving files".into(),
-        ("xdg-open", _) => format!("opening {}", short(arg(1))),
-        (first, _) if !first.is_empty() => format!("running {first}"),
-        _ => "running a command".into(),
+        ("mkdir", _) => format!("Making {}", short(arg(1))),
+        ("rm", _) => "Deleting files".into(),
+        ("cp", _) | ("mv", _) | ("rsync", _) => "Moving files".into(),
+        ("xdg-open", _) => format!("Opening {}", short(arg(1))),
+        (first, _) if !first.is_empty() => format!("Running {first}"),
+        _ => "Running a command".into(),
     }
 }
 
@@ -432,7 +432,7 @@ impl StepRow {
         text.append(&revealer);
         let root = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         root.add_css_class("step");
-        root.set_tooltip_text(Some("click to see the command and what it printed"));
+        root.set_tooltip_text(Some("Click to see the command and what it printed"));
         root.append(&mark);
         root.append(&text);
         common::play(&root, "rise");
@@ -584,7 +584,7 @@ impl TurnView {
         let plan_box = gtk::Box::new(gtk::Orientation::Vertical, 3);
         plan_box.add_css_class("plan");
         plan_box.set_visible(false);
-        let plan_caption = label("plan", &["plan-caption"]);
+        let plan_caption = label("Plan", &["plan-caption"]);
         plan_box.append(&plan_caption);
         let steps_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
         let answer = label("", &["answer"]);
@@ -641,7 +641,7 @@ impl TurnView {
             rows[i].show(state);
         }
         let done = steps.iter().filter(|s| s.done).count();
-        self.plan_caption.set_text(&format!("plan · {done} of {}", steps.len()));
+        self.plan_caption.set_text(&format!("Plan · {done} of {}", steps.len()));
         if !steps.is_empty() && !self.plan_box.is_visible() {
             common::play(&self.plan_box, "fade");
         }
@@ -932,7 +932,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
         button.add_css_class("tucked");
         logo.set_visible(false);
     }
-    let hint = label("super + space", &["orb-hint"]);
+    let hint = label("Super + Space", &["orb-hint"]);
     hint.set_valign(gtk::Align::Center);
     // The hint teaches the shortcut; once the orb has been opened it fades out for good.
     // (Faded, not removed: removing it would leave the corner window at its old width and
@@ -983,12 +983,12 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     entry.add_css_class("ask");
     entry.set_hexpand(true);
     entry.set_valign(gtk::Align::Center);
-    entry.set_placeholder_text(Some("tell your computer what you want, or open an app"));
+    entry.set_placeholder_text(Some("Tell your computer what you want, or open an app"));
     let send = gtk::Button::new();
     send.add_css_class("send");
     send.set_valign(gtk::Align::Center);
     send.set_child(Some(&common::arrow(true)));
-    send.set_tooltip_text(Some("send"));
+    send.set_tooltip_text(Some("Send"));
     pill.append(&pill_orb);
     pill.append(&entry);
     pill.append(&send);
@@ -1008,14 +1008,14 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let footer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     footer.set_margin_start(12);
     footer.set_margin_end(12);
-    let keys = label("enter to send · esc to close", &["hint"]);
+    let keys = label("Enter to send · Esc to close", &["hint"]);
     keys.set_hexpand(true);
     footer.append(&keys);
-    let ask_history = gtk::Button::with_label("history");
+    let ask_history = gtk::Button::with_label("History");
     ask_history.add_css_class("link");
     ask_history.add_css_class("hint-link");
     ask_history.set_margin_end(12);
-    ask_history.set_tooltip_text(Some("earlier requests and their steps"));
+    ask_history.set_tooltip_text(Some("Earlier requests and their steps"));
     footer.append(&ask_history);
     let model = label(&model_line(), &["hint"]);
     footer.append(&model);
@@ -1049,7 +1049,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     body.set_margin_start(24);
     body.set_margin_end(24);
     let top = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    let caption = label("you asked", &["caption"]);
+    let caption = label("You asked", &["caption"]);
     caption.set_hexpand(true);
     caption.set_valign(gtk::Align::Center);
     let status = label("", &["caption", "orb-status"]);
@@ -1061,9 +1061,9 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let working = common::pulse_dot(8);
     working.set_valign(gtk::Align::Center);
     working.set_visible(false);
-    let history = icon_button(icons::HISTORY, "earlier requests");
-    let new = icon_button(icons::NEW, "ask something new");
-    let minimise = icon_button(icons::MINIMIZE, "minimise into the orb");
+    let history = icon_button(icons::HISTORY, "Earlier requests");
+    let new = icon_button(icons::NEW, "Ask something new");
+    let minimise = icon_button(icons::MINIMIZE, "Minimise into the orb");
     top.append(&caption);
     top.append(&working);
     top.append(&status);
@@ -1090,13 +1090,13 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let follow = gtk::Entry::new();
     follow.add_css_class("follow");
     follow.set_hexpand(true);
-    follow.set_placeholder_text(Some("ask a follow-up"));
+    follow.set_placeholder_text(Some("Ask a follow-up"));
     let follow_send = gtk::Button::new();
     follow_send.add_css_class("send");
     follow_send.add_css_class("small");
     follow_send.set_valign(gtk::Align::Center);
     follow_send.set_child(Some(&common::arrow(true)));
-    follow_send.set_tooltip_text(Some("send"));
+    follow_send.set_tooltip_text(Some("Send"));
     follow_row.append(&follow);
     follow_row.append(&follow_send);
     follow_row.set_visible(false);
@@ -1140,14 +1140,14 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let terminal = gtk::Button::new();
     let terminal_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     terminal_box.append(&common::icon(icons::TERMINAL, &["link-icon"]));
-    terminal_box.append(&gtk::Label::new(Some("continue in terminal")));
+    terminal_box.append(&gtk::Label::new(Some("Continue in terminal")));
     terminal.set_child(Some(&terminal_box));
     terminal.set_valign(gtk::Align::Center);
-    terminal.set_tooltip_text(Some("open this conversation in the terminal, with every step, and keep going there"));
+    terminal.set_tooltip_text(Some("Open this conversation in the terminal, with every step, and keep going there"));
     terminal.add_css_class("link");
     terminal.set_hexpand(true);
     terminal.set_halign(gtk::Align::Start);
-    let stop = gtk::Button::with_label("stop");
+    let stop = gtk::Button::with_label("Stop");
     stop.add_css_class("stop");
     // The conversation's tokens so far, dim, beside the stop button.
     let total = label("", &["session-usage"]);
@@ -1399,8 +1399,8 @@ fn model_line() -> String {
     let catalog = hwdetect::Catalog::builtin().ok();
     let tier = catalog.as_ref().and_then(|c| trip::model::active_tier(c, &trip::model::models_dir()));
     match tier {
-        Some(t) => format!("{} · on this computer", t.model.to_lowercase()),
-        None => "no model yet · it downloads on first start".into(),
+        Some(t) => format!("{} · on this computer", t.model),
+        None => "No model yet · it downloads on first start".into(),
     }
 }
 
@@ -1480,7 +1480,7 @@ impl Orb {
             Some(req) if req.busy.get() => {
                 req.cancel.borrow().store(true, Ordering::Relaxed);
                 req.stopping.set(true);
-                self.stop.set_label("stopping…");
+                self.stop.set_label("Stopping…");
             }
             _ => self.minimise(),
         }
@@ -1681,7 +1681,7 @@ impl Orb {
             let image = gtk::Image::from_icon_name(&app.icon);
             image.set_pixel_size(18);
             inner.append(&image);
-            let name = gtk::Label::new(Some(&format!("open {}", app.name.to_lowercase())));
+            let name = gtk::Label::new(Some(&format!("Open {}", app.name)));
             name.set_ellipsize(gtk::pango::EllipsizeMode::End);
             name.set_max_width_chars(22);
             inner.append(&name);
@@ -1711,7 +1711,7 @@ impl Orb {
             return;
         }
         self.ask.set_visible(false);
-        let req = Request::new(Session::new("orb"), &text, "you asked");
+        let req = Request::new(Session::new("orb"), &text, "You asked");
         self.show_request(&req);
         self.begin(&req, text, TurnView::new(None));
     }
@@ -1954,14 +1954,14 @@ impl Orb {
         if let Some(p) = context_percent(u) {
             req.meter.set(Meter { fill: Some(f64::from(p) / 100.0), ..req.meter.get() });
             *req.meter_tip.borrow_mut() =
-                format!("context {p}% full · {} of {} tokens", tokens(u.prompt + u.completion), tokens(u.context));
+                format!("Context {p}% full · {} of {} tokens", tokens(u.prompt + u.completion), tokens(u.context));
         }
         let all = u.session_prompt + u.session_completion;
         if all > 0 {
             *req.total.borrow_mut() = (
-                format!("session {}", tokens(all)),
+                format!("Session {}", tokens(all)),
                 format!(
-                    "this conversation so far: {} tokens read, {} written",
+                    "This conversation so far: {} tokens read, {} written",
                     tokens(u.session_prompt),
                     tokens(u.session_completion)
                 ),
@@ -2062,7 +2062,7 @@ impl Orb {
                     last.finish(ok);
                 }
                 let took = req.started.get().map_or(0, |t| t.elapsed().as_secs());
-                let verb = if ok { "done in" } else { "stopped after" };
+                let verb = if ok { "Done in" } else { "Stopped after" };
                 *req.ended.borrow_mut() = format!("{verb} {}:{:02}", took / 60, took % 60);
                 if let Err(e) = result {
                     let msg = if e == "stopped" { "stopped.".to_string() } else { e };
@@ -2101,7 +2101,7 @@ impl Orb {
     /// Earlier conversations, newest first, under the ones open here (running now, or open
     /// now); one click opens it here to read or continue.
     fn show_history(self: &Rc<Self>) {
-        self.caption.set_text("earlier requests");
+        self.caption.set_text("Earlier requests");
         while let Some(child) = self.sessions.first_child() {
             self.sessions.remove(&child);
         }
@@ -2141,7 +2141,7 @@ impl Orb {
         }
         let list: Vec<_> = trip::session::list(40).into_iter().filter(|s| !open.iter().any(|r| r.id == s.id)).collect();
         if list.is_empty() && open.is_empty() {
-            let empty = label("nothing yet. what you ask here and in the terminal shows up in this list.", &["hint"]);
+            let empty = label("Nothing yet. What you ask here and in the terminal shows up in this list.", &["hint"]);
             empty.set_wrap(true);
             empty.set_margin_top(12);
             empty.set_margin_bottom(12);
@@ -2173,7 +2173,7 @@ impl Orb {
         self.terminal.set_sensitive(false);
         self.follow_row.set_visible(false);
         if !shown.is_some_and(|r| r.busy.get()) {
-            self.stop.set_label("close");
+            self.stop.set_label("Close");
         }
         self.show_card();
     }
@@ -2194,7 +2194,7 @@ impl Orb {
                 view.add_step(StepRow::past(step));
             }
             let answer = if t.answer.is_empty() && !t.error.is_empty() {
-                format!("stopped: {}", t.error)
+                format!("Stopped: {}", t.error)
             } else {
                 t.answer.clone()
             };
@@ -2356,14 +2356,14 @@ mod tests {
 
     #[test]
     fn steps_read_like_words() {
-        assert_eq!(describe("exec", "sudo flatpak install -y flathub org.videolan.VLC"), "installing org.videolan.VLC");
-        assert_eq!(describe("exec", "flatpak search vlc"), "searching for vlc");
-        assert_eq!(describe("exec", "df -h /"), "checking disk space");
-        assert_eq!(describe("exec", "mkdir -p ~/demo"), "making demo");
-        assert_eq!(describe("exec", "python3 primes.py"), "running python3");
-        assert_eq!(describe("read", "/etc/os-release"), "reading os-release");
+        assert_eq!(describe("exec", "sudo flatpak install -y flathub org.videolan.VLC"), "Installing org.videolan.VLC");
+        assert_eq!(describe("exec", "flatpak search vlc"), "Searching for vlc");
+        assert_eq!(describe("exec", "df -h /"), "Checking disk space");
+        assert_eq!(describe("exec", "mkdir -p ~/demo"), "Making demo");
+        assert_eq!(describe("exec", "python3 primes.py"), "Running python3");
+        assert_eq!(describe("read", "/etc/os-release"), "Reading os-release");
         assert_eq!(describe("waiting on job 2", "sleep 9"), "waiting on job 2");
-        assert_eq!(describe("exec", "sudo -v"), "asking for a password");
-        assert_eq!(describe("exec", "sudo -n dnf install -y vlc"), "installing vlc");
+        assert_eq!(describe("exec", "sudo -v"), "Asking for a password");
+        assert_eq!(describe("exec", "sudo -n dnf install -y vlc"), "Installing vlc");
     }
 }

@@ -9,6 +9,7 @@
 //! - `settings`: the Settings app.
 //! - `askpass`: the password pop-up for administrator commands the AI runs.
 //! - `displays`: gives each screen a whole-number scale at login, so text stays sharp.
+//! - `corners sharp|default|round`: the corner style everywhere (Settings → Appearance).
 //! - `battery-ring`: the bar's battery ring, as an SVG for waybar.
 //! - `toggle`: the on/off tiles in quick settings.
 //! - `snap`: puts the focused window in a half, a quarter, or fills the screen.
@@ -30,6 +31,7 @@ mod keeper;
 mod keyboard;
 mod keys;
 mod lock;
+mod look;
 mod nm;
 mod orb;
 mod osd;
@@ -77,6 +79,17 @@ fn main() -> ExitCode {
         display::use_crisp_scales();
         return ExitCode::SUCCESS;
     }
+    // Not a screen either: sets the corner style, for scripts and the AI.
+    if args.first().map(String::as_str) == Some("corners") {
+        let choice = look::Corners::from_id(args.get(1).map_or("default", String::as_str));
+        return match look::set(choice) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("couldn't set the corners: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     // Not a screen either: run by waybar every 30 seconds.
     if args.first().map(String::as_str) == Some("battery-ring") {
         return battery::run();
@@ -103,7 +116,7 @@ fn main() -> ExitCode {
         Some("widgets") => widgets::cli(&args[1..]),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state]"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state] | corners sharp|default|round"
             );
             ExitCode::from(2)
         }

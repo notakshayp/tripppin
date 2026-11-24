@@ -1,20 +1,45 @@
 //! Pieces every screen shares: the stylesheet, the logo, and small facts about the machine.
 
 use gtk::prelude::*;
-use gtk::{cairo, gdk, glib};
+use gtk::{cairo, gdk, gio, glib};
 use std::path::PathBuf;
 use trip::logo;
 
 pub const INK: (f64, f64, f64) = (0.949, 0.961, 0.937);
 pub const GREEN: (f64, f64, f64) = (0.341, 0.851, 0.604);
 
-/// Loads the Tripppin stylesheet for the whole app.
+thread_local! {
+    /// The corner radii on top of the stylesheet, and the watch on the file that picks them.
+    static CORNERS: std::cell::RefCell<Option<(gtk::CssProvider, gio::FileMonitor)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Loads the Tripppin stylesheet for the whole app, with the corners chosen in Settings →
+/// Appearance; when that choice changes, every running screen restyles itself.
 pub fn load_css() {
+    let Some(display) = gdk::Display::default() else { return };
     let provider = gtk::CssProvider::new();
     provider.load_from_string(include_str!("style.css"));
-    if let Some(display) = gdk::Display::default() {
-        gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
-    }
+    gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    CORNERS.with(|slot| {
+        if slot.borrow().is_some() {
+            return;
+        }
+        let corners = gtk::CssProvider::new();
+        corners.load_from_string(&crate::look::css(crate::look::current()));
+        gtk::style_context_add_provider_for_display(&display, &corners, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
+        // The folder must exist for the watch to see the file appear.
+        if let Some(dir) = crate::look::file().parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let Ok(monitor) =
+            gio::File::for_path(crate::look::file()).monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE)
+        else {
+            return;
+        };
+        let watched = corners.clone();
+        monitor.connect_changed(move |_, _, _, _| watched.load_from_string(&crate::look::css(crate::look::current())));
+        *slot.borrow_mut() = Some((corners, monitor));
+    });
 }
 
 /// A label with the given CSS classes.
@@ -311,10 +336,10 @@ pub fn monitor_named(name: &str) -> Option<gdk::Monitor> {
 
 pub fn clock() -> String {
     let format = if crate::region::twelve_hour() { "%-I:%M %p" } else { "%H:%M" };
-    glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_lowercase()).unwrap_or_default()
+    glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_string()).unwrap_or_default()
 }
 
-/// "sunday, 22 november"
+/// "Sunday, 22 November"
 pub fn long_date() -> String {
     glib::DateTime::now_local()
         .ok()
@@ -382,50 +407,50 @@ pub fn current_user() -> String {
 /// Settings → Keyboard. Keep in step with os/files/etc/niri/desktop.kdl.
 pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
     (
-        "tripppin",
+        "Tripppin",
         &[
-            ("ask tripppin", "super + space"),
-            ("terminal", "super + return"),
-            ("apps", "super + a, or type its name after super + space"),
-            ("quick settings", "super + n"),
-            ("clipboard history", "super + v"),
-            ("emoji", "super + ."),
-            ("these shortcuts", "super + /"),
+            ("Ask Tripppin", "Super + Space"),
+            ("terminal", "Super + Return"),
+            ("apps", "Super + A, or type its name after Super + Space"),
+            ("Quick settings", "Super + N"),
+            ("Clipboard history", "Super + V"),
+            ("emoji", "Super + ."),
+            ("These shortcuts", "Super + /"),
         ],
     ),
     (
-        "windows",
+        "Windows",
         &[
-            ("close a window", "super + q"),
-            ("move a window", "super + drag"),
-            ("resize a window", "super + right-drag"),
-            ("full screen", "super + f"),
-            ("float or tile a window", "super + t"),
-            ("switch windows", "alt + tab"),
-            ("see every window", "super + tab"),
-            ("snap left or right", "super + ← →"),
-            ("fill the screen", "super + ↑ (again to undo)"),
-            ("centre a window", "super + ↓"),
-            ("snap to a corner", "super + alt + arrows"),
-            ("snap by dragging", "drag to an edge or a corner"),
-            ("halves (again for ⅓, ⅔)", "ctrl + alt + arrows"),
-            ("quarters", "ctrl + alt + u, i, j, k"),
-            ("fill or centre", "ctrl + alt + return, c"),
-            ("back to before snapping", "ctrl + alt + backspace"),
-            ("workspace 1, 2, 3", "super + 1, 2, 3"),
-            ("move a window to 1, 2, 3", "super + shift + 1, 2, 3"),
+            ("Close a window", "Super + Q"),
+            ("Move a window", "Super + drag"),
+            ("Resize a window", "Super + right-drag"),
+            ("Full screen", "Super + F"),
+            ("Float or tile a window", "Super + T"),
+            ("Switch windows", "Alt + Tab"),
+            ("See every window", "Super + Tab"),
+            ("Snap left or right", "Super + ← →"),
+            ("Fill the screen", "Super + ↑ (again to undo)"),
+            ("Centre a window", "Super + ↓"),
+            ("Snap to a corner", "Super + Alt + arrows"),
+            ("Snap by dragging", "Drag to an edge or a corner"),
+            ("Halves (again for ⅓, ⅔)", "Ctrl + Alt + arrows"),
+            ("Quarters", "Ctrl + Alt + U, I, J, K"),
+            ("Fill or centre", "Ctrl + Alt + Return, C"),
+            ("Back to before snapping", "Ctrl + Alt + Backspace"),
+            ("Workspace 1, 2, 3", "Super + 1, 2, 3"),
+            ("Move a window to 1, 2, 3", "Super + Shift + 1, 2, 3"),
         ],
     ),
     (
-        "system",
+        "System",
         &[
-            ("lock", "super + l"),
-            ("power menu", "super + escape"),
-            ("screenshot of an area", "print"),
-            ("screenshot of the screen", "ctrl + print"),
-            ("screenshot of a window", "alt + print"),
-            ("draw on the last screenshot", "super + shift + s"),
-            ("record the screen", "super + shift + r"),
+            ("lock", "Super + L"),
+            ("Power menu", "Super + Escape"),
+            ("Screenshot of an area", "print"),
+            ("Screenshot of the screen", "Ctrl + Print"),
+            ("Screenshot of a window", "Alt + Print"),
+            ("Draw on the last screenshot", "Super + Shift + S"),
+            ("Record the screen", "Super + Shift + R"),
         ],
     ),
 ];

@@ -22,7 +22,7 @@ pub fn battery_warning(percent: u8, discharging: bool, warned_at: Option<u8>) ->
         _ => return None,
     };
     (warned_at.is_none_or(|w| level < w))
-        .then_some((level, if level == 5 { "plug in now: the computer sleeps soon" } else { "battery low: 10% left" }))
+        .then_some((level, if level == 5 { "Plug in now: the computer sleeps soon" } else { "Battery low: 10% left" }))
 }
 
 /// Apps that crashed after `since` (microseconds since 1970), from `coredumpctl --json=short`:
@@ -76,8 +76,8 @@ pub fn start() {
                 notify(
                     "updates",
                     "system-software-update",
-                    "an update is ready",
-                    "it starts the next time you restart",
+                    "An update is ready",
+                    "It starts the next time you restart",
                     "normal",
                 );
             }
@@ -99,7 +99,7 @@ pub fn start() {
                 let answer = Command::new("notify-send")
                     .args(["-a", "tripppin", "-i", "dialog-warning", "-A", "reopen=open it again", "--wait"])
                     .arg(format!("{name} quit unexpectedly"))
-                    .arg("its work since the last save may be lost")
+                    .arg("Its work since the last save may be lost")
                     .output()
                     .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
                     .unwrap_or_default();

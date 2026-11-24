@@ -25,27 +25,27 @@ use std::rc::Rc;
 /// The sections, in sidebar order: (id, title, icon, page).
 type Section = (&'static str, &'static str, char, fn() -> gtk::ScrolledWindow);
 const SECTIONS: [Section; 21] = [
-    ("wifi", "wi-fi", icons::WIFI, wifi_page),
-    ("network", "network & vpn", icons::NETWORK, network_page),
-    ("bluetooth", "bluetooth", icons::BLUETOOTH, bluetooth_page),
-    ("sound", "sound", icons::SOUND, sound_page),
-    ("display", "display", icons::DISPLAY, display_page),
-    ("appearance", "appearance", icons::PALETTE, appearance_page),
-    ("power", "power & battery", icons::BATTERY, power_page),
-    ("ai", "ai", icons::SPARKLES, ai_page),
-    ("notifications", "notifications", icons::BELL, notifications_page),
-    ("apps", "apps", icons::APPS, apps_page),
-    ("keyboard", "keyboard", icons::KEYBOARD, keyboard_page),
-    ("pointer", "mouse & touchpad", icons::POINTER, pointer_page),
-    ("printers", "printers & scanners", icons::PRINTER, printers_page),
-    ("time", "date & time", icons::CLOCK, time_page),
-    ("language", "language & region", icons::LANGUAGE, language_page),
-    ("accounts", "accounts", icons::USERS, accounts_page),
-    ("privacy", "privacy", icons::SHIELD, privacy_page),
-    ("accessibility", "accessibility", icons::ACCESSIBILITY, accessibility_page),
-    ("storage", "storage", icons::DISK, storage_page),
-    ("updates", "updates", icons::UPDATE, updates_page),
-    ("about", "about", icons::INFO, about_page),
+    ("wifi", "Wi-Fi", icons::WIFI, wifi_page),
+    ("network", "Network & VPN", icons::NETWORK, network_page),
+    ("bluetooth", "Bluetooth", icons::BLUETOOTH, bluetooth_page),
+    ("sound", "Sound", icons::SOUND, sound_page),
+    ("display", "Display", icons::DISPLAY, display_page),
+    ("appearance", "Appearance", icons::PALETTE, appearance_page),
+    ("power", "Power & battery", icons::BATTERY, power_page),
+    ("ai", "AI", icons::SPARKLES, ai_page),
+    ("notifications", "Notifications", icons::BELL, notifications_page),
+    ("apps", "Apps", icons::APPS, apps_page),
+    ("keyboard", "Keyboard", icons::KEYBOARD, keyboard_page),
+    ("pointer", "Mouse & touchpad", icons::POINTER, pointer_page),
+    ("printers", "Printers & scanners", icons::PRINTER, printers_page),
+    ("time", "Date & time", icons::CLOCK, time_page),
+    ("language", "Language & region", icons::LANGUAGE, language_page),
+    ("accounts", "Accounts", icons::USERS, accounts_page),
+    ("privacy", "Privacy", icons::SHIELD, privacy_page),
+    ("accessibility", "Accessibility", icons::ACCESSIBILITY, accessibility_page),
+    ("storage", "Storage", icons::DISK, storage_page),
+    ("updates", "Updates", icons::UPDATE, updates_page),
+    ("about", "About", icons::INFO, about_page),
 ];
 
 /// Shows section `i`, building its page the first time (pages read the system as they're
@@ -98,14 +98,14 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     crate::common::load_css();
     let window = gtk::ApplicationWindow::builder()
         .application(app)
-        .title("settings")
+        .title("Settings")
         .default_width(920)
         .default_height(600)
         .build();
     window.add_css_class("tripppin");
     window.add_css_class("settings");
-    // No title bar: the sidebar runs to the top and the close button floats over the page.
-    window.set_titlebar(Some(&gtk::Box::new(gtk::Orientation::Horizontal, 0)));
+    // Narrow enough for half of a small screen, wide enough for the sidebar and a page.
+    window.set_size_request(640, 420);
 
     // Pages are built as they're first opened (show_section).
     let stack = gtk::Stack::new();
@@ -115,9 +115,9 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
-    side.set_size_request(220, -1);
+    side.set_size_request(232, -1);
     let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some("search settings"));
+    search.set_placeholder_text(Some("Search settings"));
     search.add_css_class("search");
     let nav = gtk::ListBox::new();
     nav.add_css_class("nav");
@@ -143,7 +143,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
             let q = s.text().to_lowercase();
             let mut i = 0;
             while let Some(row) = nav.row_at_index(i) {
-                row.set_visible(q.is_empty() || SECTIONS[i as usize].1.contains(q.as_str()));
+                row.set_visible(q.is_empty() || SECTIONS[i as usize].1.to_lowercase().contains(q.as_str()));
                 i += 1;
             }
         });
@@ -163,34 +163,60 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     let root = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     root.append(&side);
     root.append(&stack);
-    let overlay = gtk::Overlay::new();
-    overlay.set_child(Some(&root));
-    let controls = gtk::WindowControls::new(gtk::PackType::End);
-    controls.set_halign(gtk::Align::End);
-    controls.set_valign(gtk::Align::Start);
-    controls.set_margin_top(10);
-    controls.set_margin_end(10);
-    overlay.add_overlay(&controls);
-    // Drag the window by any empty part of it.
-    let handle = gtk::WindowHandle::new();
-    handle.set_child(Some(&overlay));
-    window.set_child(Some(&handle));
+    window.set_titlebar(Some(&title_bar(&stack, &side)));
+    window.set_child(Some(&root));
     (window, stack, nav)
 }
 
-/// A page: a big lower-case title, a status line under it, optional control on the right.
-fn page(title: &str) -> (gtk::ScrolledWindow, gtk::Box, gtk::Label, gtk::Box) {
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 22);
+/// The title bar: "Settings" over the sidebar, the open page's name over the page and the
+/// window controls at the end of the same row, so page content never sits under them.
+/// Drag the window by it; double-click maximises.
+fn title_bar(stack: &gtk::Stack, sidebar: &gtk::Box) -> gtk::WindowHandle {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    row.add_css_class("titlebar-row");
+    let side = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    side.add_css_class("titlebar-side");
+    // Always exactly as wide as the sidebar under it.
+    let widths = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
+    widths.add_widget(&side);
+    widths.add_widget(sidebar);
+    let app = label("Settings", &["titlebar-app"]);
+    app.set_valign(gtk::Align::Center);
+    side.append(&app);
+    let title = label("", &["titlebar-title"]);
+    title.set_hexpand(true);
+    title.set_valign(gtk::Align::Center);
+    title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    let controls = gtk::WindowControls::new(gtk::PackType::End);
+    controls.set_valign(gtk::Align::Center);
+    row.append(&side);
+    row.append(&title);
+    row.append(&controls);
+    let show = move |s: &gtk::Stack| {
+        let name = s.visible_child_name().unwrap_or_default();
+        let shown = SECTIONS.iter().find(|(id, ..)| *id == name.as_str()).map_or("", |(_, t, ..)| *t);
+        title.set_text(shown);
+    };
+    show(stack);
+    stack.connect_visible_child_name_notify(show);
+    let handle = gtk::WindowHandle::new();
+    handle.set_child(Some(&row));
+    handle
+}
+
+/// A page: its name is in the title bar; the page starts with a status line, with an
+/// optional control (an on/off switch, "Advanced") on the right.
+fn page(_title: &str) -> (gtk::ScrolledWindow, gtk::Box, gtk::Label, gtk::Box) {
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 24);
     body.add_css_class("page");
-    let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    let titles = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    titles.set_hexpand(true);
-    titles.append(&label(title, &["page-title"]));
+    let head = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     let status = label("", &["page-sub"]);
-    titles.append(&status);
-    let right = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    status.set_hexpand(true);
+    status.set_wrap(true);
+    status.set_valign(gtk::Align::Center);
+    let right = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     right.set_valign(gtk::Align::Center);
-    head.append(&titles);
+    head.append(&status);
     head.append(&right);
     body.append(&head);
     let scroll = gtk::ScrolledWindow::new();
@@ -242,7 +268,7 @@ fn signal_icon(signal: u8, connected: bool) -> gtk::DrawingArea {
 }
 
 fn wifi_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("wi-fi");
+    let (scroll, body, status, right) = page("Wi-Fi");
     let switch = gtk::Switch::new();
     right.append(&switch);
     let list = gtk::ListBox::new();
@@ -253,12 +279,12 @@ fn wifi_page() -> gtk::ScrolledWindow {
 
     let extras = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     extras.set_homogeneous(true);
-    let saved_label = label("none yet", &["card-sub"]);
-    let hotspot_label = label("share this connection", &["card-sub"]);
+    let saved_label = label("None yet", &["card-sub"]);
+    let hotspot_label = label("Share this connection", &["card-sub"]);
     for (title, sub) in [
-        ("hotspot", &hotspot_label),
-        ("vpn", &label("wireguard, openvpn", &["card-sub"])),
-        ("saved networks", &saved_label),
+        ("Hotspot", &hotspot_label),
+        ("VPN", &label("WireGuard, OpenVPN", &["card-sub"])),
+        ("Saved networks", &saved_label),
     ] {
         let card = gtk::Button::new();
         card.add_css_class("small-card");
@@ -268,11 +294,11 @@ fn wifi_page() -> gtk::ScrolledWindow {
         card.set_child(Some(&inner));
         let hotspot_label = hotspot_label.clone();
         card.connect_clicked(move |_| match title {
-            "hotspot" => {
+            "Hotspot" => {
                 let l = hotspot_label.clone();
-                l.set_text("starting…");
+                l.set_text("Starting…");
                 background(nm::hotspot, move |r| match r {
-                    Ok((ssid, psk)) => l.set_text(&format!("on · {ssid} · {psk}")),
+                    Ok((ssid, psk)) => l.set_text(&format!("On · {ssid} · {psk}")),
                     Err(e) => l.set_text(&e),
                 });
             }
@@ -334,9 +360,9 @@ fn wifi_page() -> gtk::ScrolledWindow {
                         switch.set_visible(false);
                         list.set_visible(false);
                         status.set_text(if wired {
-                            "no wi-fi on this computer · connected by cable"
+                            "No Wi-Fi on this computer · connected by cable"
                         } else {
-                            "no wi-fi on this computer"
+                            "No Wi-Fi on this computer"
                         });
                         return;
                     }
@@ -346,17 +372,17 @@ fn wifi_page() -> gtk::ScrolledWindow {
                     }
                     list.set_visible(enabled);
                     if !enabled {
-                        status.set_text("wi-fi is off");
+                        status.set_text("Wi-Fi is off");
                         return;
                     }
                     match nets.iter().find(|n| n.in_use) {
                         Some(n) => status.set_text(&format!(
-                            "connected to {} · {} · {}",
+                            "Connected to {} · {} · {}",
                             n.ssid,
                             n.band,
                             nm::strength(n.signal)
                         )),
-                        None => status.set_text("not connected"),
+                        None => status.set_text("Not connected"),
                     }
                     for net in &nets {
                         let reload = refresh.borrow().clone();
@@ -432,12 +458,12 @@ fn network_row(
             &["row-sub", "on"],
         ));
     } else if saved {
-        text.append(&label("saved", &["row-sub"]));
+        text.append(&label("Saved", &["row-sub"]));
     }
     row.append(&text);
     if net.secured && !net.in_use {
         let lock = label("●", &["lock"]);
-        lock.set_tooltip_text(Some("needs a password"));
+        lock.set_tooltip_text(Some("Needs a password"));
         row.append(&lock);
     }
     let action = gtk::Button::with_label(if net.in_use { "disconnect" } else { "connect" });
@@ -452,7 +478,7 @@ fn network_row(
     let ask = gtk::Box::new(gtk::Orientation::Vertical, 12);
     ask.add_css_class("ask-password");
     let ask_title = gtk::Label::new(None);
-    ask_title.set_markup(&format!("password for <b>{}</b>", glib::markup_escape_text(&net.ssid)));
+    ask_title.set_markup(&format!("Password for <b>{}</b>", glib::markup_escape_text(&net.ssid)));
     ask_title.set_xalign(0.0);
     ask_title.add_css_class("row-title");
     let field_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -460,7 +486,7 @@ fn network_row(
     pw.add_css_class("field");
     pw.set_show_peek_icon(true);
     pw.set_hexpand(true);
-    let join = gtk::Button::with_label("connect");
+    let join = gtk::Button::with_label("Connect");
     join.add_css_class("pill");
     field_row.append(&pw);
     field_row.append(&join);
@@ -477,7 +503,7 @@ fn network_row(
         Rc::new(move || {
             let (ssid2, secret) = (ssid.clone(), pw.text().to_string());
             let (error, reload, open_row) = (error.clone(), reload.clone(), open_row.clone());
-            action.set_label("connecting…");
+            action.set_label("Connecting…");
             error.set_visible(false);
             background(
                 move || nm::connect(&ssid2, Some(&secret)),
@@ -485,7 +511,7 @@ fn network_row(
                     match r {
                         Ok(()) => *open_row.borrow_mut() = None,
                         Err(e) => {
-                            error.set_text(&format!("couldn't join: {e}"));
+                            error.set_text(&format!("Couldn't join: {e}"));
                             error.set_visible(true);
                         }
                     }
@@ -503,7 +529,7 @@ fn network_row(
         action.connect_clicked(move |b| {
             if in_use {
                 let (ssid, reload, error) = (ssid.clone(), reload.clone(), error.clone());
-                b.set_label("disconnecting…");
+                b.set_label("Disconnecting…");
                 background(
                     move || nm::disconnect(&ssid),
                     move |r| {
@@ -551,7 +577,7 @@ fn network_row(
             );
         });
         row.add_controller(gesture);
-        row.set_tooltip_text(Some("right-click to forget this network"));
+        row.set_tooltip_text(Some("Right-click to forget this network"));
     }
     outer
 }
@@ -560,11 +586,11 @@ fn hidden_row(error: &gtk::Label, reload: Reload) -> gtk::Box {
     let outer = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
     row.add_css_class("net-row");
-    let title = label("other network…", &["row-title", "muted"]);
+    let title = label("Other network…", &["row-title", "muted"]);
     title.set_hexpand(true);
     row.append(&title);
-    row.append(&label("hidden or enterprise", &["row-sub"]));
-    let open = gtk::Button::with_label("join");
+    row.append(&label("Hidden or enterprise", &["row-sub"]));
+    let open = gtk::Button::with_label("Join");
     open.add_css_class("link");
     open.add_css_class("accent");
     row.append(&open);
@@ -573,12 +599,12 @@ fn hidden_row(error: &gtk::Label, reload: Reload) -> gtk::Box {
     form.add_css_class("ask-password");
     let name = gtk::Entry::new();
     name.add_css_class("field");
-    name.set_placeholder_text(Some("network name"));
+    name.set_placeholder_text(Some("Network name"));
     name.set_hexpand(true);
     let pw = gtk::PasswordEntry::new();
     pw.add_css_class("field");
     pw.set_hexpand(true);
-    let join = gtk::Button::with_label("connect");
+    let join = gtk::Button::with_label("Connect");
     join.add_css_class("pill");
     form.append(&name);
     form.append(&pw);
@@ -600,7 +626,7 @@ fn hidden_row(error: &gtk::Label, reload: Reload) -> gtk::Box {
             move || nm::connect_hidden(&ssid, &secret),
             move |r| {
                 if let Err(e) = r {
-                    error.set_text(&format!("couldn't join: {e}"));
+                    error.set_text(&format!("Couldn't join: {e}"));
                     error.set_visible(true);
                 }
                 if let Some(reload) = reload {
@@ -624,19 +650,19 @@ fn clear(list: &gtk::ListBox) {
 }
 
 fn bluetooth_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("bluetooth");
+    let (scroll, body, status, right) = page("Bluetooth");
     let switch = gtk::Switch::new();
     right.append(&switch);
-    let mine_caption = caption("your devices");
+    let mine_caption = caption("Your devices");
     let mine = gtk::ListBox::new();
     mine.add_css_class("list-card");
     mine.set_selection_mode(gtk::SelectionMode::None);
     let near_head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let near_caption = caption("nearby");
+    let near_caption = caption("Nearby");
     let spinner = crate::common::spinner(14);
     spinner.set_valign(gtk::Align::Center);
     spinner.set_visible(false);
-    let again = gtk::Button::with_label("look again");
+    let again = gtk::Button::with_label("Look again");
     again.add_css_class("link");
     again.add_css_class("accent");
     let filler = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -650,7 +676,7 @@ fn bluetooth_page() -> gtk::ScrolledWindow {
     near.set_selection_mode(gtk::SelectionMode::None);
     let error = label("", &["error"]);
     error.set_visible(false);
-    let more = gtk::Button::with_label("more options");
+    let more = gtk::Button::with_label("More options");
     more.add_css_class("link");
     more.set_halign(gtk::Align::Start);
     more.connect_clicked(|_| {
@@ -687,7 +713,7 @@ fn bluetooth_page() -> gtk::ScrolledWindow {
                     if found.is_empty() {
                         let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
                         row.add_css_class("net-row");
-                        row.append(&label("nothing nearby in pairing mode", &["row-sub"]));
+                        row.append(&label("Nothing nearby in pairing mode", &["row-sub"]));
                         near.append(&row);
                     }
                     for d in &found {
@@ -728,20 +754,20 @@ fn bluetooth_page() -> gtk::ScrolledWindow {
                         p.set_visible(has && on);
                     }
                     if !has {
-                        status.set_text("no bluetooth on this computer");
+                        status.set_text("No Bluetooth on this computer");
                         return;
                     }
                     switch.set_active(on);
                     if !on {
-                        status.set_text("bluetooth is off");
+                        status.set_text("Bluetooth is off");
                         return;
                     }
-                    status.set_text(&format!("visible as \"{}\" while this page is open", name.to_lowercase()));
+                    status.set_text(&format!("Visible as \"{}\" while this page is open", name));
                     clear(&mine);
                     if devices.is_empty() {
                         let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
                         row.add_css_class("net-row");
-                        row.append(&label("none yet: pair something from nearby", &["row-sub"]));
+                        row.append(&label("None yet: pair something from nearby", &["row-sub"]));
                         mine.append(&row);
                     }
                     for d in &devices {
@@ -800,9 +826,9 @@ fn device_row(d: &bt::Device, paired: bool, error: &gtk::Label, reload: Reload) 
     let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
     text.set_hexpand(true);
     text.set_valign(gtk::Align::Center);
-    text.append(&label(&d.name.to_lowercase(), &[if d.connected { "row-title-strong" } else { "row-title" }]));
+    text.append(&label(&d.name, &[if d.connected { "row-title-strong" } else { "row-title" }]));
     let sub = match (d.connected, d.battery) {
-        (true, Some(b)) => format!("connected · battery {b}%"),
+        (true, Some(b)) => format!("Connected · battery {b}%"),
         (true, None) => "connected".to_string(),
         (false, _) if paired => format!("{word} · not connected"),
         _ => word.to_string(),
@@ -841,7 +867,7 @@ fn device_row(d: &bt::Device, paired: bool, error: &gtk::Label, reload: Reload) 
                 },
                 move |r| {
                     if let Err(e) = r {
-                        error.set_text(&format!("couldn't {verb}: {e}"));
+                        error.set_text(&format!("Couldn't {verb}: {e}"));
                         error.set_visible(true);
                     }
                     if let Some(reload) = reload {
@@ -852,7 +878,7 @@ fn device_row(d: &bt::Device, paired: bool, error: &gtk::Label, reload: Reload) 
         });
     }
     if paired {
-        row.set_tooltip_text(Some("right-click to remove this device"));
+        row.set_tooltip_text(Some("Right-click to remove this device"));
         let gesture = gtk::GestureClick::new();
         gesture.set_button(3);
         gesture.connect_released(move |_, _, _, _| {
@@ -903,7 +929,7 @@ fn level_row(name: &str, value: u32, on_change: impl Fn(u32) + 'static, mute: Op
         let switch = gtk::Switch::new();
         switch.set_active(!muted);
         switch.set_valign(gtk::Align::Center);
-        switch.set_tooltip_text(Some("on / muted"));
+        switch.set_tooltip_text(Some("On / muted"));
         switch.connect_state_set(move |_, on| {
             set(!on);
             glib::Propagation::Proceed
@@ -919,7 +945,7 @@ fn fill_devices(list: &gtk::ListBox, devices: &[snd::Device], default: &str, out
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         row.add_css_class("net-row");
         row.append(&label(
-            if output { "no speakers or headphones found" } else { "no microphone found" },
+            if output { "No speakers or headphones found" } else { "No microphone found" },
             &["row-sub"],
         ));
         list.append(&row);
@@ -944,7 +970,7 @@ fn fill_devices(list: &gtk::ListBox, devices: &[snd::Device], default: &str, out
         title.set_ellipsize(gtk::pango::EllipsizeMode::End);
         row.append(&title);
         if !in_use {
-            let use_it = gtk::Button::with_label("use this");
+            let use_it = gtk::Button::with_label("Use this");
             use_it.add_css_class("link");
             use_it.add_css_class("accent");
             let (name, reload) = (d.name.clone(), reload.clone());
@@ -975,7 +1001,7 @@ fn fill_devices(list: &gtk::ListBox, devices: &[snd::Device], default: &str, out
 }
 
 fn sound_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("sound");
+    let (scroll, body, status, _right) = page("Sound");
     let outs = gtk::ListBox::new();
     let ins = gtk::ListBox::new();
     let apps = gtk::ListBox::new();
@@ -983,17 +1009,17 @@ fn sound_page() -> gtk::ScrolledWindow {
         l.add_css_class("list-card");
         l.set_selection_mode(gtk::SelectionMode::None);
     }
-    let more = gtk::Button::with_label("more options");
+    let more = gtk::Button::with_label("More options");
     more.add_css_class("link");
     more.set_halign(gtk::Align::Start);
     more.connect_clicked(|_| {
         let _ = std::process::Command::new("pavucontrol").spawn();
     });
-    body.append(&caption("output"));
+    body.append(&caption("Output"));
     body.append(&outs);
-    body.append(&caption("input"));
+    body.append(&caption("Input"));
     body.append(&ins);
-    body.append(&caption("apps"));
+    body.append(&caption("Apps"));
     body.append(&apps);
     body.append(&more);
 
@@ -1011,7 +1037,7 @@ fn sound_page() -> gtk::ScrolledWindow {
                     status.set_text(&match current {
                         Some(d) if d.muted => format!("{} · muted", d.description),
                         Some(d) => format!("{} · {}%", d.description, d.volume),
-                        None => "no sound device".to_string(),
+                        None => "No sound device".to_string(),
                     });
                     fill_devices(&outs, &out_list, &out_default, true, reload.borrow().clone());
                     fill_devices(&ins, &in_list, &in_default, false, reload.borrow().clone());
@@ -1019,7 +1045,7 @@ fn sound_page() -> gtk::ScrolledWindow {
                     if streams.is_empty() {
                         let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
                         row.add_css_class("net-row");
-                        row.append(&label("nothing is playing", &["row-sub"]));
+                        row.append(&label("Nothing is playing", &["row-sub"]));
                         apps.append(&row);
                     }
                     for st in &streams {
@@ -1092,21 +1118,21 @@ fn dropdown(items: &[String], selected: usize) -> gtk::DropDown {
 }
 
 fn display_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("display");
+    let (scroll, body, status, _right) = page("Display");
     let screens = gtk::Box::new(gtk::Orientation::Vertical, 22);
     let light = gtk::ListBox::new();
     light.add_css_class("list-card");
     light.set_selection_mode(gtk::SelectionMode::None);
     let error = label("", &["error"]);
     error.set_visible(false);
-    let arrange = gtk::Button::with_label("arrange screens");
+    let arrange = gtk::Button::with_label("Arrange screens");
     arrange.add_css_class("link");
     arrange.set_halign(gtk::Align::Start);
     arrange.connect_clicked(|_| {
         let _ = std::process::Command::new("wdisplays").spawn();
     });
     body.append(&screens);
-    body.append(&caption("light"));
+    body.append(&caption("Light"));
     body.append(&light);
     body.append(&error);
     body.append(&arrange);
@@ -1127,7 +1153,7 @@ fn display_page() -> gtk::ScrolledWindow {
                                 o.current.and_then(|i| o.modes.get(i)).map(display::Mode::label).unwrap_or_default();
                             status.set_text(&format!("{} · {mode} · scale {:.0}%", o.title, o.scale * 100.0));
                         }
-                        None => status.set_text("no screen found"),
+                        None => status.set_text("No screen found"),
                     }
                     for o in &outs {
                         screens.append(&screen_card(o, &error));
@@ -1147,7 +1173,7 @@ fn display_page() -> gtk::ScrolledWindow {
                         display::set_night_light(on);
                         glib::Propagation::Proceed
                     });
-                    light.append(&setting_row("night light: warmer colours after sunset", &night_switch));
+                    light.append(&setting_row("Night light: warmer colours after sunset", &night_switch));
                 },
             );
         })
@@ -1174,9 +1200,9 @@ fn screen_card(o: &display::Output, error: &gtk::Label) -> gtk::Box {
         .position(|r| o.transform == r.1 || (o.transform == "normal" && r.1 == "normal"))
         .unwrap_or(0);
     let rotations = dropdown(&rot_names, rot_now);
-    list.append(&setting_row("resolution", &modes));
-    list.append(&setting_row("scale", &scales));
-    list.append(&setting_row("rotation", &rotations));
+    list.append(&setting_row("Resolution", &modes));
+    list.append(&setting_row("Scale", &scales));
+    list.append(&setting_row("Rotation", &rotations));
     card.append(&list);
     let apply = {
         let (o, modes, scales, rotations, error) =
@@ -1191,7 +1217,7 @@ fn screen_card(o: &display::Output, error: &gtk::Label) -> gtk::Box {
                 move |r| match r {
                     Ok(()) => error.set_visible(false),
                     Err(e) => {
-                        error.set_text(&format!("couldn't change the screen: {e}"));
+                        error.set_text(&format!("Couldn't change the screen: {e}"));
                         error.set_visible(true);
                     }
                 },
@@ -1205,8 +1231,8 @@ fn screen_card(o: &display::Output, error: &gtk::Label) -> gtk::Box {
     card
 }
 
-const WALLPAPERS: [(&str, &str); 4] = [("ink", "ink"), ("night", "night"), ("forest", "forest"), ("paper", "paper")];
-const TEXT_SIZES: [(&str, f64); 4] = [("small", 0.9), ("default", 1.0), ("large", 1.15), ("larger", 1.3)];
+const WALLPAPERS: [(&str, &str); 4] = [("ink", "Ink"), ("night", "Night"), ("forest", "Forest"), ("paper", "Paper")];
+const TEXT_SIZES: [(&str, f64); 4] = [("Small", 0.9), ("Default", 1.0), ("Large", 1.15), ("Larger", 1.3)];
 
 fn tripppin_config() -> std::path::PathBuf {
     std::env::var_os("XDG_CONFIG_HOME")
@@ -1244,10 +1270,10 @@ fn gsettings_set(key: &str, value: &str) {
 }
 
 fn appearance_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("appearance");
+    let (scroll, body, status, _right) = page("Appearance");
     let current = std::fs::read_to_string(tripppin_config().join("wallpaper-name")).unwrap_or_else(|_| "ink".into());
-    status.set_text(&format!("dark · {} wallpaper", current.trim()));
-    body.append(&caption("wallpaper"));
+    status.set_text(&format!("Dark · {} wallpaper", current.trim()));
+    body.append(&caption("Wallpaper"));
     let grid = gtk::FlowBox::new();
     grid.set_selection_mode(gtk::SelectionMode::None);
     grid.set_max_children_per_line(4);
@@ -1277,14 +1303,14 @@ fn appearance_page() -> gtk::ScrolledWindow {
                     t.remove_css_class("selected");
                 }
                 b.add_css_class("selected");
-                status.set_text(&format!("dark · {id} wallpaper"));
+                status.set_text(&format!("Dark · {id} wallpaper"));
             }
         });
         tiles.borrow_mut().push(tile.clone());
         grid.insert(&tile, -1);
     }
     body.append(&grid);
-    let own = gtk::Button::with_label("choose your own…");
+    let own = gtk::Button::with_label("Choose your own…");
     own.add_css_class("link");
     own.add_css_class("accent");
     own.set_halign(gtk::Align::Start);
@@ -1296,7 +1322,7 @@ fn appearance_page() -> gtk::ScrolledWindow {
             filter.set_name(Some("images"));
             let filters = gio::ListStore::new::<gtk::FileFilter>();
             filters.append(&filter);
-            let dialog = gtk::FileDialog::builder().title("choose a wallpaper").filters(&filters).modal(true).build();
+            let dialog = gtk::FileDialog::builder().title("Choose a wallpaper").filters(&filters).modal(true).build();
             let window = b.root().and_downcast::<gtk::Window>();
             let (status, tiles) = (status.clone(), tiles.clone());
             dialog.open(window.as_ref(), gio::Cancellable::NONE, move |r| {
@@ -1307,18 +1333,18 @@ fn appearance_page() -> gtk::ScrolledWindow {
                     for t in tiles.borrow().iter() {
                         t.remove_css_class("selected");
                     }
-                    status.set_text("dark · your own wallpaper");
+                    status.set_text("Dark · your own wallpaper");
                 }
             });
         });
     }
     body.append(&own);
 
-    body.append(&caption("look"));
+    body.append(&caption("Look"));
     let look = gtk::ListBox::new();
     look.add_css_class("list-card");
     look.set_selection_mode(gtk::SelectionMode::None);
-    look.append(&setting_row("mode", &label("dark · light mode comes in a later update", &["row-sub"])));
+    look.append(&setting_row("Mode", &label("Dark · light mode comes in a later update", &["row-sub"])));
     let sizes: Vec<String> = TEXT_SIZES.iter().map(|s| s.0.to_string()).collect();
     let now = text_scale();
     let size_now = TEXT_SIZES.iter().position(|s| (s.1 - now).abs() < 0.02).unwrap_or(1);
@@ -1326,7 +1352,8 @@ fn appearance_page() -> gtk::ScrolledWindow {
     size.connect_selected_notify(|d| {
         gsettings_set("text-scaling-factor", &TEXT_SIZES[d.selected() as usize].1.to_string())
     });
-    look.append(&setting_row("text size", &size));
+    look.append(&setting_row("Text size", &size));
+    look.append(&setting_row("Corners", &corners_choice()));
     let motion = gtk::Switch::new();
     motion.set_active(display::reduce_motion());
     motion.connect_state_set(|_, on| {
@@ -1334,26 +1361,54 @@ fn appearance_page() -> gtk::ScrolledWindow {
         gsettings_set("enable-animations", if on { "false" } else { "true" });
         glib::Propagation::Proceed
     });
-    look.append(&setting_row("reduce motion", &motion));
+    look.append(&setting_row("Reduce motion", &motion));
     body.append(&look);
     scroll
 }
 
+/// Sharp, Default or Round: three segments, applied at once to windows, the bar, quick
+/// settings, the launcher and our own screens (look.rs).
+fn corners_choice() -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let now = crate::look::current();
+    let buttons: Rc<RefCell<Vec<gtk::Button>>> = Rc::default();
+    for (choice, word, what) in crate::look::ALL {
+        let b = gtk::Button::with_label(word);
+        b.add_css_class("segment");
+        b.set_tooltip_text(Some(what));
+        if choice == now {
+            b.add_css_class("selected");
+        }
+        let all = buttons.clone();
+        b.connect_clicked(move |b| {
+            if crate::look::set(choice).is_ok() {
+                for other in all.borrow().iter() {
+                    other.remove_css_class("selected");
+                }
+                b.add_css_class("selected");
+            }
+        });
+        buttons.borrow_mut().push(b.clone());
+        row.append(&b);
+    }
+    row
+}
+
 fn minutes(m: u32) -> String {
     match m {
-        0 => "never".to_string(),
+        0 => "Never".to_string(),
         1 => "1 minute".to_string(),
         m => format!("{m} minutes"),
     }
 }
 
 fn power_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("power & battery");
-    let battery_caption = caption("battery");
+    let (scroll, body, status, _right) = page("Power & battery");
+    let battery_caption = caption("Battery");
     let battery = gtk::ListBox::new();
     battery.add_css_class("list-card");
     battery.set_selection_mode(gtk::SelectionMode::None);
-    let modes_caption = caption("power mode");
+    let modes_caption = caption("Power mode");
     let modes = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     modes.set_homogeneous(true);
     let error = label("", &["error"]);
@@ -1362,7 +1417,7 @@ fn power_page() -> gtk::ScrolledWindow {
     body.append(&battery);
     body.append(&modes_caption);
     body.append(&modes);
-    body.append(&caption("when you're away"));
+    body.append(&caption("When you're away"));
     let idle_list = gtk::ListBox::new();
     idle_list.add_css_class("list-card");
     idle_list.set_selection_mode(gtk::SelectionMode::None);
@@ -1372,16 +1427,16 @@ fn power_page() -> gtk::ScrolledWindow {
     let lock = dropdown(&names, pick(idle.lock));
     let screen = dropdown(&names, pick(idle.screen_off));
     let sleep = dropdown(&names, pick(idle.sleep));
-    idle_list.append(&setting_row("lock the screen after", &lock));
-    idle_list.append(&setting_row("turn the screen off after", &screen));
-    idle_list.append(&setting_row("sleep after", &sleep));
+    idle_list.append(&setting_row("Lock the screen after", &lock));
+    idle_list.append(&setting_row("Turn the screen off after", &screen));
+    idle_list.append(&setting_row("Sleep after", &sleep));
     let save = {
         let (lock, screen, sleep, error) = (lock.clone(), screen.clone(), sleep.clone(), error.clone());
         Rc::new(move || {
             let pick = |d: &gtk::DropDown| power::IDLE_CHOICES[d.selected() as usize];
             let idle = power::Idle { lock: pick(&lock), screen_off: pick(&screen), sleep: pick(&sleep) };
             if let Err(e) = power::set_idle(&idle) {
-                error.set_text(&format!("couldn't save: {e}"));
+                error.set_text(&format!("Couldn't save: {e}"));
                 error.set_visible(true);
             }
         })
@@ -1420,13 +1475,13 @@ fn power_page() -> gtk::ScrolledWindow {
                     match &bat {
                         Some(b) => {
                             status.set_text(&power::summary(b));
-                            battery.append(&setting_row("charge", &label(&format!("{}%", b.percent), &["row-value"])));
-                            battery.append(&setting_row("state", &label(&b.state.replace('-', " "), &["row-value"])));
+                            battery.append(&setting_row("Charge", &label(&format!("{}%", b.percent), &["row-value"])));
+                            battery.append(&setting_row("State", &label(&b.state.replace('-', " "), &["row-value"])));
                             if let Some(h) = b.health {
-                                battery.append(&setting_row("health", &label(&format!("{h}% of new"), &["row-value"])));
+                                battery.append(&setting_row("Health", &label(&format!("{h}% of new"), &["row-value"])));
                             }
                         }
-                        None => status.set_text("no battery · on mains power"),
+                        None => status.set_text("No battery · on mains power"),
                     }
                     while let Some(child) = modes.first_child() {
                         modes.remove(&child);
@@ -1453,7 +1508,7 @@ fn power_page() -> gtk::ScrolledWindow {
                                 b.add_css_class("selected");
                             }
                             Err(e) => {
-                                error.set_text(&format!("couldn't change the power mode: {e}"));
+                                error.set_text(&format!("Couldn't change the power mode: {e}"));
                                 error.set_visible(true);
                             }
                         });
@@ -1663,9 +1718,9 @@ fn show_progress(p: trip::models::Progress, sub: &gtk::Label, bar: &gtk::Progres
 
 fn time_left(secs: f64) -> String {
     match secs as u64 {
-        0..=59 => "under a minute".into(),
-        s @ 60..=3599 => format!("about {} min", s.div_ceil(60)),
-        s => format!("about {:.1} h", s as f64 / 3600.0),
+        0..=59 => "Under a minute".into(),
+        s @ 60..=3599 => format!("About {} min", s.div_ceil(60)),
+        s => format!("About {:.1} h", s as f64 / 3600.0),
     }
 }
 
@@ -2208,7 +2263,7 @@ impl RemoteSetup {
                                 pick_box.set_visible(true);
                             }
                             // Your own server may not list models; it can still be named by hand.
-                            Err(e) if own && e.contains("doesn't list its models") => {
+                            Err(e) if own && e.contains("Doesn't list its models") => {
                                 note.set_text("Connected, but it doesn't list its models. Type the name below.");
                                 fill_list(Vec::new(), &want);
                                 pick_box.set_visible(true);
@@ -2586,15 +2641,15 @@ fn activity_section() -> (gtk::Box, Rc<dyn Fn()>) {
 }
 
 fn notifications_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("notifications");
+    let (scroll, body, status, right) = page("Notifications");
     let dnd = gtk::Switch::new();
-    right.append(&label("do not disturb", &["row-sub"]));
+    right.append(&label("Do not disturb", &["row-sub"]));
     right.append(&dnd);
     right.set_spacing(12);
     let error = label("", &["error"]);
     error.set_visible(false);
 
-    body.append(&caption("quiet hours"));
+    body.append(&caption("Quiet hours"));
     let quiet = gtk::ListBox::new();
     quiet.add_css_class("list-card");
     quiet.set_selection_mode(gtk::SelectionMode::None);
@@ -2602,15 +2657,15 @@ fn notifications_page() -> gtk::ScrolledWindow {
     let on = gtk::Switch::new();
     let from = dropdown(&hours, 22);
     let to = dropdown(&hours, 7);
-    quiet.append(&setting_row("turn on do not disturb every day", &on));
-    let from_row = setting_row("from", &from);
-    let to_row = setting_row("until", &to);
+    quiet.append(&setting_row("Turn on do not disturb every day", &on));
+    let from_row = setting_row("From", &from);
+    let to_row = setting_row("Until", &to);
     quiet.append(&from_row);
     quiet.append(&to_row);
     body.append(&quiet);
 
-    body.append(&caption("muted apps"));
-    body.append(&label("their notifications are dropped quietly.", &["row-sub"]));
+    body.append(&caption("Muted apps"));
+    body.append(&label("Their notifications are dropped quietly.", &["row-sub"]));
     let muted = gtk::ListBox::new();
     muted.add_css_class("list-card");
     muted.set_selection_mode(gtk::SelectionMode::None);
@@ -2621,9 +2676,9 @@ fn notifications_page() -> gtk::ScrolledWindow {
         let status = status.clone();
         move |dnd: bool, quiet: Option<&(String, String)>, muted: usize| {
             let mut words =
-                vec![if dnd { "do not disturb is on".to_string() } else { "showing notifications".to_string() }];
+                vec![if dnd { "Do not disturb is on".to_string() } else { "Showing notifications".to_string() }];
             if let Some((a, b)) = quiet {
-                words.push(format!("quiet {a}–{b}"));
+                words.push(format!("Quiet {a}–{b}"));
             }
             if muted > 0 {
                 words.push(format!("{muted} muted"));
@@ -2671,7 +2726,7 @@ fn notifications_page() -> gtk::ScrolledWindow {
                 },
                 move |r| {
                     if let Err(e) = r {
-                        error.set_text(&format!("couldn't save quiet hours: {e}"));
+                        error.set_text(&format!("Couldn't save quiet hours: {e}"));
                         error.set_visible(true);
                     }
                 },
@@ -2705,7 +2760,7 @@ fn notifications_page() -> gtk::ScrolledWindow {
                                 move || apps::set_muted(&next).map_err(|e| e.to_string()),
                                 move |r| {
                                     if let Err(e) = r {
-                                        error.set_text(&format!("couldn't save: {e}"));
+                                        error.set_text(&format!("Couldn't save: {e}"));
                                         error.set_visible(true);
                                     }
                                     if let Some(f) = slot.borrow().clone() {
@@ -2716,7 +2771,7 @@ fn notifications_page() -> gtk::ScrolledWindow {
                         }
                     };
                     for n in names.iter() {
-                        let unmute = gtk::Button::with_label("unmute");
+                        let unmute = gtk::Button::with_label("Unmute");
                         unmute.add_css_class("link");
                         unmute.add_css_class("accent");
                         let (n, names, save) = (n.clone(), names.clone(), save.clone());
@@ -2746,7 +2801,7 @@ fn notifications_page() -> gtk::ScrolledWindow {
                         .collect();
                     let pick = dropdown(&lower, 0);
                     pick.set_enable_search(true);
-                    let mute = gtk::Button::with_label("mute");
+                    let mute = gtk::Button::with_label("Mute");
                     mute.add_css_class("link");
                     mute.add_css_class("accent");
                     let controls = gtk::Box::new(gtk::Orientation::Horizontal, 14);
@@ -2760,7 +2815,7 @@ fn notifications_page() -> gtk::ScrolledWindow {
                             save(next);
                         });
                     }
-                    muted_list.append(&setting_row("mute an app", &controls));
+                    muted_list.append(&setting_row("Mute an app", &controls));
                 },
             );
         }));
@@ -2804,27 +2859,27 @@ fn notifications_page() -> gtk::ScrolledWindow {
 }
 
 fn apps_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("apps");
-    let update = gtk::Button::with_label("update all");
+    let (scroll, body, status, right) = page("Apps");
+    let update = gtk::Button::with_label("Update all");
     update.add_css_class("pill");
     update.set_visible(false);
     right.append(&update);
     let error = label("", &["error"]);
     error.set_visible(false);
-    body.append(&caption("open things with"));
+    body.append(&caption("Open things with"));
     let defaults = gtk::ListBox::new();
     defaults.add_css_class("list-card");
     defaults.set_selection_mode(gtk::SelectionMode::None);
     body.append(&defaults);
-    body.append(&caption("your apps"));
+    body.append(&caption("Your apps"));
     let mine = gtk::ListBox::new();
     mine.add_css_class("list-card");
     mine.set_selection_mode(gtk::SelectionMode::None);
     body.append(&mine);
     body.append(&error);
-    body.append(&caption("get apps from flathub"));
+    body.append(&caption("Get apps from Flathub"));
     body.append(&store_section(&error));
-    body.append(&caption("part of tripppin"));
+    body.append(&caption("Part of Tripppin"));
     let system = label("", &["row-sub"]);
     system.set_wrap(true);
     system.set_xalign(0.0);
@@ -2866,7 +2921,7 @@ fn apps_page() -> gtk::ScrolledWindow {
                         "{} apps · {}",
                         installed.len(),
                         match updates.len() {
-                            0 => "up to date".to_string(),
+                            0 => "Up to date".to_string(),
                             1 => "1 update".to_string(),
                             n => format!("{n} updates"),
                         }
@@ -2878,7 +2933,7 @@ fn apps_page() -> gtk::ScrolledWindow {
                         let can: Vec<&apps::App> =
                             installed.iter().filter(|a| a.mime.iter().any(|m| mimes.contains(&m.as_str()))).collect();
                         if can.is_empty() {
-                            defaults.append(&setting_row(what, &label("no app for this yet", &["row-sub"])));
+                            defaults.append(&setting_row(what, &label("No app for this yet", &["row-sub"])));
                             continue;
                         }
                         let current = apps::default_for(mimes);
@@ -2889,7 +2944,7 @@ fn apps_page() -> gtk::ScrolledWindow {
                         let error = error.clone();
                         pick.connect_selected_notify(move |d| {
                             if let Err(e) = apps::set_default(mimes, &ids[d.selected() as usize]) {
-                                error.set_text(&format!("couldn't save: {e}"));
+                                error.set_text(&format!("Couldn't save: {e}"));
                                 error.set_visible(true);
                             }
                         });
@@ -2898,7 +2953,7 @@ fn apps_page() -> gtk::ScrolledWindow {
 
                     clear(&mine);
                     if flatpaks.is_empty() {
-                        mine.append(&setting_row("nothing installed yet", &label("", &["row-sub"])));
+                        mine.append(&setting_row("Nothing installed yet", &label("", &["row-sub"])));
                     }
                     for app in &flatpaks {
                         let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
@@ -2906,31 +2961,31 @@ fn apps_page() -> gtk::ScrolledWindow {
                         let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
                         text.set_hexpand(true);
                         text.set_valign(gtk::Align::Center);
-                        text.append(&label(&app.name.to_lowercase(), &["row-title"]));
+                        text.append(&label(&app.name, &["row-title"]));
                         let mut sub = format!("{} · {}", app.version, app.size);
                         if updates.contains(&app.id) {
                             sub.push_str(" · update waiting");
                         }
                         text.append(&label(&sub, &["row-sub"]));
                         row.append(&text);
-                        let remove = gtk::Button::with_label("remove");
+                        let remove = gtk::Button::with_label("Remove");
                         remove.add_css_class("link");
                         let (app, error, reload) = (app.clone(), error.clone(), reload.clone());
                         remove.connect_clicked(move |b| {
                             // A second click confirms.
-                            if b.label().as_deref() != Some("sure? remove") {
-                                b.set_label("sure? remove");
+                            if b.label().as_deref() != Some("Sure? Remove") {
+                                b.set_label("Sure? Remove");
                                 b.add_css_class("danger");
                                 return;
                             }
                             b.set_sensitive(false);
-                            b.set_label("removing…");
+                            b.set_label("Removing…");
                             let (app, error, reload) = (app.clone(), error.clone(), reload.clone());
                             background(
                                 move || apps::remove(&app),
                                 move |r| {
                                     if let Err(e) = r {
-                                        error.set_text(&format!("couldn't remove it: {e}"));
+                                        error.set_text(&format!("Couldn't remove it: {e}"));
                                         error.set_visible(true);
                                     }
                                     reload();
@@ -2947,7 +3002,7 @@ fn apps_page() -> gtk::ScrolledWindow {
                         .filter(|a| !a.flatpak && !flat_ids.contains(&a.id.as_str()))
                         .map(|a| a.name.to_lowercase())
                         .collect();
-                    system.set_text(&format!("{}. these update with the system.", builtin.join(" · ")));
+                    system.set_text(&format!("{}. These update with the system.", builtin.join(" · ")));
                 },
             );
         }));
@@ -2956,13 +3011,13 @@ fn apps_page() -> gtk::ScrolledWindow {
         let (slot, error) = (load.clone(), error.clone());
         update.connect_clicked(move |b| {
             b.set_sensitive(false);
-            b.set_label("updating…");
+            b.set_label("Updating…");
             let (b, slot, error) = (b.clone(), slot.clone(), error.clone());
             background(apps::update_all, move |r| {
                 b.set_sensitive(true);
-                b.set_label("update all");
+                b.set_label("Update all");
                 if let Err(e) = r {
-                    error.set_text(&format!("couldn't update: {e}"));
+                    error.set_text(&format!("Couldn't update: {e}"));
                     error.set_visible(true);
                 }
                 if let Some(f) = slot.borrow().clone() {
@@ -2980,7 +3035,7 @@ fn apps_page() -> gtk::ScrolledWindow {
 }
 
 fn keyboard_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("keyboard");
+    let (scroll, body, status, _right) = page("Keyboard");
     let error = label("", &["error"]);
     error.set_visible(false);
     let all = Rc::new(keyboard::all_layouts());
@@ -2990,18 +3045,18 @@ fn keyboard_page() -> gtk::ScrolledWindow {
             all.iter().find(|(c, _)| c == code).map(|(_, n)| n.to_lowercase()).unwrap_or_else(|| code.to_string())
         }
     };
-    body.append(&caption("layouts"));
+    body.append(&caption("Layouts"));
     let layouts = gtk::ListBox::new();
     layouts.add_css_class("list-card");
     layouts.set_selection_mode(gtk::SelectionMode::None);
     body.append(&layouts);
-    body.append(&caption("typing"));
+    body.append(&caption("Typing"));
     let typing = gtk::ListBox::new();
     typing.add_css_class("list-card");
     typing.set_selection_mode(gtk::SelectionMode::None);
     body.append(&typing);
     body.append(&error);
-    body.append(&caption("shortcuts"));
+    body.append(&caption("Shortcuts"));
     let keys = gtk::ListBox::new();
     keys.add_css_class("list-card");
     keys.set_selection_mode(gtk::SelectionMode::None);
@@ -3016,7 +3071,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
         let (state, error, slot) = (state.clone(), error.clone(), fill.clone());
         Rc::new(move |refill: bool| {
             if let Err(e) = keyboard::save(&state.borrow()) {
-                error.set_text(&format!("couldn't save: {e}"));
+                error.set_text(&format!("Couldn't save: {e}"));
                 error.set_visible(true);
             }
             if refill && let Some(f) = slot.borrow().clone() {
@@ -3034,7 +3089,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
             clear(&layouts);
             for (i, code) in k.layouts.iter().enumerate() {
                 let control: gtk::Widget = if k.layouts.len() > 1 {
-                    let remove = gtk::Button::with_label("remove");
+                    let remove = gtk::Button::with_label("Remove");
                     remove.add_css_class("link");
                     let (state, save, code) = (state.clone(), save.clone(), code.clone());
                     remove.connect_clicked(move |_| {
@@ -3058,7 +3113,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
                 .collect();
             let pick = dropdown(&labels, choices.iter().position(|(c, _)| c == "in").unwrap_or(0));
             pick.set_enable_search(true);
-            let add = gtk::Button::with_label("add");
+            let add = gtk::Button::with_label("Add");
             add.add_css_class("link");
             add.add_css_class("accent");
             let controls = gtk::Box::new(gtk::Orientation::Horizontal, 14);
@@ -3073,7 +3128,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
                     }
                 });
             }
-            layouts.append(&setting_row("add a layout", &controls));
+            layouts.append(&setting_row("Add a layout", &controls));
 
             clear(&typing);
             if k.layouts.len() > 1 {
@@ -3085,7 +3140,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
                     state.borrow_mut().switch = keyboard::SWITCHES[d.selected() as usize].0.to_string();
                     save(false);
                 });
-                typing.append(&setting_row("switch layouts with", &d));
+                typing.append(&setting_row("Switch layouts with", &d));
             }
             let delays: Vec<String> = keyboard::DELAYS.iter().map(|d| d.1.to_string()).collect();
             let delay = dropdown(&delays, keyboard::DELAYS.iter().position(|d| d.0 == k.delay).unwrap_or(2));
@@ -3096,7 +3151,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
                     save(false);
                 });
             }
-            typing.append(&setting_row("wait before a held key repeats", &delay));
+            typing.append(&setting_row("Wait before a held key repeats", &delay));
             let rates: Vec<String> = keyboard::RATES.iter().map(|r| r.1.to_string()).collect();
             let rate = dropdown(&rates, keyboard::RATES.iter().position(|r| r.0 == k.rate).unwrap_or(1));
             {
@@ -3106,10 +3161,10 @@ fn keyboard_page() -> gtk::ScrolledWindow {
                     save(false);
                 });
             }
-            typing.append(&setting_row("repeat speed", &rate));
+            typing.append(&setting_row("Repeat speed", &rate));
             typing.append(&setting_row(
-                "type indian languages in english letters",
-                &label("comes in a later update", &["row-sub"]),
+                "Type indian languages in English letters",
+                &label("Comes in a later update", &["row-sub"]),
             ));
         }));
     }
@@ -3123,7 +3178,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
 }
 
 fn pointer_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("mouse & touchpad");
+    let (scroll, body, status, _right) = page("Mouse & touchpad");
     let error = label("", &["error"]);
     error.set_visible(false);
     let state = Rc::new(RefCell::new(pointer::current()));
@@ -3131,7 +3186,7 @@ fn pointer_page() -> gtk::ScrolledWindow {
         let (state, error) = (state.clone(), error.clone());
         Rc::new(move || {
             if let Err(e) = pointer::save(&state.borrow()) {
-                error.set_text(&format!("couldn't save: {e}"));
+                error.set_text(&format!("Couldn't save: {e}"));
                 error.set_visible(true);
             }
         })
@@ -3160,36 +3215,36 @@ fn pointer_page() -> gtk::ScrolledWindow {
     };
     let p = state.borrow().clone();
     let touchpad = pointer::has_touchpad();
-    status.set_text(if touchpad { "touchpad found" } else { "no touchpad · mouse only" });
+    status.set_text(if touchpad { "Touchpad found" } else { "No touchpad · mouse only" });
     if touchpad {
-        body.append(&caption("touchpad"));
+        body.append(&caption("Touchpad"));
         let list = gtk::ListBox::new();
         list.add_css_class("list-card");
         list.set_selection_mode(gtk::SelectionMode::None);
-        list.append(&setting_row("tap to click", &switch(p.tap, |p, on| p.tap = on)));
+        list.append(&setting_row("Tap to click", &switch(p.tap, |p, on| p.tap = on)));
         list.append(&setting_row(
-            "natural scrolling: content follows your fingers",
+            "Natural scrolling: content follows your fingers",
             &switch(p.touchpad_natural, |p, on| p.touchpad_natural = on),
         ));
-        list.append(&setting_row("ignore the touchpad while typing", &switch(p.dwt, |p, on| p.dwt = on)));
-        list.append(&setting_row("speed", &speed(p.touchpad_speed, |p, v| p.touchpad_speed = v)));
-        list.append(&setting_row("gestures", &label("three fingers: switch windows and workspaces", &["row-sub"])));
+        list.append(&setting_row("Ignore the touchpad while typing", &switch(p.dwt, |p, on| p.dwt = on)));
+        list.append(&setting_row("Speed", &speed(p.touchpad_speed, |p, v| p.touchpad_speed = v)));
+        list.append(&setting_row("Gestures", &label("Three fingers: switch windows and workspaces", &["row-sub"])));
         body.append(&list);
     }
-    body.append(&caption("mouse"));
+    body.append(&caption("Mouse"));
     let list = gtk::ListBox::new();
     list.add_css_class("list-card");
     list.set_selection_mode(gtk::SelectionMode::None);
-    list.append(&setting_row("speed", &speed(p.mouse_speed, |p, v| p.mouse_speed = v)));
-    list.append(&setting_row("natural scrolling", &switch(p.mouse_natural, |p, on| p.mouse_natural = on)));
-    list.append(&setting_row("left-handed: swap the buttons", &switch(p.left_handed, |p, on| p.left_handed = on)));
+    list.append(&setting_row("Speed", &speed(p.mouse_speed, |p, v| p.mouse_speed = v)));
+    list.append(&setting_row("Natural scrolling", &switch(p.mouse_natural, |p, on| p.mouse_natural = on)));
+    list.append(&setting_row("Left-handed: swap the buttons", &switch(p.left_handed, |p, on| p.left_handed = on)));
     body.append(&list);
     body.append(&error);
     scroll
 }
 
 fn time_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("date & time");
+    let (scroll, body, status, _right) = page("Date & time");
     let error = label("", &["error"]);
     error.set_visible(false);
     let list = gtk::ListBox::new();
@@ -3211,7 +3266,7 @@ fn time_page() -> gtk::ScrolledWindow {
     let fail = {
         let error = error.clone();
         move |what: &str, e: String| {
-            error.set_text(&format!("couldn't {what}: {e}"));
+            error.set_text(&format!("Couldn't {what}: {e}"));
             error.set_visible(true);
         }
     };
@@ -3228,12 +3283,12 @@ fn time_page() -> gtk::ScrolledWindow {
                     let fail = fail.clone();
                     auto.connect_state_set(move |_, on| {
                         if let Err(e) = region::set_automatic(on) {
-                            fail("change it", e);
+                            fail("Change it", e);
                         }
                         glib::Propagation::Proceed
                     });
                 }
-                list.append(&setting_row("set the time automatically", &auto));
+                list.append(&setting_row("Set the time automatically", &auto));
                 let labels: Vec<String> = zones.iter().map(|z| region::zone_label(z)).collect();
                 let at = zones.iter().position(|z| *z == t.zone).unwrap_or(0);
                 let zone = dropdown(&labels, at);
@@ -3244,11 +3299,11 @@ fn time_page() -> gtk::ScrolledWindow {
                         let z = zones[d.selected() as usize].clone();
                         match region::set_zone(&z) {
                             Ok(()) => show_status(&z),
-                            Err(e) => fail("change the time zone", e),
+                            Err(e) => fail("Change the time zone", e),
                         }
                     });
                 }
-                list.append(&setting_row("time zone", &zone));
+                list.append(&setting_row("Time zone", &zone));
                 let twelve = gtk::Switch::new();
                 twelve.set_active(region::twelve_hour());
                 {
@@ -3256,7 +3311,7 @@ fn time_page() -> gtk::ScrolledWindow {
                     twelve.connect_state_set(move |_, on| {
                         match region::set_twelve_hour(on) {
                             Ok(()) => show_status(&zone),
-                            Err(e) => fail("save it", e.to_string()),
+                            Err(e) => fail("Save it", e.to_string()),
                         }
                         glib::Propagation::Proceed
                     });
@@ -3269,7 +3324,7 @@ fn time_page() -> gtk::ScrolledWindow {
 }
 
 fn language_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("language & region");
+    let (scroll, body, status, _right) = page("Language & region");
     let error = label("", &["error"]);
     error.set_visible(false);
     let list = gtk::ListBox::new();
@@ -3277,7 +3332,7 @@ fn language_page() -> gtk::ScrolledWindow {
     list.set_selection_mode(gtk::SelectionMode::None);
     body.append(&list);
     let note = label(
-        "region sets how dates, numbers and money are written. changes apply to apps the next time you log in. tripppin's own screens are in english for now.",
+        "Region sets how dates, numbers and money are written. Changes apply to apps the next time you log in. Tripppin's own screens are in English for now.",
         &["row-sub"],
     );
     note.set_wrap(true);
@@ -3292,12 +3347,12 @@ fn language_page() -> gtk::ScrolledWindow {
                 clear(&list);
                 let name = |l: &str| match langs.iter().find(|(c, _)| *c == l) {
                     Some((_, n)) => n.to_string(),
-                    None if l.starts_with('C') || l == "POSIX" => "english (basic)".to_string(),
+                    None if l.starts_with('C') || l == "POSIX" => "English (basic)".to_string(),
                     None => l.to_lowercase(),
                 };
                 status.set_text(&format!("{} · formats: {}", name(&lang), name(&formats)));
                 if langs.is_empty() {
-                    list.append(&setting_row("language", &label(&name(&lang), &["row-sub"])));
+                    list.append(&setting_row("Language", &label(&name(&lang), &["row-sub"])));
                     return;
                 }
                 let names: Vec<String> = langs.iter().map(|(_, n)| n.to_string()).collect();
@@ -3312,7 +3367,7 @@ fn language_page() -> gtk::ScrolledWindow {
                         match region::set_locale(l.0, f.0) {
                             Ok(()) => status.set_text(&format!("{} · formats: {} · from your next login", l.1, f.1)),
                             Err(e) => {
-                                error.set_text(&format!("couldn't change the language: {e}"));
+                                error.set_text(&format!("Couldn't change the language: {e}"));
                                 error.set_visible(true);
                             }
                         }
@@ -3322,8 +3377,8 @@ fn language_page() -> gtk::ScrolledWindow {
                     let save = save.clone();
                     d.connect_selected_notify(move |_| save());
                 }
-                list.append(&setting_row("language", &pick_lang));
-                list.append(&setting_row("region formats", &pick_formats));
+                list.append(&setting_row("Language", &pick_lang));
+                list.append(&setting_row("Region formats", &pick_formats));
             },
         );
     });
@@ -3331,8 +3386,8 @@ fn language_page() -> gtk::ScrolledWindow {
 }
 
 fn updates_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("updates");
-    let check = gtk::Button::with_label("check now");
+    let (scroll, body, status, right) = page("Updates");
+    let check = gtk::Button::with_label("Check now");
     check.add_css_class("pill");
     right.append(&check);
     let error = label("", &["error"]);
@@ -3343,7 +3398,7 @@ fn updates_page() -> gtk::ScrolledWindow {
     body.append(&list);
     body.append(&error);
     let note = label(
-        "tripppin checks once a day and downloads updates quietly. the new version starts the next time you restart, never in the middle of your work. if something's wrong after an update, go back to the version before.",
+        "Tripppin checks once a day and downloads updates quietly. The new version starts the next time you restart, never in the middle of your work. If something's wrong after an update, go back to the version before.",
         &["row-sub"],
     );
     note.set_wrap(true);
@@ -3354,7 +3409,7 @@ fn updates_page() -> gtk::ScrolledWindow {
     let fail = {
         let error = error.clone();
         move |what: &str, e: String| {
-            error.set_text(&format!("couldn't {what}: {e}"));
+            error.set_text(&format!("Couldn't {what}: {e}"));
             error.set_visible(true);
         }
     };
@@ -3369,7 +3424,7 @@ fn updates_page() -> gtk::ScrolledWindow {
                 move |(st, busy)| {
                     clear(&list);
                     check.set_sensitive(!busy);
-                    check.set_label(if busy { "checking…" } else { "check now" });
+                    check.set_label(if busy { "checking…" } else { "Check now" });
                     if busy {
                         // Look again until the check is done.
                         let slot = slot.clone();
@@ -3380,21 +3435,21 @@ fn updates_page() -> gtk::ScrolledWindow {
                         });
                     }
                     let Some(now) = &st.booted else {
-                        status.set_text("couldn't read the system version");
+                        status.set_text("Couldn't read the system version");
                         return;
                     };
                     status.set_text(&match &st.staged {
-                        Some(_) => "an update is ready · restart to finish".to_string(),
-                        None if busy => "looking for updates…".to_string(),
-                        None => "up to date".to_string(),
+                        Some(_) => "An update is ready · restart to finish".to_string(),
+                        None if busy => "Looking for updates…".to_string(),
+                        None => "Up to date".to_string(),
                     });
                     list.append(&setting_row(
-                        "this version",
+                        "This version",
                         &label(&format!("{} · {}", now.version, system::date(now.timestamp)), &["row-value"]),
                     ));
-                    list.append(&setting_row("updates from", &label(&system::channel(&now.image), &["row-value"])));
+                    list.append(&setting_row("Updates from", &label(&system::channel(&now.image), &["row-value"])));
                     if let Some(next) = &st.staged {
-                        let restart = gtk::Button::with_label("restart now");
+                        let restart = gtk::Button::with_label("Restart now");
                         restart.add_css_class("link");
                         restart.add_css_class("accent");
                         let fail = fail.clone();
@@ -3404,17 +3459,17 @@ fn updates_page() -> gtk::ScrolledWindow {
                             }
                         });
                         list.append(&setting_row(
-                            &format!("ready: {} · {}", next.version, system::date(next.timestamp)),
+                            &format!("Ready: {} · {}", next.version, system::date(next.timestamp)),
                             &restart,
                         ));
                     }
                     if let Some(prev) = &st.previous {
-                        let back = gtk::Button::with_label("go back");
+                        let back = gtk::Button::with_label("Go back");
                         back.add_css_class("link");
                         let (fail, slot) = (fail.clone(), slot.clone());
                         back.connect_clicked(move |b| {
-                            if b.label().as_deref() != Some("sure? go back") {
-                                b.set_label("sure? go back");
+                            if b.label().as_deref() != Some("Sure? Go back") {
+                                b.set_label("Sure? Go back");
                                 b.add_css_class("danger");
                                 return;
                             }
@@ -3422,7 +3477,7 @@ fn updates_page() -> gtk::ScrolledWindow {
                             let (fail, slot) = (fail.clone(), slot.clone());
                             background(system::roll_back, move |r| {
                                 if let Err(e) = r {
-                                    fail("go back", e);
+                                    fail("Go back", e);
                                 }
                                 if let Some(f) = slot.borrow().clone() {
                                     f();
@@ -3430,7 +3485,7 @@ fn updates_page() -> gtk::ScrolledWindow {
                             });
                         });
                         list.append(&setting_row(
-                            &format!("previous: {} · {}", prev.version, system::date(prev.timestamp)),
+                            &format!("Previous: {} · {}", prev.version, system::date(prev.timestamp)),
                             &back,
                         ));
                     }
@@ -3442,7 +3497,7 @@ fn updates_page() -> gtk::ScrolledWindow {
         let (slot, fail) = (load.clone(), fail.clone());
         check.connect_clicked(move |_| {
             if let Err(e) = system::check() {
-                fail("check for updates", e);
+                fail("Check for updates", e);
             }
             let slot = slot.clone();
             glib::timeout_add_local_once(std::time::Duration::from_millis(500), move || {
@@ -3465,17 +3520,17 @@ fn gb(bytes: u64) -> String {
 }
 
 fn about_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("about");
+    let (scroll, body, status, _right) = page("About");
     let error = label("", &["error"]);
     error.set_visible(false);
     body.append(&crate::common::logo(64));
     let device = gtk::ListBox::new();
     device.add_css_class("list-card");
     device.set_selection_mode(gtk::SelectionMode::None);
-    body.append(&caption("this computer"));
+    body.append(&caption("This computer"));
     body.append(&device);
     body.append(&error);
-    body.append(&caption("software"));
+    body.append(&caption("Software"));
     let software = gtk::ListBox::new();
     software.add_css_class("list-card");
     software.set_selection_mode(gtk::SelectionMode::None);
@@ -3507,52 +3562,52 @@ fn about_page() -> gtk::ScrolledWindow {
                     entry.connect_activate(move |e| {
                         let name = e.text().trim().to_lowercase();
                         if !system::valid_hostname(&name) {
-                            error.set_text("a name is letters, numbers and dashes, with no spaces");
+                            error.set_text("A name is letters, numbers and dashes, with no spaces");
                             error.set_visible(true);
                             return;
                         }
                         match system::set_hostname(&name) {
                             Ok(()) => error.set_visible(false),
                             Err(e) => {
-                                error.set_text(&format!("couldn't rename it: {e}"));
+                                error.set_text(&format!("Couldn't rename it: {e}"));
                                 error.set_visible(true);
                             }
                         }
                     });
                 }
-                device.append(&setting_row("name (press enter to save)", &entry));
+                device.append(&setting_row("Name (press enter to save)", &entry));
                 if let Some(hw) = &hw {
                     // ARM chips often don't name themselves; then only the thread count shows.
-                    let model = hw.cpu.model.to_lowercase();
+                    let model = hw.cpu.model.clone();
                     let cpu = if model.is_empty() || model == "unknown" {
                         format!("{} threads", hw.cpu.threads)
                     } else {
                         format!("{model} · {} threads", hw.cpu.threads)
                     };
-                    device.append(&setting_row("processor", &label(&cpu, &["row-value"])));
-                    device.append(&setting_row("memory", &label(&gb(hw.memory_bytes), &["row-value"])));
+                    device.append(&setting_row("Processor", &label(&cpu, &["row-value"])));
+                    device.append(&setting_row("Memory", &label(&gb(hw.memory_bytes), &["row-value"])));
                     for name in hw.gpus.iter().filter_map(|g| g.name.as_ref()) {
-                        device.append(&setting_row("graphics", &label(&name.to_lowercase(), &["row-value"])));
+                        device.append(&setting_row("Graphics", &label(name, &["row-value"])));
                     }
                 }
                 if let Some((size, free)) = disk {
                     device.append(&setting_row(
-                        "storage",
+                        "Storage",
                         &label(&format!("{} free of {}", gb(free), gb(size)), &["row-value"]),
                     ));
                 }
                 if let Some(now) = &st.booted {
                     software.append(&setting_row(
-                        "version",
+                        "Version",
                         &label(&format!("{} · {}", now.version, system::date(now.timestamp)), &["row-value"]),
                     ));
                 }
-                software.append(&setting_row("licence", &label("apache-2.0 · open source", &["row-value"])));
-                software.append(&setting_row("packages in the system", &label(&packages.to_string(), &["row-value"])));
+                software.append(&setting_row("Licence", &label("Apache-2.0 · open source", &["row-value"])));
+                software.append(&setting_row("Packages in the system", &label(&packages.to_string(), &["row-value"])));
                 let site = gtk::LinkButton::with_label("https://trippp.in", "trippp.in");
                 site.add_css_class("link");
                 site.add_css_class("accent");
-                software.append(&setting_row("website", &site));
+                software.append(&setting_row("Website", &site));
             },
         );
     });
@@ -3568,7 +3623,7 @@ fn size(bytes: u64) -> String {
 }
 
 fn storage_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("storage");
+    let (scroll, body, status, _right) = page("Storage");
     let bar = gtk::LevelBar::new();
     bar.add_css_class("usage");
     bar.set_min_value(0.0);
@@ -3578,12 +3633,12 @@ fn storage_page() -> gtk::ScrolledWindow {
     parts.add_css_class("list-card");
     parts.set_selection_mode(gtk::SelectionMode::None);
     body.append(&parts);
-    body.append(&caption("clean up"));
+    body.append(&caption("Clean up"));
     let clean = gtk::ListBox::new();
     clean.add_css_class("list-card");
     clean.set_selection_mode(gtk::SelectionMode::None);
     body.append(&clean);
-    body.append(&caption("external drives"));
+    body.append(&caption("External drives"));
     let drives = gtk::ListBox::new();
     drives.add_css_class("list-card");
     drives.set_selection_mode(gtk::SelectionMode::None);
@@ -3605,7 +3660,7 @@ fn storage_page() -> gtk::ScrolledWindow {
                 status.clone(),
                 error.clone(),
             );
-            status.set_text("measuring…");
+            status.set_text("Measuring…");
             background(
                 || (storage::usage(), storage::drives()),
                 move |(u, found)| {
@@ -3634,7 +3689,7 @@ fn storage_page() -> gtk::ScrolledWindow {
                             let (error, reload) = (error.clone(), reload.clone());
                             background(work, move |r| {
                                 if let Err(e) = r {
-                                    error.set_text(&format!("couldn't clean up: {e}"));
+                                    error.set_text(&format!("Couldn't clean up: {e}"));
                                     error.set_visible(true);
                                 }
                                 reload();
@@ -3642,19 +3697,19 @@ fn storage_page() -> gtk::ScrolledWindow {
                         });
                         setting_row(title, &b)
                     };
-                    clean.append(&action(&format!("trash · {}", size(u.trash)), "empty", || {
+                    clean.append(&action(&format!("Trash · {}", size(u.trash)), "empty", || {
                         storage::empty_trash().map_err(|e| e.to_string())
                     }));
-                    clean.append(&action(&format!("caches · {}", size(u.cache)), "clear", || {
+                    clean.append(&action(&format!("Caches · {}", size(u.cache)), "clear", || {
                         storage::clear_cache().map_err(|e| e.to_string())
                     }));
-                    clean.append(&action("app parts nothing uses any more", "remove", storage::remove_unused));
+                    clean.append(&action("App parts nothing uses any more", "remove", storage::remove_unused));
                     clear(&drives);
                     if found.is_empty() {
-                        drives.append(&setting_row("none plugged in", &label("", &["row-sub"])));
+                        drives.append(&setting_row("None plugged in", &label("", &["row-sub"])));
                     }
                     for d in found {
-                        let eject = gtk::Button::with_label("eject");
+                        let eject = gtk::Button::with_label("Eject");
                         eject.add_css_class("link");
                         eject.add_css_class("accent");
                         let title = format!("{} · {}", d.name, size(d.size));
@@ -3666,7 +3721,7 @@ fn storage_page() -> gtk::ScrolledWindow {
                                 move || storage::eject(&d),
                                 move |r| {
                                     if let Err(e) = r {
-                                        error.set_text(&format!("couldn't eject it: {e}"));
+                                        error.set_text(&format!("Couldn't eject it: {e}"));
                                         error.set_visible(true);
                                     }
                                     reload();
@@ -3722,7 +3777,7 @@ fn admin_form(
     let form = gtk::Box::new(gtk::Orientation::Vertical, 10);
     form.add_css_class("inline-form");
     let mut inputs: Vec<gtk::Editable> = Vec::new();
-    for (placeholder, secret) in fields.iter().copied().chain(std::iter::once(("your password, to confirm", true))) {
+    for (placeholder, secret) in fields.iter().copied().chain(std::iter::once(("Your password, to confirm", true))) {
         let w: gtk::Editable = if secret {
             let e = gtk::PasswordEntry::builder().placeholder_text(placeholder).show_peek_icon(true).build();
             e.add_css_class("field");
@@ -3744,7 +3799,7 @@ fn admin_form(
         go.connect_clicked(move |b| {
             let values: Vec<String> = inputs.iter().map(|i| i.text().to_string()).collect();
             if values.iter().any(String::is_empty) {
-                error.set_text("fill in every box");
+                error.set_text("Fill in every box");
                 error.set_visible(true);
                 return;
             }
@@ -3775,7 +3830,7 @@ fn admin_form(
 }
 
 fn accounts_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("accounts");
+    let (scroll, body, status, _right) = page("Accounts");
     let me_box = gtk::Box::new(gtk::Orientation::Horizontal, 18);
     body.append(&me_box);
     let you = gtk::ListBox::new();
@@ -3784,7 +3839,7 @@ fn accounts_page() -> gtk::ScrolledWindow {
     body.append(&you);
     let forms = gtk::Box::new(gtk::Orientation::Vertical, 10);
     body.append(&forms);
-    body.append(&caption("people on this computer"));
+    body.append(&caption("People on this computer"));
     let others = gtk::ListBox::new();
     others.add_css_class("list-card");
     others.set_selection_mode(gtk::SelectionMode::None);
@@ -3832,19 +3887,19 @@ fn accounts_page() -> gtk::ScrolledWindow {
                     clear(&you);
                     clear(&others);
                     let Some(me) = people.first().cloned() else {
-                        status.set_text("couldn't read the accounts");
+                        status.set_text("Couldn't read the accounts");
                         return;
                     };
                     status.set_text(&format!(
                         "{} · {}",
                         me.login,
-                        if me.admin { "administrator" } else { "standard account" }
+                        if me.admin { "administrator" } else { "Standard account" }
                     ));
                     me_box.append(&avatar(&me, 72));
                     let words = gtk::Box::new(gtk::Orientation::Vertical, 4);
                     words.set_valign(gtk::Align::Center);
                     words.append(&label(if me.name.is_empty() { &me.login } else { &me.name }, &["row-title-strong"]));
-                    let pick = gtk::Button::with_label("change picture");
+                    let pick = gtk::Button::with_label("Change picture");
                     pick.add_css_class("link");
                     pick.add_css_class("accent");
                     pick.set_halign(gtk::Align::Start);
@@ -3856,7 +3911,7 @@ fn accounts_page() -> gtk::ScrolledWindow {
                             let filters = gio::ListStore::new::<gtk::FileFilter>();
                             filters.append(&filter);
                             let dialog = gtk::FileDialog::builder()
-                                .title("choose a picture")
+                                .title("Choose a picture")
                                 .filters(&filters)
                                 .modal(true)
                                 .build();
@@ -3871,7 +3926,7 @@ fn accounts_page() -> gtk::ScrolledWindow {
                                         match accounts::set_picture(&me, &path.to_string_lossy()) {
                                             Ok(()) => reload(),
                                             Err(e) => {
-                                                error.set_text(&format!("couldn't change the picture: {e}"));
+                                                error.set_text(&format!("Couldn't change the picture: {e}"));
                                                 error.set_visible(true);
                                             }
                                         }
@@ -3885,7 +3940,7 @@ fn accounts_page() -> gtk::ScrolledWindow {
 
                     let name = gtk::Entry::new();
                     name.set_text(&me.name);
-                    name.set_placeholder_text(Some("your full name"));
+                    name.set_placeholder_text(Some("Your full name"));
                     name.add_css_class("field");
                     name.set_width_chars(22);
                     {
@@ -3893,21 +3948,21 @@ fn accounts_page() -> gtk::ScrolledWindow {
                         name.connect_activate(move |e| match accounts::set_name(&me, e.text().trim()) {
                             Ok(()) => reload(),
                             Err(err) => {
-                                error.set_text(&format!("couldn't change the name: {err}"));
+                                error.set_text(&format!("Couldn't change the name: {err}"));
                                 error.set_visible(true);
                             }
                         });
                     }
-                    you.append(&setting_row("name (press enter to save)", &name));
+                    you.append(&setting_row("Name (press enter to save)", &name));
 
                     // Password: a form opens under the list.
-                    let pw = gtk::Button::with_label("change");
+                    let pw = gtk::Button::with_label("Change");
                     pw.add_css_class("link");
                     pw.add_css_class("accent");
                     let login = me.login.clone();
                     let (pw_form, _) = admin_form(
-                        &[("new password", true)],
-                        "change password",
+                        &[("New password", true)],
+                        "Change password",
                         &error,
                         move |v| accounts::set_password(&v[1], &login, &v[0]),
                         reload.clone(),
@@ -3917,17 +3972,17 @@ fn accounts_page() -> gtk::ScrolledWindow {
                         let f = pw_form.clone();
                         pw.connect_clicked(move |_| f.set_visible(!f.is_visible()));
                     }
-                    you.append(&setting_row("password", &pw));
+                    you.append(&setting_row("Password", &pw));
                     forms.append(&pw_form);
 
                     let auto_on = auto.as_deref() == Some(me.login.as_str());
-                    let auto_btn = gtk::Button::with_label(if auto_on { "turn off" } else { "turn on" });
+                    let auto_btn = gtk::Button::with_label(if auto_on { "Turn off" } else { "Turn on" });
                     auto_btn.add_css_class("link");
                     auto_btn.add_css_class("accent");
                     let login = me.login.clone();
                     let (auto_form, _) = admin_form(
                         &[],
-                        if auto_on { "turn off" } else { "turn on" },
+                        if auto_on { "Turn off" } else { "Turn on" },
                         &error,
                         move |v| accounts::set_auto_login(&v[0], if auto_on { None } else { Some(&login) }),
                         reload.clone(),
@@ -3938,7 +3993,7 @@ fn accounts_page() -> gtk::ScrolledWindow {
                         auto_btn.connect_clicked(move |_| f.set_visible(!f.is_visible()));
                     }
                     you.append(&setting_row(
-                        if auto_on { "logs in without a password · on" } else { "log in without a password" },
+                        if auto_on { "Logs in without a password · on" } else { "Log in without a password" },
                         &auto_btn,
                     ));
                     forms.append(&auto_form);
@@ -3957,11 +4012,11 @@ fn accounts_page() -> gtk::ScrolledWindow {
                         row.append(&text);
                         others.append(&row);
                     }
-                    let add = gtk::Button::with_label("add a person");
+                    let add = gtk::Button::with_label("Add a person");
                     add.add_css_class("link");
                     add.add_css_class("accent");
                     let admin =
-                        gtk::CheckButton::with_label("administrator: can install software and change system settings");
+                        gtk::CheckButton::with_label("Administrator: can install software and change system settings");
                     let shared = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
                     {
                         let shared = shared.clone();
@@ -3970,7 +4025,7 @@ fn accounts_page() -> gtk::ScrolledWindow {
                         });
                     }
                     let (add_form, inputs) = admin_form(
-                        &[("their full name", false), ("login name", false), ("their password", true)],
+                        &[("Their full name", false), ("Login name", false), ("Their password", true)],
                         "add",
                         &error,
                         move |v| {
@@ -4030,45 +4085,45 @@ fn card() -> gtk::ListBox {
 }
 
 fn privacy_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("privacy");
-    status.set_text("what apps and the system may see");
+    let (scroll, body, status, _right) = page("Privacy");
+    status.set_text("What apps and the system may see");
     let error = label("", &["error"]);
     error.set_visible(false);
 
     let general = card();
     general.append(&setting_row(
-        "location: apps may ask where you are",
+        "Location: apps may ask where you are",
         &gsettings_switch("org.gnome.system.location", "enabled"),
     ));
     let recent = gtk::Box::new(gtk::Orientation::Horizontal, 14);
-    let clear_recent = gtk::Button::with_label("clear");
+    let clear_recent = gtk::Button::with_label("Clear");
     clear_recent.add_css_class("link");
     clear_recent.add_css_class("accent");
     {
         let error = error.clone();
         clear_recent.connect_clicked(move |b| match privacy::clear_recent() {
-            Ok(()) => b.set_label("cleared"),
+            Ok(()) => b.set_label("Cleared"),
             Err(e) => {
-                error.set_text(&format!("couldn't clear it: {e}"));
+                error.set_text(&format!("Couldn't clear it: {e}"));
                 error.set_visible(true);
             }
         });
     }
     recent.append(&clear_recent);
     recent.append(&gsettings_switch("org.gnome.desktop.privacy", "remember-recent-files"));
-    general.append(&setting_row("remember recently opened files", &recent));
-    general.append(&setting_row("the lock screen", &label("shows the time, never notifications", &["row-sub"])));
+    general.append(&setting_row("Remember recently opened files", &recent));
+    general.append(&setting_row("The lock screen", &label("Shows the time, never notifications", &["row-sub"])));
     body.append(&general);
 
-    body.append(&caption("camera"));
+    body.append(&caption("Camera"));
     let camera = card();
     body.append(&camera);
-    let mic_note = label("apps that play sound can also use the microphone.", &["row-sub"]);
+    let mic_note = label("Apps that play sound can also use the microphone.", &["row-sub"]);
     mic_note.set_wrap(true);
     mic_note.set_xalign(0.0);
     body.append(&mic_note);
 
-    body.append(&caption("firewall"));
+    body.append(&caption("Firewall"));
     let firewall = card();
     body.append(&firewall);
     let fw_forms = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -4086,7 +4141,7 @@ fn privacy_page() -> gtk::ScrolledWindow {
                 move |(cams, fw, installed)| {
                     clear(&camera);
                     if cams.is_empty() {
-                        camera.append(&setting_row("no app has asked for the camera yet", &label("", &["row-sub"])));
+                        camera.append(&setting_row("No app has asked for the camera yet", &label("", &["row-sub"])));
                     }
                     for (id, allowed) in cams {
                         let name =
@@ -4104,10 +4159,10 @@ fn privacy_page() -> gtk::ScrolledWindow {
                         fw_forms.remove(&c);
                     }
                     let Some(on) = fw else {
-                        firewall.append(&setting_row("firewall", &label("comes with the next update", &["row-sub"])));
+                        firewall.append(&setting_row("Firewall", &label("Comes with the next update", &["row-sub"])));
                         return;
                     };
-                    let toggle = gtk::Button::with_label(if on { "turn off" } else { "turn on" });
+                    let toggle = gtk::Button::with_label(if on { "Turn off" } else { "Turn on" });
                     toggle.add_css_class("link");
                     toggle.add_css_class("accent");
                     let reload = {
@@ -4120,7 +4175,7 @@ fn privacy_page() -> gtk::ScrolledWindow {
                     };
                     let (form, _) = admin_form(
                         &[],
-                        if on { "turn the firewall off" } else { "turn the firewall on" },
+                        if on { "Turn the firewall off" } else { "Turn the firewall on" },
                         &error,
                         move |v| {
                             let how = if on { "disable" } else { "enable" };
@@ -4134,7 +4189,7 @@ fn privacy_page() -> gtk::ScrolledWindow {
                         toggle.connect_clicked(move |_| f.set_visible(!f.is_visible()));
                     }
                     firewall.append(&setting_row(
-                        if on { "on · blocks connections nobody asked for" } else { "off" },
+                        if on { "On · blocks connections nobody asked for" } else { "off" },
                         &toggle,
                     ));
                     fw_forms.append(&form);
@@ -4151,12 +4206,12 @@ fn privacy_page() -> gtk::ScrolledWindow {
 }
 
 fn accessibility_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page("accessibility");
-    status.set_text("seeing, moving and typing");
+    let (scroll, body, status, _right) = page("Accessibility");
+    status.set_text("Seeing, moving and typing");
     let error = label("", &["error"]);
     error.set_visible(false);
 
-    body.append(&caption("seeing"));
+    body.append(&caption("Seeing"));
     let seeing = card();
     if privacy::has_orca() {
         let reader = gtk::Switch::new();
@@ -4165,9 +4220,9 @@ fn accessibility_page() -> gtk::ScrolledWindow {
             privacy::set_screen_reader(on);
             glib::Propagation::Proceed
         });
-        seeing.append(&setting_row("screen reader: reads the screen aloud", &reader));
+        seeing.append(&setting_row("Screen reader: reads the screen aloud", &reader));
     } else {
-        seeing.append(&setting_row("screen reader", &label("comes with the next update", &["row-sub"])));
+        seeing.append(&setting_row("Screen reader", &label("Comes with the next update", &["row-sub"])));
     }
     let large = gtk::Switch::new();
     large.set_active(
@@ -4178,9 +4233,9 @@ fn accessibility_page() -> gtk::ScrolledWindow {
         privacy::gsettings_set("org.gnome.desktop.interface", "text-scaling-factor", if on { "1.25" } else { "1.0" });
         glib::Propagation::Proceed
     });
-    seeing.append(&setting_row("larger text", &large));
+    seeing.append(&setting_row("Larger text", &large));
     seeing
-        .append(&setting_row("high contrast", &gsettings_switch("org.gnome.desktop.a11y.interface", "high-contrast")));
+        .append(&setting_row("High contrast", &gsettings_switch("org.gnome.desktop.a11y.interface", "high-contrast")));
     let names: Vec<String> = privacy::CURSOR_SIZES.iter().map(|c| c.1.to_string()).collect();
     let now = privacy::CURSOR_SIZES.iter().position(|c| c.0 == privacy::cursor_size()).unwrap_or(0);
     let cursor = dropdown(&names, now);
@@ -4188,16 +4243,16 @@ fn accessibility_page() -> gtk::ScrolledWindow {
         let error = error.clone();
         cursor.connect_selected_notify(move |d| {
             if let Err(e) = privacy::set_cursor_size(privacy::CURSOR_SIZES[d.selected() as usize].0) {
-                error.set_text(&format!("couldn't save: {e}"));
+                error.set_text(&format!("Couldn't save: {e}"));
                 error.set_visible(true);
             }
         });
     }
-    seeing.append(&setting_row("pointer size", &cursor));
-    seeing.append(&setting_row("zoom in on part of the screen", &label("not available yet", &["row-sub"])));
+    seeing.append(&setting_row("Pointer size", &cursor));
+    seeing.append(&setting_row("Zoom in on part of the screen", &label("Not available yet", &["row-sub"])));
     body.append(&seeing);
 
-    body.append(&caption("moving and typing"));
+    body.append(&caption("Moving and typing"));
     let moving = card();
     let motion = gtk::Switch::new();
     motion.set_active(display::reduce_motion());
@@ -4206,23 +4261,23 @@ fn accessibility_page() -> gtk::ScrolledWindow {
         gsettings_set("enable-animations", if on { "false" } else { "true" });
         glib::Propagation::Proceed
     });
-    moving.append(&setting_row("reduce motion", &motion));
+    moving.append(&setting_row("Reduce motion", &motion));
     moving.append(&setting_row(
-        "sticky keys: press shortcuts one key at a time",
-        &label("not available yet", &["row-sub"]),
+        "Sticky keys: press shortcuts one key at a time",
+        &label("Not available yet", &["row-sub"]),
     ));
-    moving.append(&setting_row("do things by asking", &label("super + space, then say it in words", &["row-sub"])));
+    moving.append(&setting_row("Do things by asking", &label("Super + Space, then say it in words", &["row-sub"])));
     body.append(&moving);
     body.append(&error);
     scroll
 }
 
 const PROXY_MODES: [(&str, &str); 3] =
-    [("none", "no proxy"), ("auto", "automatic (a pac address)"), ("manual", "one proxy for everything")];
+    [("none", "No proxy"), ("auto", "Automatic (a PAC address)"), ("manual", "One proxy for everything")];
 
 fn network_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("network & vpn");
-    let advanced = gtk::Button::with_label("advanced");
+    let (scroll, body, status, right) = page("Network & VPN");
+    let advanced = gtk::Button::with_label("Advanced");
     advanced.add_css_class("link");
     advanced.add_css_class("accent");
     advanced.connect_clicked(|_| {
@@ -4231,10 +4286,10 @@ fn network_page() -> gtk::ScrolledWindow {
     right.append(&advanced);
     let links = gtk::Box::new(gtk::Orientation::Vertical, 22);
     body.append(&links);
-    body.append(&caption("vpn"));
+    body.append(&caption("VPN"));
     let vpns = card();
     body.append(&vpns);
-    body.append(&caption("proxy"));
+    body.append(&caption("Proxy"));
     let proxy = card();
     body.append(&proxy);
     let error = label("", &["error"]);
@@ -4286,7 +4341,7 @@ fn network_page() -> gtk::ScrolledWindow {
                 "auto" => privacy::gsettings_set("org.gnome.system.proxy", "autoconfig-url", &text),
                 "manual" => {
                     let Some((host, port)) = text.rsplit_once(':').filter(|(_, p)| p.parse::<u16>().is_ok()) else {
-                        error.set_text("write it as host:port, like proxy.example.com:8080");
+                        error.set_text("Write it as host:port, like proxy.example.com:8080");
                         error.set_visible(true);
                         return;
                     };
@@ -4300,8 +4355,8 @@ fn network_page() -> gtk::ScrolledWindow {
             error.set_visible(false);
         });
     }
-    proxy.append(&setting_row("proxy", &mode));
-    proxy.append(&setting_row("address (press enter to save)", &address));
+    proxy.append(&setting_row("Proxy", &mode));
+    proxy.append(&setting_row("Address (press enter to save)", &address));
 
     let load: LoadSlot = Rc::new(RefCell::new(None));
     {
@@ -4325,11 +4380,11 @@ fn network_page() -> gtk::ScrolledWindow {
                     }
                     status.set_text(&match found.first() {
                         Some(l) => format!(
-                            "connected · {} · {}",
+                            "Connected · {} · {}",
                             l.connection.to_lowercase(),
-                            l.ipv4.first().map(|a| a.split('/').next().unwrap_or(a)).unwrap_or("no address")
+                            l.ipv4.first().map(|a| a.split('/').next().unwrap_or(a)).unwrap_or("No address")
                         ),
-                        None => "not connected".to_string(),
+                        None => "Not connected".to_string(),
                     });
                     for l in &found {
                         let what = match l.kind.as_str() {
@@ -4342,26 +4397,26 @@ fn network_page() -> gtk::ScrolledWindow {
                         let c = card();
                         let value = |v: &str| label(v, &["row-value"]);
                         if !l.ipv4.is_empty() {
-                            c.append(&setting_row("address", &value(&l.ipv4.join(", "))));
+                            c.append(&setting_row("Address", &value(&l.ipv4.join(", "))));
                         }
                         if !l.gateway.is_empty() {
-                            c.append(&setting_row("router", &value(&l.gateway)));
+                            c.append(&setting_row("Router", &value(&l.gateway)));
                         }
                         if !l.dns.is_empty() {
-                            c.append(&setting_row("dns", &value(&l.dns.join(", "))));
+                            c.append(&setting_row("DNS", &value(&l.dns.join(", "))));
                         }
                         if !l.ipv6.is_empty() {
-                            c.append(&setting_row("ipv6", &value(&l.ipv6.join(", "))));
+                            c.append(&setting_row("IPv6", &value(&l.ipv6.join(", "))));
                         }
                         if !l.hardware.is_empty() {
-                            c.append(&setting_row("hardware address", &value(&l.hardware)));
+                            c.append(&setting_row("Hardware address", &value(&l.hardware)));
                         }
                         links.append(&c);
                     }
                     clear(&vpns);
                     for (name, _kind, active) in saved {
                         let controls = gtk::Box::new(gtk::Orientation::Horizontal, 14);
-                        let remove = gtk::Button::with_label("remove");
+                        let remove = gtk::Button::with_label("Remove");
                         remove.add_css_class("link");
                         let toggle = gtk::Switch::new();
                         toggle.set_active(active);
@@ -4373,7 +4428,7 @@ fn network_page() -> gtk::ScrolledWindow {
                                     move || nm::vpn_up(&name, on),
                                     move |r| {
                                         if let Err(e) = r {
-                                            error.set_text(&format!("couldn't change the vpn: {e}"));
+                                            error.set_text(&format!("Couldn't change the VPN: {e}"));
                                             error.set_visible(true);
                                         }
                                         reload();
@@ -4385,13 +4440,13 @@ fn network_page() -> gtk::ScrolledWindow {
                         {
                             let (name, error, reload) = (name.clone(), error.clone(), reload.clone());
                             remove.connect_clicked(move |b| {
-                                if b.label().as_deref() != Some("sure? remove") {
-                                    b.set_label("sure? remove");
+                                if b.label().as_deref() != Some("Sure? Remove") {
+                                    b.set_label("Sure? Remove");
                                     b.add_css_class("danger");
                                     return;
                                 }
                                 if let Err(e) = nm::remove_connection(&name) {
-                                    error.set_text(&format!("couldn't remove it: {e}"));
+                                    error.set_text(&format!("Couldn't remove it: {e}"));
                                     error.set_visible(true);
                                 }
                                 reload();
@@ -4399,9 +4454,9 @@ fn network_page() -> gtk::ScrolledWindow {
                         }
                         controls.append(&remove);
                         controls.append(&toggle);
-                        vpns.append(&setting_row(&name.to_lowercase(), &controls));
+                        vpns.append(&setting_row(&name, &controls));
                     }
-                    let add = gtk::Button::with_label("add from a file (wireguard .conf or openvpn .ovpn)");
+                    let add = gtk::Button::with_label("Add from a file (WireGuard .conf or OpenVPN .ovpn)");
                     add.add_css_class("link");
                     add.add_css_class("accent");
                     {
@@ -4410,11 +4465,11 @@ fn network_page() -> gtk::ScrolledWindow {
                             let filter = gtk::FileFilter::new();
                             filter.add_pattern("*.conf");
                             filter.add_pattern("*.ovpn");
-                            filter.set_name(Some("vpn settings"));
+                            filter.set_name(Some("VPN settings"));
                             let filters = gio::ListStore::new::<gtk::FileFilter>();
                             filters.append(&filter);
                             let dialog = gtk::FileDialog::builder()
-                                .title("choose a vpn file")
+                                .title("Choose a VPN file")
                                 .filters(&filters)
                                 .modal(true)
                                 .build();
@@ -4429,7 +4484,7 @@ fn network_page() -> gtk::ScrolledWindow {
                                         match nm::import_vpn(&path.to_string_lossy()) {
                                             Ok(()) => reload(),
                                             Err(e) => {
-                                                error.set_text(&format!("couldn't add that vpn: {e}"));
+                                                error.set_text(&format!("Couldn't add that VPN: {e}"));
                                                 error.set_visible(true);
                                             }
                                         }
@@ -4455,8 +4510,8 @@ fn network_page() -> gtk::ScrolledWindow {
 }
 
 fn printers_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("printers & scanners");
-    let add = gtk::Button::with_label("add a printer");
+    let (scroll, body, status, right) = page("Printers & scanners");
+    let add = gtk::Button::with_label("Add a printer");
     add.add_css_class("link");
     add.add_css_class("accent");
     add.connect_clicked(|_| {
@@ -4465,21 +4520,21 @@ fn printers_page() -> gtk::ScrolledWindow {
     right.append(&add);
     let list = card();
     body.append(&list);
-    body.append(&caption("waiting to print"));
+    body.append(&caption("Waiting to print"));
     let queue = card();
     body.append(&queue);
-    body.append(&caption("scanners"));
+    body.append(&caption("Scanners"));
     let scan = card();
-    let open = gtk::Button::with_label("open the scanner");
+    let open = gtk::Button::with_label("Open the scanner");
     open.add_css_class("link");
     open.add_css_class("accent");
     open.connect_clicked(|_| {
         let _ = std::process::Command::new("simple-scan").spawn();
     });
-    scan.append(&setting_row("scan a page or a photo", &open));
+    scan.append(&setting_row("Scan a page or a photo", &open));
     body.append(&scan);
     let note =
-        label("printers on your wi-fi or plugged in by usb show up by themselves; most need no driver.", &["row-sub"]);
+        label("Printers on your Wi-Fi or plugged in by USB show up by themselves; most need no driver.", &["row-sub"]);
     note.set_wrap(true);
     note.set_xalign(0.0);
     body.append(&note);
@@ -4507,22 +4562,22 @@ fn printers_page() -> gtk::ScrolledWindow {
                     clear(&list);
                     clear(&queue);
                     let Some(found) = found else {
-                        status.set_text("printing comes with the next update");
+                        status.set_text("Printing comes with the next update");
                         add.set_visible(false);
                         scan.set_visible(false);
-                        list.append(&setting_row("printers", &label("comes with the next update", &["row-sub"])));
-                        queue.append(&setting_row("nothing waiting", &label("", &["row-sub"])));
+                        list.append(&setting_row("Printers", &label("Comes with the next update", &["row-sub"])));
+                        queue.append(&setting_row("Nothing waiting", &label("", &["row-sub"])));
                         return;
                     };
                     let count =
                         if found.len() == 1 { "1 printer".to_string() } else { format!("{} printers", found.len()) };
                     status.set_text(&match found.iter().find(|p| p.default) {
                         Some(p) => format!("{count} · default: {}", p.name.replace('_', " ").to_lowercase()),
-                        None if found.is_empty() => "no printers found".to_string(),
+                        None if found.is_empty() => "No printers found".to_string(),
                         None => count,
                     });
                     if found.is_empty() {
-                        list.append(&setting_row("no printers found yet", &label("", &["row-sub"])));
+                        list.append(&setting_row("No printers found yet", &label("", &["row-sub"])));
                     }
                     let fail = {
                         let error = error.clone();
@@ -4547,40 +4602,40 @@ fn printers_page() -> gtk::ScrolledWindow {
                         let sub = if p.default { format!("{} · default", p.state) } else { p.state.clone() };
                         text.append(&label(&sub, &if p.default { vec!["row-sub", "on"] } else { vec!["row-sub"] }));
                         row.append(&text);
-                        let test = gtk::Button::with_label("test page");
+                        let test = gtk::Button::with_label("Test page");
                         test.add_css_class("link");
                         {
                             let (name, fail, reload) = (p.name.clone(), fail.clone(), reload.clone());
                             test.connect_clicked(move |_| match printers::test_page(&name) {
                                 Ok(()) => reload(),
-                                Err(e) => fail(format!("couldn't print: {e}")),
+                                Err(e) => fail(format!("Couldn't print: {e}")),
                             });
                         }
                         row.append(&test);
                         if !p.default {
-                            let make = gtk::Button::with_label("make default");
+                            let make = gtk::Button::with_label("Make default");
                             make.add_css_class("link");
                             make.add_css_class("accent");
                             let (name, fail, reload) = (p.name.clone(), fail.clone(), reload.clone());
                             make.connect_clicked(move |_| match printers::set_default(&name) {
                                 Ok(()) => reload(),
-                                Err(e) => fail(format!("couldn't change it: {e}")),
+                                Err(e) => fail(format!("Couldn't change it: {e}")),
                             });
                             row.append(&make);
                         }
                         list.append(&row);
                     }
                     if jobs.is_empty() {
-                        queue.append(&setting_row("nothing waiting", &label("", &["row-sub"])));
+                        queue.append(&setting_row("Nothing waiting", &label("", &["row-sub"])));
                     }
                     for j in jobs {
-                        let stop = gtk::Button::with_label("cancel");
+                        let stop = gtk::Button::with_label("Cancel");
                         stop.add_css_class("link");
                         let (fail, reload) = (fail.clone(), reload.clone());
                         let id = j.id.clone();
                         stop.connect_clicked(move |_| match printers::cancel(&id) {
                             Ok(()) => reload(),
-                            Err(e) => fail(format!("couldn't cancel it: {e}")),
+                            Err(e) => fail(format!("Couldn't cancel it: {e}")),
                         });
                         queue.append(&setting_row(
                             &format!("{} · {}", j.printer.replace('_', " ").to_lowercase(), j.size),
@@ -4604,11 +4659,11 @@ fn printers_page() -> gtk::ScrolledWindow {
 fn store_section(error: &gtk::Label) -> gtk::Box {
     let section = gtk::Box::new(gtk::Orientation::Vertical, 12);
     let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some("search apps: photo editor, spotify, discord…"));
+    search.set_placeholder_text(Some("Search apps: photo editor, Spotify, Discord…"));
     search.add_css_class("search");
     let results = card();
     results.set_visible(false);
-    let hint = label("or just ask tripppin: super + space, \"install a photo editor\".", &["row-sub"]);
+    let hint = label("Or just ask Tripppin: Super + Space, \"install a photo editor\".", &["row-sub"]);
     hint.set_xalign(0.0);
     section.append(&search);
     section.append(&results);
@@ -4621,14 +4676,14 @@ fn store_section(error: &gtk::Label) -> gtk::Box {
         }
         clear(&results);
         results.set_visible(true);
-        results.append(&setting_row("looking on flathub…", &label("", &["row-sub"])));
+        results.append(&setting_row("Looking on Flathub…", &label("", &["row-sub"])));
         let (results, error) = (results.clone(), error.clone());
         background(
             move || (apps::search(&query), apps::flatpaks()),
             move |(found, have)| {
                 clear(&results);
                 if found.is_empty() {
-                    results.append(&setting_row("nothing found; try other words", &label("", &["row-sub"])));
+                    results.append(&setting_row("Nothing found; try other words", &label("", &["row-sub"])));
                 }
                 for app in found {
                     let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
@@ -4636,8 +4691,8 @@ fn store_section(error: &gtk::Label) -> gtk::Box {
                     let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
                     text.set_hexpand(true);
                     text.set_valign(gtk::Align::Center);
-                    text.append(&label(&app.name.to_lowercase(), &["row-title"]));
-                    let sub = label(&app.summary.to_lowercase(), &["row-sub"]);
+                    text.append(&label(&app.name, &["row-title"]));
+                    let sub = label(&app.summary, &["row-sub"]);
                     sub.set_ellipsize(gtk::pango::EllipsizeMode::End);
                     sub.set_max_width_chars(48);
                     text.append(&sub);
@@ -4651,16 +4706,16 @@ fn store_section(error: &gtk::Label) -> gtk::Box {
                     let id = app.id.clone();
                     install.connect_clicked(move |b| {
                         b.set_sensitive(false);
-                        b.set_label("installing…");
+                        b.set_label("Installing…");
                         let (b, error, id) = (b.clone(), error.clone(), id.clone());
                         background(
                             move || apps::install(&id),
                             move |r| match r {
-                                Ok(()) => b.set_label("installed"),
+                                Ok(()) => b.set_label("Installed"),
                                 Err(e) => {
-                                    b.set_label("install");
+                                    b.set_label("Install");
                                     b.set_sensitive(true);
-                                    error.set_text(&format!("couldn't install it: {e}"));
+                                    error.set_text(&format!("Couldn't install it: {e}"));
                                     error.set_visible(true);
                                 }
                             },

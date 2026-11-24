@@ -47,9 +47,9 @@ pub fn battery() -> Option<Battery> {
 /// One line for the page's status: "84% · 2.1 hours left" or "charging · 84%".
 pub fn summary(b: &Battery) -> String {
     match b.state.as_str() {
-        "charging" if !b.time_left.is_empty() => format!("charging · {}% · full in {}", b.percent, b.time_left),
-        "charging" => format!("charging · {}%", b.percent),
-        "fully-charged" => "fully charged · plugged in".to_string(),
+        "charging" if !b.time_left.is_empty() => format!("Charging · {}% · full in {}", b.percent, b.time_left),
+        "charging" => format!("Charging · {}%", b.percent),
+        "fully-charged" => "Fully charged · plugged in".to_string(),
         _ if !b.time_left.is_empty() => format!("{}% · {} left", b.percent, b.time_left),
         _ => format!("{}%", b.percent),
     }

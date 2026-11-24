@@ -4,6 +4,8 @@
 
 [customizations.installer.kickstart]
 contents = """
+# The computer's name starts as "tripppin" (the Network & Host Name screen can change it).
+network --hostname=tripppin
 %post --erroronfail
 bootc switch --mutate-in-place --transport registry ghcr.io/notakshayp/tripppin:nightly-amd64
 %end
