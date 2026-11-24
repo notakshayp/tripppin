@@ -14,6 +14,11 @@
 //! continues the same conversation; the history button lists earlier conversations (the orb's
 //! and the terminal's) to read or continue; "continue in terminal" opens the conversation in
 //! the AI shell.
+//!
+//! Several requests can run at once, each with its own session, stop flag, thread and events
+//! (tagged with the session id). The card shows one; chips under its header switch between
+//! them, and the history lists them first ("Running now", "Open now") with a way back. While
+//! the card is open the rest of the screen dims softly; clicking the dim puts the card away.
 
 use crate::common::{self, icons, label};
 use gtk::prelude::*;
@@ -30,6 +35,8 @@ use trip::model::{PlanStep, Usage};
 use trip::session::Session;
 
 const SUGGESTIONS: [&str; 3] = ["free up some space", "connect my headphones", "what changed today?"];
+
+const ORB_TIP: &str = "ask tripppin (super + space)\ndrag to move it · right-click to tuck it away";
 
 /// Space between the orb's glow and the screen edge, and room for the bar at the top.
 const EDGE: i32 = 6;
@@ -142,36 +149,46 @@ enum Event {
     Done(Result<(), String>, Box<Session>),
 }
 
-/// The agent's progress, sent across to the GTK thread.
-struct Sender(async_channel::Sender<Event>);
+/// The agent's progress, sent across to the GTK thread, tagged with its request's id so each
+/// request's events reach that request whichever is on show.
+struct Sender {
+    tx: async_channel::Sender<(String, Event)>,
+    id: String,
+}
+
+impl Sender {
+    fn send(&self, event: Event) {
+        let _ = self.tx.send_blocking((self.id.clone(), event));
+    }
+}
 
 impl Ui for Sender {
     fn text(&mut self, piece: &str) {
-        let _ = self.0.send_blocking(Event::Text(piece.to_string()));
+        self.send(Event::Text(piece.to_string()));
     }
     fn step(&mut self, label: &str, detail: &str) {
-        let _ = self.0.send_blocking(Event::Step(label.to_string(), detail.to_string()));
+        self.send(Event::Step(label.to_string(), detail.to_string()));
     }
     fn output(&mut self, line: &str) {
-        let _ = self.0.send_blocking(Event::Output(line.to_string()));
+        self.send(Event::Output(line.to_string()));
     }
     fn note(&mut self, text: &str) {
-        let _ = self.0.send_blocking(Event::Note(text.to_string()));
+        self.send(Event::Note(text.to_string()));
     }
     fn step_done(&mut self, ok: bool) {
-        let _ = self.0.send_blocking(Event::StepDone(ok));
+        self.send(Event::StepDone(ok));
     }
     fn thinking(&mut self) {
-        let _ = self.0.send_blocking(Event::Thinking);
+        self.send(Event::Thinking);
     }
     fn waiting(&mut self, what: &str) {
-        let _ = self.0.send_blocking(Event::Waiting(what.to_string()));
+        self.send(Event::Waiting(what.to_string()));
     }
     fn usage(&mut self, usage: &Usage) {
-        let _ = self.0.send_blocking(Event::Usage(usage.clone()));
+        self.send(Event::Usage(usage.clone()));
     }
     fn plan(&mut self, steps: &[PlanStep]) {
-        let _ = self.0.send_blocking(Event::Plan(steps.to_vec()));
+        self.send(Event::Plan(steps.to_vec()));
     }
 }
 
@@ -717,18 +734,92 @@ fn meter(state: Rc<Cell<Meter>>) -> gtk::DrawingArea {
     area
 }
 
-struct State {
-    cancel: Arc<AtomicBool>,
-    busy: bool,
-    started: Option<Instant>,
+/// One conversation the orb has open: running, or finished and still on show. Several can run
+/// at once, each with its own session, stop flag, thread and events; the card shows one.
+struct Request {
+    /// The session's id, which also tags the request's events.
+    id: String,
+    title: String,
+    /// What the card's header says over it ("you asked", or when it was).
+    caption: String,
+    /// Away in the agent's thread while it works.
+    session: RefCell<Option<Session>>,
+    cancel: RefCell<Arc<AtomicBool>>,
+    busy: Cell<bool>,
+    stopping: Cell<bool>,
+    /// Finished while another was on show; it stays until it's been looked at.
+    unseen: Cell<bool>,
+    started: Cell<Option<Instant>>,
     /// What it's doing or waiting on, for the status line.
-    phase: String,
-    answer: String,
-    /// The conversation in the card; away in the agent's thread while it works.
-    session: Option<Session>,
-    /// Its id, also while the agent has it.
-    session_id: Option<String>,
-    turn: Option<Rc<TurnView>>,
+    phase: RefCell<String>,
+    /// The status once it's finished ("done in 0:12").
+    ended: RefCell<String>,
+    answer: RefCell<String>,
+    turn: RefCell<Option<Rc<TurnView>>>,
+    /// Its turns; in the card's scroller while it's the one on show.
+    turns: gtk::Box,
+    /// Its context meter, and the tooltip saying how full.
+    meter: Cell<Meter>,
+    meter_tip: RefCell<String>,
+    /// The conversation's tokens so far, and the tooltip with the split.
+    total: RefCell<(String, String)>,
+}
+
+impl Request {
+    fn new(session: Session, title: &str, caption: &str) -> Rc<Self> {
+        Rc::new(Request {
+            id: session.id.clone(),
+            title: title.to_string(),
+            caption: caption.to_string(),
+            session: RefCell::new(Some(session)),
+            cancel: RefCell::new(Arc::new(AtomicBool::new(false))),
+            busy: Cell::new(false),
+            stopping: Cell::new(false),
+            unseen: Cell::new(false),
+            started: Cell::new(None),
+            phase: RefCell::new(String::new()),
+            ended: RefCell::new(String::new()),
+            answer: RefCell::new(String::new()),
+            turn: RefCell::new(None),
+            turns: gtk::Box::new(gtk::Orientation::Vertical, 14),
+            meter: Cell::new(Meter::default()),
+            meter_tip: RefCell::new(String::new()),
+            total: RefCell::new((String::new(), String::new())),
+        })
+    }
+
+    /// "m:ss" since it started.
+    fn elapsed(&self) -> String {
+        let secs = self.started.get().map_or(0, |t| t.elapsed().as_secs());
+        format!("{}:{:02}", secs / 60, secs % 60)
+    }
+}
+
+/// What the tabs and the history say about a request the orb has open.
+pub fn request_state(busy: bool, shown: bool, unseen: bool) -> &'static str {
+    match (busy, shown, unseen) {
+        (true, _, _) => "Running now",
+        (false, true, _) => "Open now",
+        (false, false, true) => "Finished, not opened yet",
+        (false, false, false) => "Finished",
+    }
+}
+
+/// The bar's word for what the orb is doing: nothing, "● working", or "● 2 running".
+pub fn bar_status(running: usize) -> String {
+    match running {
+        0 => String::new(),
+        1 => "● working".into(),
+        n => format!("● {n} running"),
+    }
+}
+
+#[derive(Default)]
+struct State {
+    /// Every request open in the orb: those running, the one on show, and any that finished
+    /// unseen.
+    requests: Vec<Rc<Request>>,
+    shown: Option<Rc<Request>>,
 }
 
 struct Orb {
@@ -753,7 +844,16 @@ struct Orb {
     meter_state: Rc<Cell<Meter>>,
     total: gtk::Label,
     scroller: gtk::ScrolledWindow,
-    inner: gtk::Box,
+    /// Each open request's conversation; the one on show is visible.
+    convos: gtk::Stack,
+    /// A chip for each open request, to switch between them, when there's more than one.
+    tabs: gtk::Box,
+    tabs_row: gtk::ScrolledWindow,
+    back: gtk::Button,
+    /// The soft dim over the rest of the screen while the card is open.
+    dim: gtk::Window,
+    dim_box: gtk::Box,
+    dim_wanted: Rc<Cell<bool>>,
     follow: gtk::Entry,
     follow_row: gtk::Box,
     terminal: gtk::Button,
@@ -821,7 +921,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     button.add_css_class("orb");
     let logo = common::logo(18);
     button.set_child(Some(&logo));
-    button.set_tooltip_text(Some("ask tripppin (super + space)\ndrag to move it · right-click to tuck it away"));
+    button.set_tooltip_text(Some(ORB_TIP));
     button.set_halign(gtk::Align::Center);
     button.set_valign(gtk::Align::Center);
     button.set_margin_top(GLOW);
@@ -936,7 +1036,8 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
 
     // ---- the card, next to the orb: the conversation, or the history ----
     let card = layer_window(app, "tripppin-orb-card");
-    card.set_layer(Layer::Top);
+    // Above the dim (on the top layer), with the orb, which joins it while the dim is up.
+    card.set_layer(Layer::Overlay);
     card.set_exclusive_zone(-1);
     card.set_keyboard_mode(KeyboardMode::OnDemand);
     let body = gtk::Box::new(gtk::Orientation::Vertical, 10);
@@ -975,13 +1076,15 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let asked = label("", &["asked"]);
     asked.set_wrap(true);
     asked.set_max_width_chars(44);
-    let inner = gtk::Box::new(gtk::Orientation::Vertical, 14);
-    // Steps and answers scroll once they outgrow the card; the newest stays in view.
+    // Steps and answers scroll once they outgrow the card; the newest stays in view. The
+    // request on show puts its own turns in here.
     let scroller = gtk::ScrolledWindow::new();
     scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     scroller.set_propagate_natural_height(true);
     scroller.set_max_content_height(MAX_LIST);
-    scroller.set_child(Some(&inner));
+    let convos = gtk::Stack::new();
+    convos.set_vhomogeneous(false);
+    scroller.set_child(Some(&convos));
     let follow_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     follow_row.add_css_class("follow-row");
     let follow = gtk::Entry::new();
@@ -1010,6 +1113,19 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     past.set_propagate_natural_height(true);
     past.set_max_content_height(MAX_LIST + 60);
     past.set_child(Some(&sessions));
+    // Back to the request that's running or was open (Escape does the same).
+    let back = gtk::Button::new();
+    let back_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    back_box.append(&common::icon(icons::CHEVRON_LEFT, &["link-icon"]));
+    back_box.append(&gtk::Label::new(Some("Back to current request")));
+    back.set_child(Some(&back_box));
+    back.add_css_class("link");
+    back.add_css_class("history-back");
+    back.set_halign(gtk::Align::Start);
+    back.set_tooltip_text(Some("Back to the request that's running or open (Esc)"));
+    let history_page = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    history_page.append(&back);
+    history_page.append(&past);
 
     let pages = gtk::Stack::new();
     pages.set_transition_type(gtk::StackTransitionType::Crossfade);
@@ -1017,7 +1133,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     pages.set_vhomogeneous(false);
     pages.set_interpolate_size(true);
     pages.add_named(&talk, Some("talk"));
-    pages.add_named(&past, Some("history"));
+    pages.add_named(&history_page, Some("history"));
 
     let foot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     foot.add_css_class("card-foot");
@@ -1044,11 +1160,35 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let meter_state = Rc::new(Cell::new(Meter::default()));
     let context_meter = meter(meter_state.clone());
     context_meter.set_visible(false);
+    // Open requests, to switch between, once there's more than one.
+    let tabs = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    tabs.add_css_class("request-tabs");
+    // Sideways scrolling, so many tabs never widen the card.
+    let tabs_row = gtk::ScrolledWindow::new();
+    tabs_row.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Never);
+    tabs_row.set_propagate_natural_height(true);
+    tabs_row.set_child(Some(&tabs));
+    tabs_row.set_visible(false);
     body.append(&top);
     body.append(&context_meter);
+    body.append(&tabs_row);
     body.append(&pages);
     body.append(&foot);
     card.set_child(Some(&body));
+
+    // ---- the dim: the rest of the screen, softly darker while the card is open ----
+    let dim = layer_window(app, "tripppin-orb-dim");
+    dim.set_layer(Layer::Top);
+    for e in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
+        dim.set_anchor(e, true);
+    }
+    dim.set_exclusive_zone(-1);
+    dim.set_keyboard_mode(KeyboardMode::None);
+    let dim_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    dim_box.add_css_class("orb-dim");
+    dim_box.set_hexpand(true);
+    dim_box.set_vexpand(true);
+    dim.set_child(Some(&dim_box));
 
     let orb = Rc::new(Orb {
         corner_window: corner.clone(),
@@ -1072,7 +1212,13 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
         meter_state,
         total,
         scroller,
-        inner,
+        convos,
+        tabs,
+        tabs_row,
+        back: back.clone(),
+        dim,
+        dim_box: dim_box.clone(),
+        dim_wanted: Rc::new(Cell::new(false)),
         follow,
         follow_row,
         terminal,
@@ -1083,16 +1229,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
         apps: RefCell::new(Vec::new()),
         shade: shade.clone(),
         column: column.clone(),
-        state: RefCell::new(State {
-            cancel: Arc::new(AtomicBool::new(false)),
-            busy: false,
-            started: None,
-            phase: String::new(),
-            answer: String::new(),
-            session: None,
-            session_id: None,
-            turn: None,
-        }),
+        state: RefCell::new(State::default()),
     });
 
     orb.place_card();
@@ -1107,6 +1244,28 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     {
         let o = orb.clone();
         history.connect_clicked(move |_| o.show_history());
+    }
+    {
+        let o = orb.clone();
+        back.connect_clicked(move |_| {
+            o.back_from_history();
+        });
+    }
+    // Clicking the dim puts the card away, like Escape.
+    let dim_click = gtk::GestureClick::new();
+    {
+        let o = orb.clone();
+        dim_click.connect_released(move |_, _, _, _| o.minimise());
+    }
+    dim_box.add_controller(dim_click);
+    // However the card goes away, the dim goes with it.
+    {
+        let o = orb.clone();
+        orb.card.connect_visible_notify(move |c| {
+            if !c.is_visible() {
+                o.set_dim(false);
+            }
+        });
     }
     {
         let o = orb.clone();
@@ -1181,7 +1340,9 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
         let o = orb.clone();
         card_keys.connect_key_pressed(move |_, key, _, _| {
             if key == gdk::Key::Escape {
-                o.minimise();
+                if !o.back_from_history() {
+                    o.minimise();
+                }
                 glib::Propagation::Stop
             } else {
                 glib::Propagation::Proceed
@@ -1275,9 +1436,8 @@ fn write_status(text: &str) {
 
 impl Orb {
     fn toggle(self: &Rc<Self>) {
-        let busy = self.state.borrow().busy;
-        let has_result = self.state.borrow().session_id.is_some();
-        if busy || (has_result && self.card.is_visible()) {
+        let (running, shown) = (self.running() > 0, self.shown().is_some());
+        if running || (shown && self.card.is_visible()) {
             if self.card.is_visible() {
                 self.minimise();
             } else {
@@ -1288,35 +1448,41 @@ impl Orb {
         if self.ask.is_visible() {
             self.close_ask();
         } else {
-            self.card.set_visible(false);
-            self.entry.set_text("");
-            // The model may have arrived since the orb started (first boot downloads it).
-            self.model.set_text(&model_line());
-            *self.apps.borrow_mut() = crate::apps::installed();
-            self.match_apps("");
-            self.ask.present();
-            common::play(&self.shade, "fade");
-            common::play(&self.column, "pop");
-            self.entry.grab_focus();
-            if self.hint.opacity() > 0.0 {
-                self.hint.set_opacity(0.0);
-                let file = used_file();
-                if let Some(dir) = file.parent() {
-                    let _ = std::fs::create_dir_all(dir);
-                }
-                let _ = std::fs::write(file, "");
-            }
+            self.open_ask();
         }
     }
 
+    /// The ask bar, for something new. Requests already running carry on.
+    fn open_ask(self: &Rc<Self>) {
+        self.card.set_visible(false);
+        self.entry.set_text("");
+        // The model may have arrived since the orb started (first boot downloads it).
+        self.model.set_text(&model_line());
+        *self.apps.borrow_mut() = crate::apps::installed();
+        self.match_apps("");
+        self.ask.present();
+        common::play(&self.shade, "fade");
+        common::play(&self.column, "pop");
+        self.entry.grab_focus();
+        if self.hint.opacity() > 0.0 {
+            self.hint.set_opacity(0.0);
+            let file = used_file();
+            if let Some(dir) = file.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(file, "");
+        }
+    }
+
+    /// Stop applies to the request on show; with nothing running there, it closes the card.
     fn stop_or_close(&self) {
-        let st = self.state.borrow();
-        if st.busy {
-            st.cancel.store(true, Ordering::Relaxed);
-            self.stop.set_label("stopping…");
-        } else {
-            drop(st);
-            leave(&self.card, &self.body);
+        match self.shown() {
+            Some(req) if req.busy.get() => {
+                req.cancel.borrow().store(true, Ordering::Relaxed);
+                req.stopping.set(true);
+                self.stop.set_label("stopping…");
+            }
+            _ => self.minimise(),
         }
     }
 
@@ -1325,13 +1491,42 @@ impl Orb {
     }
 
     fn show_card(&self) {
+        self.set_dim(true);
         self.card.present();
         common::play(&self.body, if self.corner.get().top() { "drop" } else { "rise" });
     }
 
     /// Back into the orb; it keeps glowing while it works, and a click brings the card back.
     fn minimise(&self) {
+        self.set_dim(false);
         leave(&self.card, &self.body);
+    }
+
+    /// Softly dims the rest of the screen under the card, lifting the orb above the dim, or
+    /// fades the dim away and puts the orb back on its usual layer.
+    fn set_dim(&self, on: bool) {
+        if self.dim_wanted.replace(on) == on {
+            return;
+        }
+        if on {
+            self.corner_window.set_layer(Layer::Overlay);
+            self.dim_box.remove_css_class("out");
+            self.dim.present();
+            common::play(&self.dim_box, "fade");
+            return;
+        }
+        self.dim_box.add_css_class("out");
+        let (dim, dim_box, corner, wanted) =
+            (self.dim.clone(), self.dim_box.clone(), self.corner_window.clone(), self.dim_wanted.clone());
+        glib::timeout_add_local_once(std::time::Duration::from_millis(170), move || {
+            // Opened again meanwhile: leave it up.
+            if wanted.get() {
+                return;
+            }
+            dim.set_visible(false);
+            dim_box.remove_css_class("out");
+            corner.set_layer(Layer::Top);
+        });
     }
 
     /// Puts the card beside the orb, on the screen side of its corner.
@@ -1503,10 +1698,11 @@ impl Orb {
         self.close_ask();
     }
 
-    /// A new request from the ask bar: a new conversation. An app's exact name opens the app.
+    /// A new request from the ask bar: a new conversation, alongside any still running. An app's
+    /// exact name opens the app.
     fn submit(self: &Rc<Self>) {
         let text = self.entry.text().trim().to_string();
-        if text.is_empty() || self.state.borrow().busy {
+        if text.is_empty() {
             return;
         }
         let exact = self.apps.borrow().iter().find(|a| a.name.eq_ignore_ascii_case(&text)).cloned();
@@ -1515,158 +1711,272 @@ impl Orb {
             return;
         }
         self.ask.set_visible(false);
-        self.clear_talk();
-        self.asked.set_text(&text);
-        self.caption.set_text("you asked");
-        let session = Session::new("orb");
-        self.state.borrow_mut().session_id = Some(session.id.clone());
-        self.begin(session, text, TurnView::new(None));
+        let req = Request::new(Session::new("orb"), &text, "you asked");
+        self.show_request(&req);
+        self.begin(&req, text, TurnView::new(None));
     }
 
     /// A follow-up in the card: the same conversation, so the model knows what came before.
     fn follow_up(self: &Rc<Self>) {
         let text = self.follow.text().trim().to_string();
-        if text.is_empty() || self.state.borrow().busy {
+        let Some(req) = self.shown() else { return };
+        if text.is_empty() || req.busy.get() || req.session.borrow().is_none() {
             return;
         }
-        let Some(session) = self.state.borrow_mut().session.take() else { return };
         self.follow.set_text("");
-        self.begin(session, text.clone(), TurnView::new(Some(&text)));
+        self.begin(&req, text.clone(), TurnView::new(Some(&text)));
     }
 
-    fn clear_talk(&self) {
-        while let Some(child) = self.inner.first_child() {
-            self.inner.remove(&child);
-        }
-        self.scroller.set_min_content_height(0);
-        self.pages.set_visible_child_name("talk");
-        // A different conversation: its tokens start again.
-        self.meter_state.set(Meter::default());
-        self.meter.set_visible(false);
-        self.total.set_visible(false);
-    }
-
-    /// Back to the ask bar for something unrelated.
+    /// Back to the ask bar for something new; anything running carries on beside it.
     fn start_new(self: &Rc<Self>) {
-        if self.state.borrow().busy {
+        self.open_ask();
+    }
+
+    fn shown(&self) -> Option<Rc<Request>> {
+        self.state.borrow().shown.clone()
+    }
+
+    fn is_shown(&self, req: &Rc<Request>) -> bool {
+        self.state.borrow().shown.as_ref().is_some_and(|s| Rc::ptr_eq(s, req))
+    }
+
+    /// How many requests are running.
+    fn running(&self) -> usize {
+        self.state.borrow().requests.iter().filter(|r| r.busy.get()).count()
+    }
+
+    /// Puts a request on show in the card: its conversation, status, meter and tokens. Finished
+    /// requests already looked at leave the tabs (the history keeps them).
+    fn show_request(self: &Rc<Self>, req: &Rc<Request>) {
+        let gone: Vec<Rc<Request>> = {
+            let mut st = self.state.borrow_mut();
+            let (keep, gone) = std::mem::take(&mut st.requests)
+                .into_iter()
+                .partition(|r| r.busy.get() || r.unseen.get() || Rc::ptr_eq(r, req));
+            st.requests = keep;
+            if !st.requests.iter().any(|r| Rc::ptr_eq(r, req)) {
+                st.requests.push(req.clone());
+            }
+            st.shown = Some(req.clone());
+            gone
+        };
+        for r in gone {
+            self.convos.remove(&r.turns);
+        }
+        req.unseen.set(false);
+        if req.turns.parent().is_none() {
+            self.convos.add_child(&req.turns);
+        }
+        self.convos.set_visible_child(&req.turns);
+        self.asked.set_text(&req.title);
+        self.caption.set_text(&req.caption);
+        self.pages.set_visible_child_name("talk");
+        self.refresh_shown();
+        self.refresh_tabs();
+        self.refresh_orb();
+        self.scroll_to_end();
+    }
+
+    /// The card's header and footer, from the request on show.
+    fn refresh_shown(&self) {
+        let Some(req) = self.shown() else { return };
+        let busy = req.busy.get();
+        self.working.set_visible(busy);
+        if busy {
+            self.tick();
+        } else {
+            self.status.set_text(&req.ended.borrow());
+            self.status.set_tooltip_text(None);
+        }
+        let m = Meter { busy, ..req.meter.get() };
+        self.meter_state.set(m);
+        self.meter.set_visible(busy || m.fill.is_some());
+        let tip = req.meter_tip.borrow();
+        self.meter.set_tooltip_text((!tip.is_empty()).then_some(tip.as_str()));
+        self.meter.queue_draw();
+        let (total, total_tip) = req.total.borrow().clone();
+        self.total.set_text(&total);
+        self.total.set_tooltip_text(Some(&total_tip));
+        self.total.set_visible(!total.is_empty());
+        self.stop.set_label(if !busy {
+            "close"
+        } else if req.stopping.get() {
+            "stopping…"
+        } else {
+            "stop"
+        });
+        let talking = self.pages.visible_child_name().as_deref() == Some("talk");
+        self.follow_row.set_visible(!busy && talking);
+        self.terminal.set_sensitive(talking);
+    }
+
+    /// The orb and the bar: working while anything runs, and how many.
+    fn refresh_orb(&self) {
+        let n = self.running();
+        if n > 0 {
+            self.button.add_css_class("working");
+        } else {
+            self.button.remove_css_class("working");
+        }
+        let tip = if n > 1 { format!("{n} requests running · click to see them") } else { ORB_TIP.to_string() };
+        self.button.set_tooltip_text(Some(&tip));
+        write_status(&bar_status(n));
+    }
+
+    /// A chip for each open request, the one on show marked, once there's more than one.
+    fn refresh_tabs(self: &Rc<Self>) {
+        while let Some(child) = self.tabs.first_child() {
+            self.tabs.remove(&child);
+        }
+        let (list, shown) = {
+            let st = self.state.borrow();
+            (st.requests.clone(), st.shown.clone())
+        };
+        self.tabs_row.set_visible(list.len() > 1);
+        if list.len() < 2 {
             return;
         }
-        {
-            let mut st = self.state.borrow_mut();
-            st.session = None;
-            st.session_id = None;
-            st.turn = None;
+        for r in list {
+            let on_show = shown.as_ref().is_some_and(|s| Rc::ptr_eq(s, &r));
+            let b = gtk::Button::new();
+            b.add_css_class("request-tab");
+            if on_show {
+                b.add_css_class("selected");
+            }
+            let inner = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            let mark: gtk::Widget = if r.busy.get() {
+                common::pulse_dot(6).upcast()
+            } else {
+                let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                dot.add_css_class("request-tab-dot");
+                if r.unseen.get() {
+                    dot.add_css_class("unseen");
+                }
+                dot.upcast()
+            };
+            mark.set_valign(gtk::Align::Center);
+            inner.append(&mark);
+            inner.append(&gtk::Label::new(Some(&clip(&r.title, 18))));
+            b.set_child(Some(&inner));
+            let state = request_state(r.busy.get(), on_show, r.unseen.get());
+            b.set_tooltip_text(Some(&format!("{}\n{state}", r.title)));
+            let o = self.clone();
+            b.connect_clicked(move |_| o.show_request(&r));
+            self.tabs.append(&b);
         }
-        self.card.set_visible(false);
-        self.toggle();
     }
 
-    fn begin(self: &Rc<Self>, mut session: Session, text: String, view: Rc<TurnView>) {
-        self.inner.append(&view.root);
-        self.pages.set_visible_child_name("talk");
-        self.stop.set_label("stop");
-        self.follow_row.set_visible(false);
-        self.terminal.set_sensitive(true);
+    fn begin(self: &Rc<Self>, req: &Rc<Request>, text: String, view: Rc<TurnView>) {
+        let Some(mut session) = req.session.borrow_mut().take() else { return };
+        req.turns.append(&view.root);
         let cancel = Arc::new(AtomicBool::new(false));
-        {
-            let mut st = self.state.borrow_mut();
-            st.busy = true;
-            st.started = Some(Instant::now());
-            st.phase = "thinking".into();
-            st.answer.clear();
-            st.cancel = cancel.clone();
-            st.turn = Some(view);
+        *req.cancel.borrow_mut() = cancel.clone();
+        req.busy.set(true);
+        req.stopping.set(false);
+        req.started.set(Some(Instant::now()));
+        *req.phase.borrow_mut() = "thinking".into();
+        req.ended.borrow_mut().clear();
+        req.answer.borrow_mut().clear();
+        *req.turn.borrow_mut() = Some(view);
+        if self.is_shown(req) {
+            self.pages.set_visible_child_name("talk");
+            self.refresh_shown();
+            self.show_card();
+            self.scroll_to_end();
         }
-        self.button.add_css_class("working");
-        self.working.set_visible(true);
-        self.meter_state.set(Meter { busy: true, ..self.meter_state.get() });
-        self.meter.set_visible(true);
-        // The meter's sweep runs only while it works.
-        let weak = Rc::downgrade(self);
-        self.meter.add_tick_callback(move |m, _| {
-            m.queue_draw();
-            match weak.upgrade() {
-                Some(orb) if orb.state.borrow().busy => glib::ControlFlow::Continue,
-                _ => glib::ControlFlow::Break,
-            }
-        });
-        write_status("● working");
-        self.show_card();
-        self.tick();
-        self.scroll_to_end();
+        self.refresh_tabs();
+        self.refresh_orb();
         // A live status with a running clock, so it's clear the orb is still at it.
-        let weak = Rc::downgrade(self);
-        glib::timeout_add_seconds_local(1, move || match weak.upgrade() {
-            Some(orb) if orb.state.borrow().busy => {
-                orb.tick();
+        let (weak, r) = (Rc::downgrade(self), Rc::downgrade(req));
+        glib::timeout_add_seconds_local(1, move || match (weak.upgrade(), r.upgrade()) {
+            (Some(orb), Some(req)) if req.busy.get() => {
+                if orb.is_shown(&req) {
+                    orb.tick();
+                }
                 glib::ControlFlow::Continue
             }
             _ => glib::ControlFlow::Break,
         });
+        // The meter's sweep runs while it works.
+        let r = Rc::downgrade(req);
+        self.meter.add_tick_callback(move |m, _| {
+            m.queue_draw();
+            if r.upgrade().is_some_and(|r| r.busy.get()) {
+                glib::ControlFlow::Continue
+            } else {
+                glib::ControlFlow::Break
+            }
+        });
 
-        let (tx, rx) = async_channel::unbounded::<Event>();
+        // Its own thread and channel; other requests may be running tools at the same time.
+        let (tx, rx) = async_channel::unbounded::<(String, Event)>();
+        let id = req.id.clone();
         std::thread::spawn(move || {
             session.ask(&text);
-            let mut ui = Sender(tx.clone());
+            let mut ui = Sender { tx: tx.clone(), id: id.clone() };
             let result = agent::run(&mut session, &cancel, &mut ui).map(|_| ()).map_err(|e| format!("{e:#}"));
-            let _ = tx.send_blocking(Event::Done(result, Box::new(session)));
+            let _ = tx.send_blocking((id, Event::Done(result, Box::new(session))));
         });
         let orb = self.clone();
         glib::spawn_future_local(async move {
-            while let Ok(event) = rx.recv().await {
+            while let Ok((id, event)) = rx.recv().await {
                 let done = matches!(event, Event::Done(..));
-                orb.apply(event);
+                let req = orb.state.borrow().requests.iter().find(|r| r.id == id).cloned();
+                if let Some(req) = req {
+                    orb.apply(&req, event);
+                    // Straight away, not at the next second, so the status keeps up.
+                    if !done && orb.is_shown(&req) {
+                        orb.tick();
+                    }
+                }
                 if done {
                     break;
                 }
-                // Straight away, not at the next second, so the status keeps up with each event.
-                orb.tick();
             }
         });
     }
 
-    fn elapsed(&self) -> String {
-        let secs = self.state.borrow().started.map_or(0, |t| t.elapsed().as_secs());
-        format!("{}:{:02}", secs / 60, secs % 60)
-    }
-
-    /// The status line: what it's doing or waiting on, and a clock that keeps running.
+    /// The status line: what the request on show is doing or waiting on, and a clock that
+    /// keeps running.
     fn tick(&self) {
-        let phase = clip(&self.state.borrow().phase, 40);
-        let text = format!("{phase} · {}", self.elapsed());
-        self.status.set_text(&text);
-        self.status.set_tooltip_text(Some(&self.state.borrow().phase));
+        let Some(req) = self.shown() else { return };
+        if !req.busy.get() {
+            return;
+        }
+        let phase = req.phase.borrow().clone();
+        self.status.set_text(&format!("{} · {}", clip(&phase, 40), req.elapsed()));
+        self.status.set_tooltip_text(Some(&phase));
     }
 
-    /// A reply's tokens: the line under the request, the context meter and the session total.
-    fn show_usage(&self, turn: &TurnView, u: &Usage) {
+    /// A reply's tokens: the line under the request, its context meter and session total.
+    fn show_usage(&self, req: &Rc<Request>, turn: &TurnView, u: &Usage) {
         turn.add_usage(u);
         if let Some(p) = context_percent(u) {
-            self.meter_state.set(Meter { fill: Some(f64::from(p) / 100.0), ..self.meter_state.get() });
-            self.meter.set_tooltip_text(Some(&format!(
-                "context {p}% full · {} of {} tokens",
-                tokens(u.prompt + u.completion),
-                tokens(u.context)
-            )));
-            self.meter.set_visible(true);
-            self.meter.queue_draw();
+            req.meter.set(Meter { fill: Some(f64::from(p) / 100.0), ..req.meter.get() });
+            *req.meter_tip.borrow_mut() =
+                format!("context {p}% full · {} of {} tokens", tokens(u.prompt + u.completion), tokens(u.context));
         }
         let all = u.session_prompt + u.session_completion;
         if all > 0 {
-            self.total.set_text(&format!("session {}", tokens(all)));
-            self.total.set_tooltip_text(Some(&format!(
-                "this conversation so far: {} tokens read, {} written",
-                tokens(u.session_prompt),
-                tokens(u.session_completion)
-            )));
-            self.total.set_visible(true);
+            *req.total.borrow_mut() = (
+                format!("session {}", tokens(all)),
+                format!(
+                    "this conversation so far: {} tokens read, {} written",
+                    tokens(u.session_prompt),
+                    tokens(u.session_completion)
+                ),
+            );
+        }
+        if self.is_shown(req) {
+            self.refresh_shown();
         }
     }
 
     /// Grows the list with its content up to `MAX_LIST`, then it scrolls; keeps the newest in view.
     /// (A layer-shell window doesn't grow on its own when its content does.)
     fn scroll_to_end(&self) {
-        let (scroller, inner) = (self.scroller.clone(), self.inner.clone());
+        let Some(req) = self.shown() else { return };
+        let (scroller, inner) = (self.scroller.clone(), req.turns.clone());
         glib::idle_add_local_once(move || {
             let width = scroller.width().max(360);
             let (_, natural, _, _) = inner.measure(gtk::Orientation::Vertical, width);
@@ -1678,31 +1988,36 @@ impl Orb {
         });
     }
 
-    fn apply(&self, event: Event) {
-        let mut st = self.state.borrow_mut();
-        let Some(turn) = st.turn.clone() else { return };
+    /// One of a request's events, whether or not it's the one on show.
+    fn apply(self: &Rc<Self>, req: &Rc<Request>, event: Event) {
+        let Some(turn) = req.turn.borrow().clone() else { return };
+        let shown = self.is_shown(req);
         match event {
             Event::Text(piece) => {
-                st.phase = "answering".into();
-                st.answer.push_str(&piece);
-                turn.set_answer(&st.answer);
-                self.scroll_to_end();
+                *req.phase.borrow_mut() = "answering".into();
+                req.answer.borrow_mut().push_str(&piece);
+                turn.set_answer(&req.answer.borrow());
+                if shown {
+                    self.scroll_to_end();
+                }
             }
-            Event::Thinking => st.phase = "thinking".into(),
+            Event::Thinking => *req.phase.borrow_mut() = "thinking".into(),
             Event::Waiting(what) => {
                 if !what.trim().is_empty() {
-                    st.phase = what;
+                    *req.phase.borrow_mut() = what;
                 }
             }
             Event::Usage(u) => {
-                drop(st);
-                self.show_usage(&turn, &u);
-                self.scroll_to_end();
+                self.show_usage(req, &turn, &u);
+                if shown {
+                    self.scroll_to_end();
+                }
             }
             Event::Plan(steps) => {
-                drop(st);
                 turn.set_plan(&steps);
-                self.scroll_to_end();
+                if shown {
+                    self.scroll_to_end();
+                }
             }
             Event::StepDone(ok) => {
                 if let Some(last) = turn.last() {
@@ -1710,15 +2025,17 @@ impl Orb {
                 }
             }
             Event::Step(kind, detail) => {
-                st.phase = describe(&kind, &detail);
+                *req.phase.borrow_mut() = describe(&kind, &detail);
                 if let Some(last) = turn.last() {
                     last.finish(true);
                 }
                 // Text before a tool call is the model thinking aloud; the steps say it better.
-                st.answer.clear();
+                req.answer.borrow_mut().clear();
                 turn.set_answer("");
                 turn.add_step(StepRow::new(&describe(&kind, &detail), &detail));
-                self.scroll_to_end();
+                if shown {
+                    self.scroll_to_end();
+                }
             }
             Event::Output(line) => {
                 // Progress bars redraw with carriage returns; show the latest state of the line.
@@ -1738,47 +2055,92 @@ impl Orb {
                 }
             }
             Event::Done(result, session) => {
-                st.busy = false;
-                st.session = Some(*session);
+                req.busy.set(false);
+                *req.session.borrow_mut() = Some(*session);
                 let ok = result.is_ok();
                 if let Some(last) = turn.last() {
                     last.finish(ok);
                 }
-                let took = st.started.map_or(0, |t| t.elapsed().as_secs());
+                let took = req.started.get().map_or(0, |t| t.elapsed().as_secs());
                 let verb = if ok { "done in" } else { "stopped after" };
-                self.status.set_text(&format!("{verb} {}:{:02}", took / 60, took % 60));
+                *req.ended.borrow_mut() = format!("{verb} {}:{:02}", took / 60, took % 60);
                 if let Err(e) = result {
                     let msg = if e == "stopped" { "stopped.".to_string() } else { e };
                     turn.set_answer(&msg);
                 }
-                self.scroll_to_end();
-                // Finished while minimised: come back to show the answer.
-                if !self.card.is_visible() {
-                    self.show_card();
-                }
-                self.button.remove_css_class("working");
-                self.working.set_visible(false);
-                let m = Meter { busy: false, ..self.meter_state.get() };
-                self.meter_state.set(m);
-                self.meter.set_visible(m.fill.is_some());
-                self.meter.queue_draw();
-                self.stop.set_label("close");
-                self.follow_row.set_visible(true);
-                write_status("");
-                let summary = st.answer.trim().lines().next().unwrap_or("done").to_string();
+                let summary = req.answer.borrow().trim().lines().next().unwrap_or("done").to_string();
                 let _ = std::fs::write(common::runtime_dir().join("last-done"), summary);
+                if !self.card.is_visible() {
+                    // Finished while the card was put away: come back to show it.
+                    self.show_request(req);
+                    self.show_card();
+                } else if shown {
+                    self.refresh_shown();
+                    self.scroll_to_end();
+                } else {
+                    // Another is on show: its tab says this one is ready.
+                    req.unseen.set(true);
+                }
+                self.refresh_tabs();
+                self.refresh_orb();
             }
         }
     }
 
-    /// Earlier conversations, newest first; one click opens it here to read or continue.
+    /// Back from the history to the request that's running or was open. False when there's
+    /// nothing to go back to (or the history isn't showing).
+    fn back_from_history(self: &Rc<Self>) -> bool {
+        if self.pages.visible_child_name().as_deref() != Some("history") {
+            return false;
+        }
+        let Some(req) = self.shown() else { return false };
+        self.show_request(&req);
+        true
+    }
+
+    /// Earlier conversations, newest first, under the ones open here (running now, or open
+    /// now); one click opens it here to read or continue.
     fn show_history(self: &Rc<Self>) {
         self.caption.set_text("earlier requests");
         while let Some(child) = self.sessions.first_child() {
             self.sessions.remove(&child);
         }
-        let list = trip::session::list(40);
-        if list.is_empty() {
+        let (mut open, shown) = {
+            let st = self.state.borrow();
+            (st.requests.clone(), st.shown.clone())
+        };
+        let on_show = |r: &Rc<Request>| shown.as_ref().is_some_and(|s| Rc::ptr_eq(s, r));
+        // Running first, then the one open, then any finished unseen.
+        open.sort_by_key(|r| (!r.busy.get(), !on_show(r)));
+        for r in &open {
+            let mark: gtk::Widget = if r.busy.get() {
+                let dot = common::pulse_dot(8);
+                dot.set_margin_top(4);
+                dot.set_margin_start(4);
+                dot.set_margin_end(4);
+                dot.upcast()
+            } else {
+                tick(icons::CHECK, false).upcast()
+            };
+            let mut words = request_state(r.busy.get(), on_show(r), r.unseen.get()).to_string();
+            if r.busy.get() {
+                words.push_str(&format!(" · {}", clip(&r.phase.borrow(), 32)));
+            }
+            let row = session_row(&mark, &r.title, &words);
+            row.add_css_class("current");
+            if on_show(r) {
+                row.add_css_class("on-show");
+            }
+            let click = gtk::GestureClick::new();
+            {
+                let (o, r) = (self.clone(), r.clone());
+                click.connect_released(move |_, _, _, _| o.show_request(&r));
+            }
+            row.add_controller(click);
+            self.sessions.append(&row);
+        }
+        let list: Vec<_> = trip::session::list(40).into_iter().filter(|s| !open.iter().any(|r| r.id == s.id)).collect();
+        if list.is_empty() && open.is_empty() {
             let empty = label("nothing yet. what you ask here and in the terminal shows up in this list.", &["hint"]);
             empty.set_wrap(true);
             empty.set_margin_top(12);
@@ -1787,29 +2149,17 @@ impl Orb {
         }
         let now = trip::session::now_secs();
         for s in list {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-            row.add_css_class("session-row");
             let mark = match s.ok {
                 Some(true) => tick(icons::CHECK, false),
                 Some(false) => tick(icons::ALERT, true),
                 None => tick(icons::HISTORY, false),
             };
-            mark.set_valign(gtk::Align::Start);
-            mark.set_margin_top(2);
-            let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
-            text.set_hexpand(true);
-            let title = label(&s.title, &["step-title"]);
-            title.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            title.set_max_width_chars(40);
             let mut words = vec![trip::session::when(s.started, now), s.source.clone()];
             words.push(format!("{} step{}", s.steps, if s.steps == 1 { "" } else { "s" }));
             if s.turns > 1 {
                 words.push(format!("{} requests", s.turns));
             }
-            text.append(&title);
-            text.append(&label(&words.join(" · "), &["step-detail"]));
-            row.append(&mark);
-            row.append(&text);
+            let row = session_row(&mark, &s.title, &words.join(" · "));
             let click = gtk::GestureClick::new();
             {
                 let (o, id) = (self.clone(), s.id.clone());
@@ -1818,28 +2168,26 @@ impl Orb {
             row.add_controller(click);
             self.sessions.append(&row);
         }
+        self.back.set_visible(shown.is_some());
         self.pages.set_visible_child_name("history");
         self.terminal.set_sensitive(false);
         self.follow_row.set_visible(false);
-        if !self.state.borrow().busy {
+        if !shown.is_some_and(|r| r.busy.get()) {
             self.stop.set_label("close");
         }
         self.show_card();
     }
 
-    /// Shows an earlier conversation with all its steps; a follow-up continues it.
+    /// Shows a conversation with all its steps: the open request if it's one, or an earlier
+    /// one from the history; a follow-up continues it.
     fn open_session(self: &Rc<Self>, id: &str) {
-        if self.state.borrow().busy {
-            // The running request stays; it can be read once it's done.
-            self.pages.set_visible_child_name("talk");
-            self.caption.set_text("you asked");
+        let open = self.state.borrow().requests.iter().find(|r| r.id == id).cloned();
+        if let Some(req) = open {
+            self.show_request(&req);
             return;
         }
         let Some(session) = trip::session::load(id) else { return };
-        self.clear_talk();
-        self.caption.set_text(&trip::session::when(session.started, trip::session::now_secs()));
-        self.asked.set_text(session.title());
-        let mut last = None;
+        let mut views = Vec::new();
         for (i, t) in session.turns.iter().enumerate() {
             let view = TurnView::new((i > 0).then_some(t.request.as_str()));
             for step in &t.steps {
@@ -1851,38 +2199,52 @@ impl Orb {
                 t.answer.clone()
             };
             view.set_answer(&answer);
-            self.inner.append(&view.root);
-            last = Some(view);
+            views.push(view);
         }
-        self.status.set_text("");
-        {
-            let mut st = self.state.borrow_mut();
-            st.session_id = Some(session.id.clone());
-            st.session = Some(session);
-            st.turn = last;
+        let caption = trip::session::when(session.started, trip::session::now_secs());
+        let title = session.title().to_string();
+        let req = Request::new(session, &title, &caption);
+        for view in &views {
+            req.turns.append(&view.root);
         }
-        self.terminal.set_sensitive(true);
-        self.follow_row.set_visible(true);
-        self.stop.set_label("close");
-        self.scroll_to_end();
+        *req.turn.borrow_mut() = views.pop();
+        self.show_request(&req);
     }
 
-    /// Opens the conversation in the terminal (`trip shell --continue`), with every step, where
-    /// it carries on as a chat.
+    /// Opens the conversation on show in the terminal (`trip shell --continue`), with every
+    /// step, where it carries on as a chat.
     fn continue_in_terminal(&self) {
-        let Some(id) = self.state.borrow().session_id.clone() else { return };
+        let Some(req) = self.shown() else { return };
         // While it works, the terminal shows what's done so far.
-        if let Some(s) = self.state.borrow().session.as_ref() {
+        if let Some(s) = req.session.borrow().as_ref() {
             s.save();
         }
         let spawned = std::process::Command::new("foot")
-            .args(["--title", "tripppin", "--", "trip", "shell", "--continue", &id])
+            .args(["--title", "tripppin", "--", "trip", "shell", "--continue", &req.id])
             .env("TRIPPPIN_IN_SHELL", "1")
             .spawn();
         if spawned.is_ok() {
             self.minimise();
         }
     }
+}
+
+/// A row in the history: its mark, title and a dim line under it.
+fn session_row(mark: &impl IsA<gtk::Widget>, title: &str, detail: &str) -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    row.add_css_class("session-row");
+    mark.set_valign(gtk::Align::Start);
+    mark.set_margin_top(2);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    text.set_hexpand(true);
+    let title = label(title, &["step-title"]);
+    title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    title.set_max_width_chars(40);
+    text.append(&title);
+    text.append(&label(detail, &["step-detail"]));
+    row.append(mark);
+    row.append(&text);
+    row
 }
 
 /// Installed apps matching typed text: the name starts with it first, then a word in the name
@@ -1904,7 +2266,8 @@ fn app_matches(apps: &[crate::apps::App], text: &str) -> Vec<crate::apps::App> {
 #[cfg(test)]
 mod tests {
     use super::{
-        Corner, TurnTokens, app_matches, clip, context_percent, current_step, describe, markup, parse_prefs, tokens,
+        Corner, TurnTokens, app_matches, bar_status, clip, context_percent, current_step, describe, markup,
+        parse_prefs, request_state, tokens,
     };
     use trip::model::{PlanStep, Usage};
 
@@ -1939,6 +2302,16 @@ mod tests {
     fn keeps_the_status_short() {
         assert_eq!(clip("loading the model", 40), "loading the model");
         assert_eq!(clip("running dnf install -y vlc", 12), "running dnf…");
+    }
+
+    #[test]
+    fn says_what_runs_where() {
+        assert_eq!(bar_status(0), "");
+        assert_eq!(bar_status(1), "● working");
+        assert_eq!(bar_status(2), "● 2 running");
+        assert_eq!(request_state(true, false, false), "Running now");
+        assert_eq!(request_state(false, true, true), "Open now");
+        assert_eq!(request_state(false, false, true), "Finished, not opened yet");
     }
 
     #[test]
