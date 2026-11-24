@@ -214,3 +214,4 @@ real hardware.
 - [x] Setup page: write the USB (Mac, Windows, Linux), boot it, install, first boot
 - [x] No "scroll" hint on the hero
 - [x] Deployed to Firebase hosting
+- [~] Desktop surface: `tripppin-ui desktop` (background layer, one per screen) shows ~/Desktop as icons and opens a right-click menu (new folder, add app or widget, wallpaper, display settings, terminal); compiles and unit-tested, not yet tried on a real pointer
