@@ -3,8 +3,8 @@
 //! The geometry here is the one source for every drawing of the mark (`brand/logo.svg`,
 //! the desktop's screens in `tripppin-ui`, the boot splash frames from
 //! `scripts/brand-assets.sh`): a ring of radius 60 centred at (100, 114), stroke 22 with
-//! round caps, open ±52° at the top, and in the opening a four-point spark turned 45° into
-//! an ×, centred at (100, 46), its points 42 long and its waist 0.22 of that. The mark's
+//! round caps, open ±44° at the top, and in the opening an upright four-point spark centred
+//! at (100, 50), its points 36 long and its waist 0.24 of that. The mark's
 //! box is 146 × 175 units from (27, 12).
 //!
 //! In the terminal each character cell holds two square pixels (upper and lower half
@@ -18,13 +18,13 @@ use std::time::Duration;
 /// The ring: centre x, centre y, radius, stroke width.
 pub const RING: (f64, f64, f64, f64) = (100.0, 114.0, 60.0, 22.0);
 /// Half the ring's opening at the top, in degrees either side of straight up.
-pub const GAP_DEG: f64 = 52.0;
+pub const GAP_DEG: f64 = 44.0;
 /// How far round the ring goes, in degrees.
 pub const SPAN: f64 = 360.0 - 2.0 * GAP_DEG;
 /// The spark: centre x, centre y, point length, waist ratio.
-pub const SPARK: (f64, f64, f64, f64) = (100.0, 46.0, 42.0, 0.22);
-/// The spark's resting turn: its long points on the diagonals, an ×.
-pub const SPARK_REST_DEG: f64 = 45.0;
+pub const SPARK: (f64, f64, f64, f64) = (100.0, 50.0, 36.0, 0.24);
+/// The spark's resting turn: its long points straight up, down and across.
+pub const SPARK_REST_DEG: f64 = 0.0;
 /// The mark's box in logo units: x, y, width, height.
 pub const BOX: (f64, f64, f64, f64) = (27.0, 12.0, 146.0, 175.0);
 /// How long the intro takes, in seconds.
@@ -82,7 +82,7 @@ fn ease_out(t: f64) -> f64 {
 }
 
 /// The intro at `t` seconds: the ring draws itself from its left end, down and round, with a
-/// glowing head; then the × spins in half a turn, settling from just past full size; then it
+/// glowing head; then the spark spins in half a turn, settling from just past full size; then it
 /// glints once. From [`INTRO_SECS`] on, the finished mark.
 pub fn intro_pose(t: f64) -> Pose {
     const RING_END: f64 = 0.55;
@@ -97,8 +97,8 @@ pub fn intro_pose(t: f64) -> Pose {
     Pose { ring, head_glow: 1.0 - u, spark_scale, spark_turn, glint }
 }
 
-/// The waiting motion after the intro, `t` seconds after it ended: every 2.4 s the × makes
-/// a gentle quarter turn (an × turned a quarter is the same ×, so it always rests looking
+/// The waiting motion after the intro, `t` seconds after it ended: every 2.4 s the spark makes
+/// a gentle quarter turn (a spark turned a quarter is the same spark, so it always rests looking
 /// right). Returns the extra turn in degrees.
 pub fn waiting_turn(t: f64) -> f64 {
     const EVERY: f64 = 2.4;
@@ -390,19 +390,19 @@ mod tests {
     }
 
     #[test]
-    fn spark_is_an_x_not_a_plus() {
+    fn spark_points_straight_up_and_across() {
         let (cx, cy, r, _) = SPARK;
         let d = r * 0.6;
         let diag = d / 2f64.sqrt();
-        // Out along the diagonals there is spark; straight up, down and across there isn't.
-        for (sx, sy) in [(1.0, 1.0), (1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)] {
-            assert!(in_spark(cx + sx * diag, cy + sy * diag, 1.0, 0.0));
-        }
+        // Straight up, down and across there is spark; out along the diagonals there isn't.
         for (dx, dy) in [(0.0, d), (0.0, -d), (d, 0.0), (-d, 0.0)] {
-            assert!(!in_spark(cx + dx, cy + dy, 1.0, 0.0));
+            assert!(in_spark(cx + dx, cy + dy, 1.0, 0.0));
         }
-        // A quarter turn is the same ×.
-        assert!(in_spark(cx + diag, cy - diag, 1.0, 90.0));
+        for (sx, sy) in [(1.0, 1.0), (1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)] {
+            assert!(!in_spark(cx + sx * diag, cy + sy * diag, 1.0, 0.0));
+        }
+        // A quarter turn is the same spark.
+        assert!(in_spark(cx, cy - d, 1.0, 90.0));
     }
 
     #[test]
@@ -434,7 +434,7 @@ mod tests {
         assert_eq!(intro_pose(0.0).spark_scale, 0.0);
         assert_eq!(intro_pose(INTRO_SECS), Pose::FULL);
         assert_eq!(intro().last().map(|f| f.0), Some(Pose::FULL));
-        // The spark turns in from half a turn away, so it lands as an ×.
+        // The spark turns in from half a turn away, so it lands upright.
         assert!(intro_pose(0.45).spark_turn < -150.0);
     }
 
@@ -459,12 +459,12 @@ mod tests {
 
     #[test]
     fn geometry() {
-        assert!(in_spark(100.0, 46.0, 1.0, 0.0));
-        assert!(!in_spark(140.0, 46.0, 1.0, 0.0));
+        assert!(in_spark(100.0, 50.0, 1.0, 0.0));
+        assert!(!in_spark(140.0, 50.0, 1.0, 0.0));
         assert!(ring_at(40.0, 114.0, 1.0).is_some());
         assert!(ring_at(100.0, 54.0, 1.0).is_none()); // the gap
         let [(lx, ly), (rx, ry)] = ring_ends();
-        assert!((lx - 52.72).abs() < 0.01 && (rx - 147.28).abs() < 0.01 && (ly - 77.06).abs() < 0.01 && ly == ry);
+        assert!((lx - 58.32).abs() < 0.01 && (rx - 141.68).abs() < 0.01 && (ly - 70.84).abs() < 0.01 && ly == ry);
     }
 }
 
