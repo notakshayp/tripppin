@@ -4,10 +4,9 @@ use hwdetect::{Catalog, Hardware, Tier};
 use serde::Serialize;
 
 mod demo;
-mod logo;
 mod shell;
 
-use trip::{agent, model};
+use trip::{agent, logo, model};
 
 #[derive(Parser)]
 #[command(name = "trip", version, about = "Tripppin: tell your computer what you want.")]
