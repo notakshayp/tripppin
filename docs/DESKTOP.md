@@ -144,6 +144,27 @@ From the owner's first hands-on test: sluggish, soft text, too large, no icons, 
 - [x] Checked in the VM: oversized windows shrink back on screen, maximise and restore, app matches in the ask bar, the new card with a two-step request, "continue in terminal" and `/history`, the Wi-Fi tile with no adapter, the Settings shortcuts row, the volume slider (now reads the real level), Settings → AI (local and cloud views), the sudo pop-up end to end (`sudo id -u` from the AI with no terminal), passwordless groups on and off
 - [ ] Needs a pointer (not testable over ssh): opening a step, sending a follow-up, the history list, dragging a window under the bar
 
+## Laptop fixes (owner's first test on an AMD laptop)
+
+- [x] Red lock screen. Cause: the lock assigned its windows to screens *before* asking to lock. gtk4-layer-shell 1.2+ (Fedora 45 has 1.3) shows a window as soon as it's assigned, finds no lock yet and never makes it a lock surface, so niri locked with nothing to show (red) and nowhere to type, and kept refusing new locks because the client was alive. Now: lock first, one window per screen from the `monitor` signal (screens added or woken while locked get one too), and the app stays alive with no screens
+- [x] Lock that can't be stranded: `tripppin-ui lock` starts a keeper and returns once locked; the keeper restarts the lock screen within a second if it dies (niri hands a dead client's lock to the next one). Super + L and Ctrl + Super + L lock, and also work while locked, so they bring a dead lock screen back
+- [x] swayidle runs with `-w`, which waits for every command: the fade before the lock now runs in the background and the lock returns once locked, so screen-off and sleep still happen while locked (before, swayidle sat waiting on the fade and the lock). `loginctl lock-session` locks too
+- [x] Bar: icons only on the right (keyboard layout, Wi-Fi strength, wired, offline, networking off, Bluetooth on/off/connected, volume, muted, headphones, recording dot); the clock is the only words. Bluetooth hides only when the computer has no adapter
+- [x] Battery: a ring that fills with charge (green, amber below 20%, red below 10%, a bolt when plugged in), percentage in the tooltip; `tripppin-ui battery-ring` writes the SVG and waybar's image module draws it at 16 px (32 at 2x). Every 30 s and at once on power changes (udev sends waybar signal 8). Hidden with no battery; mice and headsets (`scope=Device`) never count
+- [x] Logo in the bar opens the apps (checked with a real click in the VM); Super + A too
+- [x] Quick settings reads as one control: network, Bluetooth, volume and battery sit in one pill that lifts on hover, with a pointer cursor and "Click for quick settings" tooltips; any of them opens the panel (right-click goes to the Settings page). The bar's green hover glow is gone
+- [x] Quick settings tiles: grey when off, filled forest when on, lighter on hover, pressed when clicked. The on/off state never showed before: our `sh -c '…'` commands broke inside swaync's own `sh -c "…"`; the switches are now `tripppin-ui toggle <wifi|bluetooth|airplane|night-light>`
+- [x] Checked in the VM with real (uinput) input: lock and unlock by password, Ctrl + Super + L, the lock screen killed and restarted by the keeper, everything killed (red) and brought back by Super + L, a screen unplugged and replugged while locked, `loginctl unlock-session`, swayidle carrying on after an idle lock, the battery ring at 64% (and charging), 15%, 7% at 1x and 2x, the pill's hover, the logo click, toggling night light from its tile
+- [ ] On the laptop: a real battery and charger, lid close and resume with the lock
+
+### If the screen is ever red and won't unlock
+
+niri shows red when the session is locked but no lock screen is drawing. In order:
+
+1. Press Super + L (or Ctrl + Super + L). It works while locked and starts a new lock screen, which takes over the dead one; type your password.
+2. Switch to a text console with Ctrl + Alt + F2, log in, and run `loginctl unlock-session $(loginctl show-user $USER -p Display --value)`. That opens a live lock screen. If no lock screen is running at all, run `XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-1 tripppin-ui lock --release`, which takes over the dead lock and opens it. Ctrl + Alt + F1 goes back to the desktop.
+3. Last resort (loses unsaved work): `loginctl terminate-session <id>` from the console, then log in again.
+
 ## Later (after this desktop lands)
 
 Not blockers for the desktop: bigger features, things niri can't do yet, and checks that need
