@@ -71,6 +71,7 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [x] `trip model pull` / `list`: download with resume and SHA-256 check into `/var/lib/tripppin/models`; TLS trusts the OS certificate store
 - [x] `tripppin-llm.service`: `trip model serve` execs llama-server on 127.0.0.1:8086; DynamicUser, read-only models, localhost-only IP filter, idle unload after 15 min
 - [x] `trip ask "…"`: streams the answer and reports time to first word and tokens/s
+- [x] Memory-safe serving sized per machine ([HARNESS.md](HARNESS.md)): model shape read from the GGUF header; context and placement (CPU, integrated GPU within its GTT share, graphics card via `--fit`) chosen so model + cache fit next to the desktop; q8_0 KV cache with flash attention, context checkpoints, a bounded prompt cache, cache reuse
 - [ ] Measure speed (tokens per second, time to first word) per hardware tier; publish in the plan
 - [ ] Eval runner skeleton with a first handful of recorded requests
 
@@ -82,6 +83,8 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [x] Agent loop in `trip`: the model calls tools until it answers in plain text (25-step cap, Ctrl-C stops it)
 - [x] Tools: `exec` (bash, live output, timeout, sudo prompts work), `read_file`, `write_file`
 - [x] Task notebook and compaction for small models: the model's plan and notes plus one line per step, shown at every step; old steps dropped when the context fills (the notebook keeps them); every session saved and listed (`/history`, the orb's history), continued in the terminal
+- [x] Task plan (`plan` / `done` tools): short steps, one at a time, each checked; kept in the session across compaction and `--continue`; stuck detection (repeats, no progress, failures in a row) nudges, then makes the model stop and explain
+- [x] Compaction on the server's real token counts with headroom (85 % → 55 %); the notebook sent as its own message so the prompt cache holds; what was dropped recorded in the session; UI events for waiting, token usage and the plan ([HARNESS.md](HARNESS.md))
 - [x] Administrator commands: sudo asks through a pop-up showing the command; Settings → AI can allow installs, services or updates without a password
 - [x] Tool-call verifier: unknown tools, bad JSON, missing or mistyped fields and calls written as text go back to the model with the exact problem; 3 retries before giving up
 - [x] Flatpak with Flathub in the image, so the agent can install apps

@@ -12,7 +12,7 @@
 
 use crate::jobs;
 use crate::model::{self, ContextFull, Message, ToolCall};
-use crate::session::Session;
+use crate::session::{Dropped, Session};
 use crate::term::{ACCENT, DIM, RESET};
 use anyhow::{Result, bail};
 use serde_json::{Value, json};
@@ -34,12 +34,20 @@ const MAX_RESULT_CHARS: usize = 4000;
 const MAX_READ_BYTES: u64 = 1 << 20;
 /// The same exec command more often than this in one task is refused, so the model can't loop.
 const MAX_REPEATS: usize = 2;
-/// A rough, deliberately low estimate of characters per token, for budgeting the context.
-const CHARS_PER_TOKEN: usize = 3;
-/// Context kept free for the tool definitions and the model's reply, in tokens.
-const CONTEXT_RESERVE: usize = 3000;
-/// Room for the notebook, which is added to what the model sees, in characters.
-const NOTEBOOK_RESERVE: usize = 3000;
+/// Identical calls of other tools (read the same file, the same note) allowed before refusing.
+const MAX_SAME_CALL: usize = 3;
+/// Steps one request may take with a long plan.
+const MAX_PLAN_TOTAL: usize = 150;
+/// Characters per token before the server has counted a prompt: deliberately low.
+const START_CHARS_PER_TOKEN: f64 = 3.0;
+/// Compaction starts when the prompt fills this share of the room left after the reply…
+const COMPACT_AT_PERCENT: usize = 85;
+/// …and goes down to this share, so it runs rarely and the server's cache stays useful.
+const COMPACT_TO_PERCENT: usize = 55;
+/// Steps without the plan moving before the model is reminded; twice this and it must stop.
+const STALL_STEPS: usize = 8;
+/// The newest output is cut to this many characters when nothing else frees enough room.
+const SHORT_RESULT_CHARS: usize = 1500;
 const TRIMMED: &str = "[earlier output removed to save space; run the command again if you need it]";
 
 /// The tools the model can call, as JSON schemas.
@@ -106,10 +114,46 @@ pub fn tools() -> Value {
         {
             "type": "function",
             "function": {
+                "name": "plan",
+                "description": "Write the plan for a task of more than two steps: short steps, each one thing you can \
+    do and check. Your notebook shows the plan and which step you're on. Call it again to rewrite the plan when it \
+    isn't working; steps you keep word for word stay done.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "steps": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "The steps in order, a few words each. At most 12."
+                        }
+                    },
+                    "required": ["steps"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "done",
+                "description": "Mark a plan step done, once you've checked it worked (for example by reading the file \
+    back or running a command that shows the change). Then go on to the next step.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "step": { "type": "integer", "description": "The step's number in the plan." },
+                        "check": { "type": "string", "description": "How you checked it worked, in one line." }
+                    },
+                    "required": ["step", "check"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "note",
-                "description": "Write a short note in your task notebook: your plan, a fact you found, what worked or \
-    what failed. The notebook is shown to you at every step, even after old messages are dropped, so note anything \
-    you'll need later. Start a task of more than two steps by noting your plan.",
+                "description": "Write a short note in your task notebook: a fact you found, what worked or what \
+    failed. The notebook is shown to you at every step, even after old messages are dropped, so note anything \
+    you'll need later.",
                 "parameters": {
                     "type": "object",
                     "properties": { "text": { "type": "string", "description": "The note, one or two lines." } },
@@ -147,7 +191,7 @@ pub fn tools() -> Value {
     ])
 }
 
-const TOOL_NAMES: &str = "exec, job_wait, job_output, job_stop, note, read_file and write_file";
+const TOOL_NAMES: &str = "exec, job_wait, job_output, job_stop, plan, done, note, read_file and write_file";
 
 /// A tool call that passed the checks.
 #[derive(Debug, PartialEq)]
@@ -156,9 +200,49 @@ pub enum Action {
     JobWait { job: usize, wait_secs: u64 },
     JobOutput { job: usize },
     JobStop { job: usize },
+    Plan { steps: Vec<String> },
+    Done { step: usize, check: String },
     Note { text: String },
     ReadFile { path: String },
     WriteFile { path: String, content: String },
+}
+
+/// Plan steps as a small model may send them: a list, or one string with a step per line
+/// ("1. find it\n2. fix it"). Numbering and bullets are dropped.
+fn plan_steps(value: Option<&Value>) -> Result<Vec<String>, String> {
+    let clean = |s: &str| {
+        let s = s.trim();
+        let digits = s.trim_start_matches(|c: char| c.is_ascii_digit());
+        let s = match digits.strip_prefix(['.', ')']) {
+            Some(rest) if digits.len() < s.len() => rest,
+            _ => s.strip_prefix(['-', '*', '•']).unwrap_or(s),
+        };
+        one_line_full(s)
+    };
+    let steps: Vec<String> = match value {
+        Some(Value::Array(items)) => items
+            .iter()
+            .map(|v| match v {
+                Value::String(s) => Ok(clean(s)),
+                other => Err(format!("each step must be a string, but one was {}.", kind(other))),
+            })
+            .collect::<Result<_, _>>()?,
+        Some(Value::String(s)) => s.lines().map(clean).collect(),
+        None => return Err(format!("plan needs a \"steps\" field. For example: {}.", example("plan"))),
+        Some(other) => return Err(format!("\"steps\" must be a list of strings, but you sent {}.", kind(other))),
+    };
+    let steps: Vec<String> = steps.into_iter().filter(|s| !s.is_empty()).collect();
+    if steps.is_empty() {
+        return Err(format!("the plan has no steps. For example: {}.", example("plan")));
+    }
+    if steps.len() > crate::session::MAX_PLAN_STEPS {
+        return Err(format!(
+            "that's {} steps; keep the plan to {} or fewer bigger ones.",
+            steps.len(),
+            crate::session::MAX_PLAN_STEPS
+        ));
+    }
+    Ok(steps.into_iter().map(|s| s.chars().take(160).collect()).collect())
 }
 
 /// Checks a call's structure. The error is written for the model: what's wrong and what to send.
@@ -237,6 +321,22 @@ pub fn verify(call: &ToolCall) -> Result<Action, String> {
         "job_wait" => Ok(Action::JobWait { job: job()?, wait_secs: seconds("wait_secs", DEFAULT_JOB_WAIT_SECS)? }),
         "job_output" => Ok(Action::JobOutput { job: job()? }),
         "job_stop" => Ok(Action::JobStop { job: job()? }),
+        "plan" => Ok(Action::Plan { steps: plan_steps(args.get("steps"))? }),
+        "done" => {
+            let bad =
+                |what: &str| format!("\"step\" for done must be the step's number in the plan, but you sent {what}.");
+            let step = match args.get("step") {
+                None => return Err(format!("done needs a \"step\" field. For example: {}.", example("done"))),
+                Some(Value::Number(n)) => {
+                    n.as_u64().filter(|&n| n > 0).map(|n| n as usize).ok_or_else(|| bad("that number"))?
+                }
+                Some(Value::String(s)) => {
+                    s.trim().trim_start_matches("step").trim().parse::<usize>().map_err(|_| bad("text"))?
+                }
+                Some(other) => return Err(bad(kind(other))),
+            };
+            Ok(Action::Done { step, check: text("check", false)? })
+        }
         "note" => Ok(Action::Note { text: text("text", false)? }),
         "read_file" => Ok(Action::ReadFile { path: text("path", false)? }),
         "write_file" => Ok(Action::WriteFile { path: text("path", false)?, content: text("content", true)? }),
@@ -250,7 +350,9 @@ fn example(tool: &str) -> &'static str {
         "read_file" => r#"{"path": "~/notes.txt"}"#,
         "write_file" => r#"{"path": "~/notes.txt", "content": "hello"}"#,
         "job_wait" | "job_output" | "job_stop" => r#"{"job": 1}"#,
-        "note" => r#"{"text": "plan: 1. find the package 2. install it 3. check it runs"}"#,
+        "note" => r#"{"text": "the theme is set in ~/.config/gtk-4.0/settings.ini"}"#,
+        "plan" => r#"{"steps": ["find the package", "install it", "check it runs"]}"#,
+        "done" => r#"{"step": 1, "check": "flatpak list shows org.videolan.VLC"}"#,
         _ => r#"{"command": "ls -la ~"}"#,
     }
 }
@@ -344,26 +446,47 @@ pub fn run(session: &mut Session, cancel: &AtomicBool, ui: &mut dyn Ui) -> Resul
 
 fn work(session: &mut Session, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<Done> {
     let tools = tools();
-    let budget = (model::context_tokens().saturating_sub(CONTEXT_RESERVE).max(2000) * CHARS_PER_TOKEN)
-        .saturating_sub(NOTEBOOK_RESERVE);
+    let tools_chars = tools.to_string().len();
+    let mut budget = Budget::new(model::server_info().context);
+    let mut watch = Watch::default();
     let mut runs: HashMap<String, usize> = HashMap::new();
     let mut retries = 0;
-    for step in 0..MAX_STEPS {
-        if compact(session, budget) {
-            ui.note("memory nearly full: older steps were dropped; the task notebook keeps track of them");
+    if !session.plan.is_empty() {
+        ui.plan(&session.plan);
+    }
+    let mut step = 0;
+    while step < max_steps(session) {
+        step += 1;
+        let answer_now = watch.must_answer();
+        if answer_now && !watch.told_to_stop {
+            watch.told_to_stop = true;
+            ui.note("the model seems stuck; asking it to say where it got to");
         }
-        let reply = match ask(session, &tools, cancel, ui) {
+        let hints = watch.hints(session);
+        let offered = (!answer_now).then_some(&tools);
+        let fixed = prompt_chars(&prompt(session, &hints)) - prompt_chars(&session.history)
+            + offered.map_or(0, |_| tools_chars);
+        let estimate = budget.tokens(prompt_chars(&session.history) + fixed);
+        if estimate > budget.compact_at() {
+            shrink(session, ui, &budget, budget.compact_to(), fixed);
+        }
+        let reply = match ask(session, &hints, offered, cancel, ui, &mut budget) {
             Err(e) if e.downcast_ref::<ContextFull>().is_some() => {
                 // The estimate was off; keep only the newest steps and try once more.
                 ui.note("the conversation got too long for the model's memory; dropping older steps");
-                compact(session, 0);
-                ask(session, &tools, cancel, ui).map_err(|e| match e.downcast_ref::<ContextFull>() {
-                    Some(_) => anyhow::anyhow!("this task got too long for the model's memory. try a smaller step."),
-                    None => e,
+                shrink(session, ui, &budget, 0, fixed);
+                ask(session, &hints, offered, cancel, ui, &mut budget).map_err(|e| {
+                    match e.downcast_ref::<ContextFull>() {
+                        Some(_) => {
+                            anyhow::anyhow!("this task got too long for the model's memory. try a smaller step.")
+                        }
+                        None => e,
+                    }
                 })?
             }
             other => other?,
         };
+        report_usage(session, ui, &budget, &reply);
         if !reply.text.is_empty() && !reply.text.ends_with('\n') {
             ui.text("\n");
         }
@@ -377,7 +500,7 @@ fn work(session: &mut Session, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<D
         let history = &mut session.history;
         if reply.calls.is_empty() {
             history.push(Message::assistant(&reply.text));
-            if looks_like_text_call(&reply.text) {
+            if looks_like_text_call(&reply.text) && !answer_now {
                 retries += 1;
                 if retries > MAX_RETRIES {
                     bail!("the model kept writing tool calls it couldn't send properly. try rephrasing.");
@@ -402,10 +525,54 @@ fn work(session: &mut Session, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<D
             let result = match verify(call) {
                 Ok(Action::Exec { command, .. }) if bump(&mut runs, &command) > MAX_REPEATS => {
                     ui.note(&format!("not running `{}` again; it already ran {MAX_REPEATS} times", one_line(&command)));
+                    watch.step(Some(false));
                     format!(
                         "Not run: you've already run this exact command {MAX_REPEATS} times in this task. \
 Don't repeat it. Try a different approach, or tell the person what's blocking you."
                     )
+                }
+                Ok(action) if repeats(&action) && bump(&mut runs, &signature(call)) > MAX_SAME_CALL => {
+                    ui.note(&format!("not repeating {} again; the model is going round in circles", call.name));
+                    watch.step(Some(false));
+                    format!(
+                        "Not done: you've made this exact {} call {MAX_SAME_CALL} times already. It won't help \
+again. Take the next step of your plan, rewrite the plan, or tell the person what's blocking you.",
+                        call.name
+                    )
+                }
+                Ok(Action::Plan { steps }) => {
+                    show_step(ui, "plan", &steps.join(" · "));
+                    session.step_started("plan", &steps.join("; "));
+                    if session.set_plan(&steps) {
+                        watch.progress();
+                        ui.plan(&session.plan);
+                    }
+                    session.step_finished(Some(true), "");
+                    ui.step_done(true);
+                    match session.current_step() {
+                        Some((n, s)) => format!(
+                            "Plan saved ({} steps). Now step {n}: {}. Do just that, check it worked, then call done \
+with {n}.",
+                            session.plan.len(),
+                            s.text
+                        ),
+                        None => "Plan saved; every step in it is already done. Check the result, then answer.".into(),
+                    }
+                }
+                Ok(Action::Done { step: n, check }) => {
+                    show_step(ui, "done", &format!("step {n}: {check}"));
+                    session.step_started("done", &format!("step {n}: {check}"));
+                    let result = session.finish_step(n, &check);
+                    session.step_finished(Some(result.is_ok()), result.as_ref().err().map_or("", |e| e.as_str()));
+                    ui.step_done(result.is_ok());
+                    match result {
+                        Ok(next) => {
+                            watch.progress();
+                            ui.plan(&session.plan);
+                            next
+                        }
+                        Err(problem) => format!("Error: {problem}"),
+                    }
                 }
                 Ok(Action::Note { text }) => {
                     show_step(ui, "note", &text);
@@ -424,6 +591,7 @@ Don't repeat it. Try a different approach, or tell the person what's blocking yo
                     if let Some(ok) = ok {
                         ui.step_done(ok);
                     }
+                    watch.step(ok);
                     session.step_finished(ok, &result);
                     result
                 }
@@ -449,10 +617,262 @@ Don't repeat it. Try a different approach, or tell the person what's blocking yo
             retries = 0;
         }
     }
-    bail!("stopped after {MAX_STEPS} steps without finishing. ask again to keep going.")
+    bail!("stopped after {step} steps without finishing. ask again to keep going.")
 }
 
-/// One model turn, streamed to the terminal.
+/// Steps one request may take: 40, or more for a long plan (12 a step, up to 150).
+fn max_steps(session: &Session) -> usize {
+    if session.plan.is_empty() { MAX_STEPS } else { (session.plan.len() * 12 + 10).clamp(MAX_STEPS, MAX_PLAN_TOTAL) }
+}
+
+/// Calls that are pointless to repeat word for word (waiting on a job is not).
+fn repeats(action: &Action) -> bool {
+    !matches!(action, Action::JobWait { .. } | Action::JobOutput { .. } | Action::Exec { .. })
+}
+
+/// A call's name and arguments, the same however the JSON was spaced.
+fn signature(call: &ToolCall) -> String {
+    let args =
+        serde_json::from_str::<Value>(&call.arguments).map_or_else(|_| call.arguments.clone(), |v| v.to_string());
+    format!("{} {args}", call.name.trim())
+}
+
+/// How full the model's context is allowed to get, in the server's own tokens.
+struct Budget {
+    /// The server's context size.
+    context: usize,
+    /// Characters (of the JSON we send) per token, learnt from the server's counts.
+    chars_per_token: f64,
+    /// The last prompt's size as the server counted it.
+    last_prompt: usize,
+}
+
+impl Budget {
+    fn new(context: usize) -> Self {
+        Budget { context, chars_per_token: START_CHARS_PER_TOKEN, last_prompt: 0 }
+    }
+
+    /// Room for the prompt, after keeping enough free for the longest reply.
+    fn room(&self) -> usize {
+        self.context.saturating_sub(model::REPLY_TOKENS + 256).max(2000)
+    }
+
+    /// Compaction starts above this many tokens…
+    fn compact_at(&self) -> usize {
+        self.room() * COMPACT_AT_PERCENT / 100
+    }
+
+    /// …and goes down to this many, so it doesn't run again (and throw away the server's
+    /// cache) on the very next step.
+    fn compact_to(&self) -> usize {
+        self.room() * COMPACT_TO_PERCENT / 100
+    }
+
+    fn tokens(&self, chars: usize) -> usize {
+        (chars as f64 / self.chars_per_token).ceil() as usize
+    }
+
+    fn chars(&self, tokens: usize) -> usize {
+        (tokens as f64 * self.chars_per_token) as usize
+    }
+
+    /// Learns the ratio from a prompt of `chars` that the server counted as `tokens`.
+    fn learn(&mut self, chars: usize, tokens: usize) {
+        if tokens >= 200 {
+            self.chars_per_token = (chars as f64 / tokens as f64).clamp(1.5, 8.0);
+        }
+        self.last_prompt = tokens;
+    }
+}
+
+/// Signs that the model is stuck, and what to tell it.
+#[derive(Default)]
+struct Watch {
+    /// Steps that ran something since the plan last moved (written, rewritten, a step done).
+    since_progress: usize,
+    /// Steps that ran something, in all.
+    steps: usize,
+    failures_in_row: usize,
+    told_to_stop: bool,
+}
+
+impl Watch {
+    fn step(&mut self, ok: Option<bool>) {
+        self.steps += 1;
+        self.since_progress += 1;
+        match ok {
+            Some(false) => self.failures_in_row += 1,
+            Some(true) => self.failures_in_row = 0,
+            None => {}
+        }
+    }
+
+    fn progress(&mut self) {
+        self.since_progress = 0;
+    }
+
+    /// Stuck for good: the next reply gets no tools, so it has to explain.
+    fn must_answer(&self) -> bool {
+        self.since_progress >= 2 * STALL_STEPS || self.failures_in_row >= 5
+    }
+
+    /// Reminders for the notebook, from what's happened so far.
+    fn hints(&self, session: &Session) -> Vec<String> {
+        let mut out = Vec::new();
+        if self.must_answer() {
+            out.push(
+                "Stop here; no more tools. Tell the person in a few lines what you did, what's left and what's \
+blocking you, and ask how to go on."
+                    .to_string(),
+            );
+            return out;
+        }
+        if session.plan.is_empty() && self.steps >= 3 {
+            out.push(
+                "This task is taking several steps. Write a short plan with the plan tool, then work through it one \
+step at a time."
+                    .to_string(),
+            );
+        }
+        if let Some((n, s)) = session.current_step().filter(|_| self.since_progress >= STALL_STEPS) {
+            out.push(format!(
+                "You've taken {} steps since the plan last moved, and step {n} ({}) isn't done. If it is done, call \
+done with how you checked. If it's stuck, rewrite the plan with plan, or stop and tell the person what's blocking \
+you.",
+                self.since_progress, s.text
+            ));
+        }
+        if self.failures_in_row >= 3 {
+            out.push(format!(
+                "The last {} steps failed. Don't try the same thing again: find another way (rewrite the plan) or stop \
+and ask the person.",
+                self.failures_in_row
+            ));
+        }
+        out
+    }
+}
+
+/// Tells the UI the server's token counts, with the context size and the session's totals.
+fn report_usage(session: &mut Session, ui: &mut dyn Ui, budget: &Budget, reply: &model::Reply) {
+    session.prompt_tokens += reply.usage.prompt as u64;
+    session.completion_tokens += reply.usage.completion as u64;
+    ui.usage(&model::Usage {
+        context: budget.context,
+        session_prompt: session.prompt_tokens as usize,
+        session_completion: session.completion_tokens as usize,
+        ..reply.usage.clone()
+    });
+}
+
+/// Compacts the conversation down to `target` tokens (plus `fixed` characters of tools and
+/// notebook) and records what went.
+fn shrink(session: &mut Session, ui: &mut dyn Ui, budget: &Budget, target: usize, fixed: usize) {
+    let before = budget.tokens(prompt_chars(&session.history) + fixed);
+    let Some(mut dropped) = compact(session, budget.chars(target).saturating_sub(fixed)) else { return };
+    dropped.tokens_before = before;
+    dropped.tokens_after = budget.tokens(prompt_chars(&session.history) + fixed);
+    let mut what = Vec::new();
+    if !dropped.steps.is_empty() {
+        what.push(format!("{} old steps", dropped.steps.len()));
+    }
+    if !dropped.requests.is_empty() {
+        what.push(format!("{} earlier requests", dropped.requests.len()));
+    }
+    if dropped.outputs_trimmed > 0 {
+        what.push(format!("{} old outputs", dropped.outputs_trimmed));
+    }
+    ui.note(&format!(
+        "memory nearly full ({} of {} tokens): dropped {}; the task notebook keeps track of them",
+        before,
+        budget.context,
+        what.join(", ")
+    ));
+    session.dropped.push(dropped);
+    session.save();
+}
+
+/// The conversation's size as sent, in characters of JSON.
+fn prompt_chars(messages: &[Message]) -> usize {
+    messages.iter().map(|m| m.0.to_string().len()).sum()
+}
+
+/// What the model is sent: the conversation, then the notebook as a message of its own, so
+/// the conversation before it is the same from one step to the next and the server reads only
+/// what's new (with a hybrid model like Qwen3.5 it can only go back to where a message
+/// starts). Right after a request, the notebook joins that message so roles still alternate.
+fn prompt(session: &Session, hints: &[String]) -> Vec<Message> {
+    let mut messages = session.history.clone();
+    let has_work = session.turns.last().is_some_and(|t| !t.steps.is_empty())
+        || !session.notes.is_empty()
+        || !session.plan.is_empty()
+        || !hints.is_empty();
+    if !has_work {
+        return messages;
+    }
+    let notebook = session.notebook_with(hints);
+    match messages.last_mut() {
+        Some(last) if last.0["role"] == "user" => {
+            let content = last.0["content"].as_str().unwrap_or("").to_string();
+            last.0["content"] = Value::String(format!("{content}\n\n---\n{notebook}"));
+        }
+        _ => messages.push(Message::user(&notebook)),
+    }
+    messages
+}
+
+/// One model turn: says what it's waiting on, streams the text to `ui` and learns the
+/// characters-per-token ratio from the server's count.
+fn ask(
+    session: &Session,
+    hints: &[String],
+    tools: Option<&Value>,
+    cancel: &AtomicBool,
+    ui: &mut dyn Ui,
+    budget: &mut Budget,
+) -> Result<model::Reply> {
+    ui.thinking();
+    let messages = prompt(session, hints);
+    let chars = prompt_chars(&messages) + tools.map_or(0, |t| t.to_string().len());
+    if model::server_info().loading {
+        ui.waiting("loading the model");
+    } else {
+        // Roughly what's new since the last request; the server's progress says exactly.
+        let new = budget.tokens(chars).saturating_sub(budget.last_prompt).max(1);
+        ui.waiting(&format!("reading {} tokens", thousands(new)));
+    }
+    let reply = model::stream(&messages, tools, cancel, |event| match event {
+        model::Event::Reading { total, cached, done } => {
+            let todo = total.saturating_sub(cached).max(1);
+            let read = done.saturating_sub(cached).min(todo);
+            ui.waiting(&if read == 0 {
+                format!("reading {} tokens", thousands(todo))
+            } else {
+                format!("reading {} tokens ({}%)", thousands(todo), read * 100 / todo)
+            });
+        }
+        model::Event::Writing => ui.waiting("writing"),
+        model::Event::Text(piece) => ui.text(piece),
+    })?;
+    if reply.usage.prompt > 0 {
+        budget.learn(chars, reply.usage.prompt);
+    }
+    Ok(reply)
+}
+
+/// 3200 → "3,200".
+fn thousands(n: usize) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// Whether a tool result means the step worked: `None` while its job is still running.
 fn outcome(result: &str) -> Option<bool> {
     if result.contains("is still running") {
@@ -464,20 +884,6 @@ fn outcome(result: &str) -> Option<bool> {
     } else {
         Some(true)
     }
-}
-
-/// Sends the conversation with the notebook added to its newest message, so the model always
-/// sees its request, notes and steps right before it decides (the notebook isn't kept in the
-/// history, so the conversation itself stays unchanged and cacheable).
-fn ask(session: &Session, tools: &Value, cancel: &AtomicBool, ui: &mut dyn Ui) -> Result<model::Reply> {
-    ui.thinking();
-    let mut messages = session.history.clone();
-    let has_work = session.turns.last().is_some_and(|t| !t.steps.is_empty()) || !session.notes.is_empty();
-    if has_work && let Some(last) = messages.last_mut() {
-        let content = last.0["content"].as_str().unwrap_or("").to_string();
-        last.0["content"] = Value::String(format!("{content}\n\n---\n{}", session.notebook()));
-    }
-    model::stream(&messages, Some(tools), cancel, |piece| ui.text(piece))
 }
 
 fn bump(runs: &mut HashMap<String, usize>, command: &str) -> usize {
@@ -500,20 +906,40 @@ fn one_line(text: &str) -> String {
     }
 }
 
-/// Keeps the conversation under `budget` characters, in three passes, stopping as soon as it fits:
+/// One line per tool call in an assistant message ("exec ls -la"), for the record of what was dropped.
+fn describe_calls(message: &Message) -> Vec<String> {
+    let calls = message.0.get("tool_calls").and_then(|c| c.as_array()).cloned().unwrap_or_default();
+    calls
+        .iter()
+        .map(|c| {
+            let name = c.pointer("/function/name").and_then(|n| n.as_str()).unwrap_or("?");
+            let args = c.pointer("/function/arguments").and_then(|a| a.as_str()).unwrap_or("");
+            let parsed: Value = serde_json::from_str(args).unwrap_or_default();
+            let detail = ["command", "path", "text", "job", "step"]
+                .iter()
+                .find_map(|k| parsed.get(*k).map(|v| v.as_str().map_or_else(|| v.to_string(), String::from)))
+                .unwrap_or_default();
+            format!("{name} {}", one_line(&detail)).trim().to_string()
+        })
+        .collect()
+}
+
+/// Keeps the conversation under `budget` characters, in steps, stopping as soon as it fits:
 /// 1. earlier requests keep only what was asked and answered (their steps go);
 /// 2. old command output is replaced with a short note (the newest result always stays);
-/// 3. the current request's oldest steps go altogether, keeping the newest two.
+/// 3. the current request's oldest steps go altogether, keeping the newest two;
+/// 4. earlier requests go altogether, oldest first (the notebook lists the last few);
+/// 5. the newest output is cut short.
 ///
-/// Every step stays in the session's notebook, which the model sees each time. Returns whether
-/// whole steps were dropped (passes 1 and 3).
-fn compact(session: &mut Session, budget: usize) -> bool {
+/// Every step stays in the session's notebook, which the model sees each time. Returns what
+/// went, or `None` when nothing needed to.
+fn compact(session: &mut Session, budget: usize) -> Option<Dropped> {
     let size = |h: &[Message]| h.iter().map(|m| m.0.to_string().len()).sum::<usize>();
     if size(&session.history) <= budget {
-        return false;
+        return None;
     }
-    let start = session.turns.last().map_or(1, |t| t.start).min(session.history.len());
-    let mut dropped = false;
+    let mut report = Dropped { turn: session.turns.len().saturating_sub(1), ..Default::default() };
+    let mut start = session.turns.last().map_or(1, |t| t.start).min(session.history.len());
 
     // 1. Earlier requests: only the questions and the final answers.
     let before = session.history.len();
@@ -522,15 +948,12 @@ fn compact(session: &mut Session, budget: usize) -> bool {
         let role = m.0["role"].as_str().unwrap_or("");
         if i == 0 || i >= start || role == "user" || (role == "assistant" && m.0.get("tool_calls").is_none()) {
             kept.push(m);
+        } else {
+            report.steps.extend(describe_calls(&m));
         }
     }
-    let removed = before - kept.len();
+    start -= before - kept.len();
     session.history = kept;
-    let start = start - removed;
-    if let Some(t) = session.turns.last_mut() {
-        t.start = start;
-    }
-    dropped |= removed > 0;
 
     // 2. Old output.
     let history = &mut session.history;
@@ -547,6 +970,7 @@ fn compact(session: &mut Session, budget: usize) -> bool {
         let before = m.to_string().len();
         m["content"] = Value::String(TRIMMED.into());
         total = total - before + m.to_string().len();
+        report.outputs_trimmed += 1;
     }
 
     // 3. The current request's oldest steps (a call and its results go together).
@@ -557,17 +981,41 @@ fn compact(session: &mut Session, budget: usize) -> bool {
         if groups.len() <= 2 {
             break;
         }
-        let from = groups[0];
-        let to = groups[1];
-        let gone: usize = history[from..to].iter().map(|m| m.0.to_string().len()).sum();
-        history.drain(from..to);
-        total -= gone;
-        dropped = true;
+        let (from, to) = (groups[0], groups[1]);
+        report.steps.extend(describe_calls(&history[from]));
+        total -= history.drain(from..to).map(|m| m.0.to_string().len()).sum::<usize>();
     }
-    if dropped {
-        session.compactions += 1;
+
+    // 4. Earlier requests, oldest first: a question and everything up to the next one.
+    while total > budget && start > 1 {
+        let end = (2..start).find(|&i| history[i].0["role"] == "user").unwrap_or(start);
+        let request = history[1].0["content"].as_str().unwrap_or("").to_string();
+        report.requests.push(one_line(&request));
+        total -= history.drain(1..end).map(|m| m.0.to_string().len()).sum::<usize>();
+        start -= end - 1;
+        session.forgotten += 1;
     }
-    dropped
+
+    // 5. The newest output, cut short.
+    if total > budget
+        && let Some(last) = history.iter_mut().rev().find(|m| m.0["role"] == "tool")
+    {
+        let content = last.0["content"].as_str().unwrap_or("").to_string();
+        if content.chars().count() > SHORT_RESULT_CHARS {
+            let tail: String = content.chars().skip(content.chars().count() - SHORT_RESULT_CHARS).collect();
+            last.0["content"] = Value::String(format!("[cut to its end to save space]\n…{tail}"));
+            report.outputs_trimmed += 1;
+        }
+    }
+
+    if let Some(t) = session.turns.last_mut() {
+        t.start = start;
+    }
+    if report.steps.is_empty() && report.requests.is_empty() && report.outputs_trimmed == 0 {
+        return None;
+    }
+    session.compactions += 1;
+    Some(report)
 }
 
 /// Shows the step on one line, cut to a readable length.
@@ -588,6 +1036,8 @@ fn describe_action(action: &Action) -> (String, String) {
         Action::JobOutput { job } => (format!("checking job {job}"), jobs::command(*job).unwrap_or_default()),
         Action::JobStop { job } => (format!("stopping job {job}"), jobs::command(*job).unwrap_or_default()),
         Action::Note { text } => ("note".into(), text.clone()),
+        Action::Plan { steps } => ("plan".into(), steps.join("; ")),
+        Action::Done { step, check } => ("done".into(), format!("step {step}: {check}")),
         Action::ReadFile { path } => ("read".into(), path.clone()),
         Action::WriteFile { path, .. } => ("write".into(), path.clone()),
     }
@@ -595,9 +1045,11 @@ fn describe_action(action: &Action) -> (String, String) {
 
 fn perform(action: &Action, cancel: &AtomicBool, ui: &mut dyn Ui) -> String {
     match action {
-        Action::Note { .. } => "Noted.".into(),
+        // Handled by the agent loop itself, which keeps the notebook.
+        Action::Note { .. } | Action::Plan { .. } | Action::Done { .. } => "Noted.".into(),
         Action::Exec { command, wait_secs, background } => {
             show_step(ui, if *background { "exec in the background" } else { "exec" }, command);
+            ui.waiting(&format!("running {}", one_line(command)));
             let id = match jobs::start(command, !*background) {
                 Ok(id) => id,
                 Err(e) => return format!("Error: {e}"),
@@ -611,6 +1063,7 @@ fn perform(action: &Action, cancel: &AtomicBool, ui: &mut dyn Ui) -> String {
         }
         Action::JobWait { job, wait_secs } => {
             show_step(ui, &format!("waiting on job {job}"), &jobs::command(*job).unwrap_or_default());
+            ui.waiting(&format!("running {}", one_line(&jobs::command(*job).unwrap_or_else(|| format!("job {job}")))));
             jobs::wait(*job, Duration::from_secs(*wait_secs), cancel, &mut |line| ui.output(line))
         }
         Action::JobOutput { job } => {
@@ -777,7 +1230,8 @@ mod tests {
             Message::tool("b", &big),
             Message::tool("c", &big),
         ]);
-        assert!(!compact(&mut s, 8000), "only output was trimmed");
+        let d = compact(&mut s, 8000).unwrap();
+        assert_eq!((d.outputs_trimmed, d.steps.len()), (2, 0), "only output was trimmed");
         let h = &s.history;
         assert_eq!(h[2].0["content"], TRIMMED);
         assert_eq!(h[3].0["content"], TRIMMED);
@@ -805,13 +1259,128 @@ mod tests {
         }
         let mut s = session_with(h);
         s.turns[0].start = 5;
-        assert!(compact(&mut s, 8000));
+        let d = compact(&mut s, 10_500).unwrap();
+        assert_eq!(d.steps, ["exec", "exec", "exec"], "the earlier request's step and the two oldest current ones");
         let roles: Vec<String> = s.history.iter().map(|m| m.0["role"].as_str().unwrap().to_string()).collect();
         assert_eq!(roles, ["system", "user", "assistant", "user", "assistant", "tool", "assistant", "tool"]);
         assert_eq!(s.history[3].0["content"], "task");
         assert_eq!(s.turns[0].start, 3);
         assert_eq!(s.history[5].0["tool_call_id"], "c", "the newest two steps stay");
         assert_eq!(s.compactions, 1);
+    }
+
+    #[test]
+    fn drops_whole_earlier_requests_last() {
+        let mut h = vec![Message::system()];
+        for (q, a) in [("first question", "x".repeat(4000)), ("second question", "y".repeat(4000))] {
+            h.push(Message::user(q));
+            h.push(Message::assistant(&a));
+        }
+        h.push(Message::user("task"));
+        let mut s = session_with(h);
+        s.turns[0].start = 5;
+        let d = compact(&mut s, 8000).unwrap();
+        assert_eq!(d.requests, ["first question"]);
+        assert_eq!(s.forgotten, 1);
+        assert_eq!(s.history[1].0["content"], "second question");
+        assert_eq!(s.turns[0].start, 3);
+        assert_eq!(s.history[3].0["content"], "task");
+        assert!(compact(&mut s, 1_000_000).is_none());
+    }
+
+    #[test]
+    fn describes_dropped_steps() {
+        let m = Message::assistant_calls("", &[call("exec", r#"{"command":"ls -la"}"#), call("done", r#"{"step":2}"#)]);
+        assert_eq!(describe_calls(&m), ["exec ls -la", "done 2"]);
+    }
+
+    #[test]
+    fn the_notebook_follows_the_conversation_so_the_cache_holds() {
+        let mut s = Session::new("test");
+        s.ask("make the desktop dark");
+        assert_eq!(prompt(&s, &[]).len(), 2, "no work yet: just the conversation");
+        s.set_plan(&["find the setting".into()]);
+        let p = prompt(&s, &[]);
+        assert_eq!(p.len(), 2, "right after the request the notebook joins it");
+        assert!(p[1].0["content"].as_str().unwrap().contains("TASK NOTEBOOK"));
+        s.history.push(Message::assistant_calls("", &[call("exec", r#"{"command":"ls"}"#)]));
+        s.history.push(Message::tool("c", "ok"));
+        let p = prompt(&s, &[]);
+        assert_eq!(p.len(), 5);
+        assert_eq!(p[3].0, s.history[3].0, "the conversation is sent unchanged");
+        assert_eq!(p[4].0["role"], "user");
+    }
+
+    #[test]
+    fn budgets_with_the_servers_token_counts() {
+        let mut b = Budget::new(32768);
+        assert_eq!(b.room(), 32768 - model::REPLY_TOKENS - 256);
+        assert!(b.compact_to() < b.compact_at() && b.compact_at() < b.room());
+        assert_eq!(b.tokens(3000), 1000);
+        b.learn(40_000, 10_000);
+        assert_eq!(b.tokens(4000), 1000);
+        assert_eq!(b.last_prompt, 10_000);
+        b.learn(100, 10);
+        assert_eq!(b.chars_per_token, 4.0, "too small a sample to learn from");
+        assert_eq!(Budget::new(1000).room(), 2000);
+    }
+
+    #[test]
+    fn notices_a_stuck_model() {
+        let mut s = Session::new("test");
+        s.ask("x");
+        let mut w = Watch::default();
+        for _ in 0..3 {
+            w.step(Some(true));
+        }
+        assert!(w.hints(&s)[0].contains("Write a short plan"));
+        s.set_plan(&["a".into(), "b".into()]);
+        w.progress();
+        assert!(w.hints(&s).is_empty());
+        for _ in 0..STALL_STEPS {
+            w.step(Some(true));
+        }
+        assert!(w.hints(&s)[0].contains("step 1 (a) isn't done"));
+        for _ in 0..3 {
+            w.step(Some(false));
+        }
+        assert!(w.hints(&s).iter().any(|h| h.contains("The last 3 steps failed")));
+        assert!(!w.must_answer());
+        for _ in 0..2 {
+            w.step(Some(false));
+        }
+        assert!(w.must_answer());
+        assert!(w.hints(&s)[0].starts_with("Stop here; no more tools"));
+    }
+
+    #[test]
+    fn a_long_plan_gets_more_steps() {
+        let mut s = Session::new("test");
+        assert_eq!(max_steps(&s), MAX_STEPS);
+        s.set_plan(&(0..10).map(|i| format!("step {i}")).collect::<Vec<_>>());
+        assert_eq!(max_steps(&s), 130);
+    }
+
+    #[test]
+    fn reads_plans_however_they_come() {
+        assert_eq!(
+            verify(&call("plan", r#"{"steps":["1. find it","- fix it","3D print"]}"#)),
+            Ok(Action::Plan { steps: vec!["find it".into(), "fix it".into(), "3D print".into()] })
+        );
+        assert_eq!(
+            verify(&call("plan", r#"{"steps":"1) look\n2) change\n\n"}"#)),
+            Ok(Action::Plan { steps: vec!["look".into(), "change".into()] })
+        );
+        assert!(verify(&call("plan", r#"{"steps":[]}"#)).unwrap_err().contains("no steps"));
+        assert!(verify(&call("plan", r#"{"steps":[1]}"#)).unwrap_err().contains("must be a string"));
+        assert_eq!(
+            verify(&call("done", r#"{"step":"step 2","check":"ls shows it"}"#)),
+            Ok(Action::Done { step: 2, check: "ls shows it".into() })
+        );
+        assert!(verify(&call("done", r#"{"step":1}"#)).unwrap_err().contains("\"check\""));
+        assert_eq!(signature(&call("note", r#"{ "text" : "a" }"#)), signature(&call("note", r#"{"text":"a"}"#)));
+        assert_eq!(thousands(3200), "3,200");
+        assert_eq!(thousands(1234567), "1,234,567");
     }
 
     #[test]
