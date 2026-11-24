@@ -1,7 +1,9 @@
-# The login screen. tripppin-ui greeter talks to greetd; niri-session is the desktop.
+# The login screen. tripppin-ui greeter (in a small niri session) talks to greetd, and the
+# desktop it starts is /usr/libexec/tripppin-session (niri-session). Both keep the text
+# console plain ink, so logging in goes from the login screen to the splash with no text.
 [terminal]
 vt = 1
 
 [default_session]
-command = "niri -c /etc/tripppin/greeter-niri.kdl"
+command = "/usr/libexec/tripppin-greeter-session"
 user = "greetd"

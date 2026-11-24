@@ -10,6 +10,8 @@ input {
 }
 
 layout {
+    // Ink behind everything, so the moment before the splash and wallpaper draw is ink too.
+    background-color "#0b100f"
     gaps 16
     center-focused-column "never"
     default-column-width { proportion 0.5; }
@@ -50,6 +52,9 @@ environment {
 // Whole-number scales first, so text is sharp and the desktop compact (Settings → Display
 // keeps the person's own choice).
 spawn-at-startup "tripppin-ui" "displays"
+// Then the splash: the logo on ink over everything, the same ink the login screen faded to,
+// until the bar and the orb are up (at most a few seconds); then it fades into the desktop.
+spawn-at-startup "tripppin-ui" "splash"
 // The wallpaper: the person's choice (Settings → Appearance), else ours.
 spawn-at-startup "sh" "-c" "w=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
 spawn-at-startup "waybar"
