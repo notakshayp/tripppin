@@ -64,7 +64,7 @@ button:active { transform: scale(0.96); }
   border-radius: 20px;
   border: 1px solid #2f3d38;
   background: rgba(20, 27, 25, 0.97);
-  box-shadow: 0 0 40px rgba(87, 217, 154, 0.07), 0 24px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   padding: 14px;
   animation: open 300ms cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -85,27 +85,40 @@ button:active { transform: scale(0.96); }
 }
 .widget-title > button:hover { color: #57d99a; border-color: #57d99a; }
 
-/* Tiles: icon and name, ink when off, forest green when on. */
+/* Tiles: raised buttons that lift under the pointer and sink when pressed. Off: a quiet
+   grey tile. On: filled forest green with paper text, so the state reads at a glance. */
 .widget-buttons-grid { padding: 2px 0; }
+/* The tile itself shows hover, not a second box behind it. */
+.widget-buttons-grid > flowbox > flowboxchild,
+.widget-buttons-grid > flowbox > flowboxchild:hover,
+.widget-buttons-grid > flowbox > flowboxchild:selected { background: transparent; outline: none; }
 .widget-buttons-grid > flowbox > flowboxchild > button {
   min-width: 100px;
   min-height: 40px;
   margin: 3px;
   padding: 0 12px;
   border-radius: 12px;
-  border: 1px solid #222d2a;
-  background: #0f1513;
-  color: #d9e1dd;
+  border: 1px solid rgba(242, 245, 239, 0.08);
+  background: rgba(242, 245, 239, 0.05);
+  color: #b7c3bd;
   font-size: 12px;
   font-weight: 500;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
-.widget-buttons-grid > flowbox > flowboxchild > button:hover { border-color: #3d4a45; background: #141d1a; }
+.widget-buttons-grid > flowbox > flowboxchild > button:hover {
+  border-color: rgba(242, 245, 239, 0.16);
+  background: rgba(242, 245, 239, 0.10);
+  color: #f2f5ef;
+}
+.widget-buttons-grid > flowbox > flowboxchild > button:active { background: rgba(242, 245, 239, 0.03); }
 .widget-buttons-grid > flowbox > flowboxchild > button.toggle:checked,
 .widget-buttons-grid > flowbox > flowboxchild > button.active {
   background: #1f6b45;
-  border-color: #57d99a;
+  border-color: rgba(87, 217, 154, 0.35);
   color: #f2f5ef;
 }
+.widget-buttons-grid > flowbox > flowboxchild > button.toggle:checked:hover,
+.widget-buttons-grid > flowbox > flowboxchild > button.active:hover { background: #267a50; }
 
 .widget-volume, .widget-slider, .widget-backlight {
   padding: 6px 12px;
