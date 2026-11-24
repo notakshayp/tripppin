@@ -165,6 +165,20 @@ RUN set -e; src=/usr/share/icons/Papirus; dst=/usr/share/icons/Tripppin; \
     test -f "$dst/48x48/places/folder.svg"
 
 # The boot splash: our Plymouth theme, built into the initramfs so it shows from the start.
+# A clean app list: hide helpers, duplicates of our Settings pages and Fedora's tool windows
+# (they still open from files and links), and give the two everyday apps plain names.
+# Settings' own pages are found by searching "Settings" words instead of listing 20 entries.
+RUN cd /usr/share/applications \
+    && for f in blueman-manager blueman-adapters foot-server footclient qt5ct qt6ct system-config-printer \
+         thunar-bulk-rename thunar-settings network.cycles.wdisplays org.pulseaudio.pavucontrol \
+         org.gnome.FileRoller org.gnome.SimpleScan; do \
+         [ ! -f "$f.desktop" ] || sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$f.desktop"; \
+       done \
+    && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \
+    && sed -i -e '/^Name\[/d' -e 's/^Name=Foot$/Name=Terminal/' foot.desktop \
+    && sed -i -e '/^Name\[/d' -e 's/^Name=Thunar File Manager$/Name=Files/' thunar.desktop \
+    && ! grep -q NoDisplay in.trippp.Settings.desktop
+
 RUN plymouth-set-default-theme tripppin \
     && kver=$(cd /usr/lib/modules && echo *) \
     && DRACUT_NO_XATTR=1 dracut -f --no-hostonly --reproducible "/usr/lib/modules/$kver/initramfs.img" "$kver" \
