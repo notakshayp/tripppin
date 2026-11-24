@@ -1,6 +1,7 @@
 // The tripppin desktop, everything but the mouse and touchpad (pointer.kdl): both
 // /etc/niri/config.kdl and the person's own config include it. Every window floats,
-// with rounded corners, a soft shadow and a green ring on the focused one.
+// with softly rounded corners (Settings → Appearance → Corners can change them), a soft
+// shadow and a quiet ring on the focused one.
 
 input {
     keyboard {
@@ -15,9 +16,10 @@ layout {
     default-column-width { proportion 0.5; }
 
     focus-ring {
-        width 2
-        active-color "#57d99a"
-        inactive-color "#2a3632"
+        width 1
+        // A muted green hairline, not a neon frame: it says which window has focus, quietly.
+        active-color "#57d99a80"
+        inactive-color "#f2f5ef1a"
     }
     border {
         off
@@ -68,7 +70,7 @@ spawn-at-startup "tripppin-ui" "welcome" "--first-time"
 spawn-at-startup "sh" "-c" "f=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/idle; [ -f \"$f\" ] || f=/usr/share/tripppin/idle; exec swayidle -w -C \"$f\""
 
 window-rule {
-    geometry-corner-radius 16
+    geometry-corner-radius 10
     clip-to-geometry true
     open-floating true
 }

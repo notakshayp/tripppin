@@ -1,12 +1,12 @@
-# Defaults for GTK and libadwaita apps: dark, green accent, Inter and DM Mono at a compact
-# 10 pt, greyscale-antialiased with slight hinting (sharp at scale 1).
+# Defaults for GTK and libadwaita apps: dark, green accent, Inter and DM Mono at 11 pt
+# (about 15 px, readable at scale 1), greyscale-antialiased with slight hinting.
 [org/gnome/desktop/interface]
 color-scheme='prefer-dark'
 gtk-theme='adw-gtk3-dark'
 accent-color='green'
-font-name='Inter 10'
-document-font-name='Inter 10'
-monospace-font-name='DM Mono 10'
+font-name='Inter 11'
+document-font-name='Inter 11'
+monospace-font-name='DM Mono 11'
 font-antialiasing='grayscale'
 font-hinting='slight'
 icon-theme='Tripppin'

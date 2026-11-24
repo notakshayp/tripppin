@@ -8,6 +8,7 @@
 //! - `settings`: the Settings app.
 //! - `askpass`: the password pop-up for administrator commands the AI runs.
 //! - `displays`: gives each screen a whole-number scale at login, so text stays sharp.
+//! - `corners sharp|default|round`: the corner style everywhere (Settings → Appearance).
 
 mod accounts;
 mod apps;
@@ -24,6 +25,7 @@ mod keeper;
 mod keyboard;
 mod keys;
 mod lock;
+mod look;
 mod nm;
 mod orb;
 mod osd;
@@ -67,6 +69,17 @@ fn main() -> ExitCode {
         display::use_crisp_scales();
         return ExitCode::SUCCESS;
     }
+    // Not a screen either: sets the corner style, for scripts and the AI.
+    if args.first().map(String::as_str) == Some("corners") {
+        let choice = look::Corners::from_id(args.get(1).map_or("default", String::as_str));
+        return match look::set(choice) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("couldn't set the corners: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     use_software_rendering_without_3d();
     match args.first().map(String::as_str) {
         Some("orb") => orb::run(),
@@ -84,7 +97,7 @@ fn main() -> ExitCode {
         Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | askpass | displays"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | askpass | displays | corners sharp|default|round"
             );
             ExitCode::from(2)
         }

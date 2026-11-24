@@ -37,6 +37,10 @@ fn build(app: &gtk::Application, tier: Tier) {
     let window = gtk::Window::builder().application(app).title("welcome").default_width(620).build();
     window.add_css_class("tripppin");
     window.add_css_class("fb");
+    // A plain title bar of ours, so the close button has its own row above the card.
+    let header = gtk::HeaderBar::new();
+    header.set_title_widget(Some(&gtk::Label::new(None)));
+    window.set_titlebar(Some(&header));
     let card = gtk::Box::new(gtk::Orientation::Vertical, 22);
     card.add_css_class("fb-card");
     card.set_size_request(620, -1);

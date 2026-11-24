@@ -1,19 +1,44 @@
 //! Pieces every screen shares: the stylesheet, the logo, and small facts about the machine.
 
 use gtk::prelude::*;
-use gtk::{cairo, gdk, glib};
+use gtk::{cairo, gdk, gio, glib};
 use std::path::PathBuf;
 
 pub const INK: (f64, f64, f64) = (0.949, 0.961, 0.937);
 pub const GREEN: (f64, f64, f64) = (0.341, 0.851, 0.604);
 
-/// Loads the Tripppin stylesheet for the whole app.
+thread_local! {
+    /// The corner radii on top of the stylesheet, and the watch on the file that picks them.
+    static CORNERS: std::cell::RefCell<Option<(gtk::CssProvider, gio::FileMonitor)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Loads the Tripppin stylesheet for the whole app, with the corners chosen in Settings →
+/// Appearance; when that choice changes, every running screen restyles itself.
 pub fn load_css() {
+    let Some(display) = gdk::Display::default() else { return };
     let provider = gtk::CssProvider::new();
     provider.load_from_string(include_str!("style.css"));
-    if let Some(display) = gdk::Display::default() {
-        gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
-    }
+    gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    CORNERS.with(|slot| {
+        if slot.borrow().is_some() {
+            return;
+        }
+        let corners = gtk::CssProvider::new();
+        corners.load_from_string(&crate::look::css(crate::look::current()));
+        gtk::style_context_add_provider_for_display(&display, &corners, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
+        // The folder must exist for the watch to see the file appear.
+        if let Some(dir) = crate::look::file().parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let Ok(monitor) =
+            gio::File::for_path(crate::look::file()).monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE)
+        else {
+            return;
+        };
+        let watched = corners.clone();
+        monitor.connect_changed(move |_, _, _, _| watched.load_from_string(&crate::look::css(crate::look::current())));
+        *slot.borrow_mut() = Some((corners, monitor));
+    });
 }
 
 /// A label with the given CSS classes.

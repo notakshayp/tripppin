@@ -104,8 +104,8 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
         .build();
     window.add_css_class("tripppin");
     window.add_css_class("settings");
-    // No title bar: the sidebar runs to the top and the close button floats over the page.
-    window.set_titlebar(Some(&gtk::Box::new(gtk::Orientation::Horizontal, 0)));
+    // Narrow enough for half of a small screen, wide enough for the sidebar and a page.
+    window.set_size_request(640, 420);
 
     // Pages are built as they're first opened (show_section).
     let stack = gtk::Stack::new();
@@ -115,7 +115,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
 
     let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
     side.add_css_class("sidebar");
-    side.set_size_request(220, -1);
+    side.set_size_request(232, -1);
     let search = gtk::SearchEntry::new();
     search.set_placeholder_text(Some("search settings"));
     search.add_css_class("search");
@@ -163,34 +163,60 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     let root = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     root.append(&side);
     root.append(&stack);
-    let overlay = gtk::Overlay::new();
-    overlay.set_child(Some(&root));
-    let controls = gtk::WindowControls::new(gtk::PackType::End);
-    controls.set_halign(gtk::Align::End);
-    controls.set_valign(gtk::Align::Start);
-    controls.set_margin_top(10);
-    controls.set_margin_end(10);
-    overlay.add_overlay(&controls);
-    // Drag the window by any empty part of it.
-    let handle = gtk::WindowHandle::new();
-    handle.set_child(Some(&overlay));
-    window.set_child(Some(&handle));
+    window.set_titlebar(Some(&title_bar(&stack, &side)));
+    window.set_child(Some(&root));
     (window, stack, nav)
 }
 
-/// A page: a big lower-case title, a status line under it, optional control on the right.
-fn page(title: &str) -> (gtk::ScrolledWindow, gtk::Box, gtk::Label, gtk::Box) {
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 22);
+/// The title bar: "Settings" over the sidebar, the open page's name over the page and the
+/// window controls at the end of the same row, so page content never sits under them.
+/// Drag the window by it; double-click maximises.
+fn title_bar(stack: &gtk::Stack, sidebar: &gtk::Box) -> gtk::WindowHandle {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    row.add_css_class("titlebar-row");
+    let side = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    side.add_css_class("titlebar-side");
+    // Always exactly as wide as the sidebar under it.
+    let widths = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
+    widths.add_widget(&side);
+    widths.add_widget(sidebar);
+    let app = label("Settings", &["titlebar-app"]);
+    app.set_valign(gtk::Align::Center);
+    side.append(&app);
+    let title = label("", &["titlebar-title"]);
+    title.set_hexpand(true);
+    title.set_valign(gtk::Align::Center);
+    title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    let controls = gtk::WindowControls::new(gtk::PackType::End);
+    controls.set_valign(gtk::Align::Center);
+    row.append(&side);
+    row.append(&title);
+    row.append(&controls);
+    let show = move |s: &gtk::Stack| {
+        let name = s.visible_child_name().unwrap_or_default();
+        let shown = SECTIONS.iter().find(|(id, ..)| *id == name.as_str()).map_or("", |(_, t, ..)| *t);
+        title.set_text(shown);
+    };
+    show(stack);
+    stack.connect_visible_child_name_notify(show);
+    let handle = gtk::WindowHandle::new();
+    handle.set_child(Some(&row));
+    handle
+}
+
+/// A page: its name is in the title bar; the page starts with a status line, with an
+/// optional control (an on/off switch, "Advanced") on the right.
+fn page(_title: &str) -> (gtk::ScrolledWindow, gtk::Box, gtk::Label, gtk::Box) {
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 24);
     body.add_css_class("page");
-    let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    let titles = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    titles.set_hexpand(true);
-    titles.append(&label(title, &["page-title"]));
+    let head = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     let status = label("", &["page-sub"]);
-    titles.append(&status);
-    let right = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    status.set_hexpand(true);
+    status.set_wrap(true);
+    status.set_valign(gtk::Align::Center);
+    let right = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     right.set_valign(gtk::Align::Center);
-    head.append(&titles);
+    head.append(&status);
     head.append(&right);
     body.append(&head);
     let scroll = gtk::ScrolledWindow::new();
@@ -1327,6 +1353,7 @@ fn appearance_page() -> gtk::ScrolledWindow {
         gsettings_set("text-scaling-factor", &TEXT_SIZES[d.selected() as usize].1.to_string())
     });
     look.append(&setting_row("text size", &size));
+    look.append(&setting_row("corners", &corners_choice()));
     let motion = gtk::Switch::new();
     motion.set_active(display::reduce_motion());
     motion.connect_state_set(|_, on| {
@@ -1337,6 +1364,34 @@ fn appearance_page() -> gtk::ScrolledWindow {
     look.append(&setting_row("reduce motion", &motion));
     body.append(&look);
     scroll
+}
+
+/// Sharp, Default or Round: three segments, applied at once to windows, the bar, quick
+/// settings, the launcher and our own screens (look.rs).
+fn corners_choice() -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let now = crate::look::current();
+    let buttons: Rc<RefCell<Vec<gtk::Button>>> = Rc::default();
+    for (choice, word, what) in crate::look::ALL {
+        let b = gtk::Button::with_label(word);
+        b.add_css_class("segment");
+        b.set_tooltip_text(Some(what));
+        if choice == now {
+            b.add_css_class("selected");
+        }
+        let all = buttons.clone();
+        b.connect_clicked(move |b| {
+            if crate::look::set(choice).is_ok() {
+                for other in all.borrow().iter() {
+                    other.remove_css_class("selected");
+                }
+                b.add_css_class("selected");
+            }
+        });
+        buttons.borrow_mut().push(b.clone());
+        row.append(&b);
+    }
+    row
 }
 
 fn minutes(m: u32) -> String {
