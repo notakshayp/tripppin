@@ -21,8 +21,9 @@ pub const RING: (f64, f64, f64, f64) = (100.0, 114.0, 60.0, 22.0);
 pub const GAP_DEG: f64 = 52.0;
 /// How far round the ring goes, in degrees.
 pub const SPAN: f64 = 360.0 - 2.0 * GAP_DEG;
-/// The spark: centre x, centre y, point length, waist ratio.
-pub const SPARK: (f64, f64, f64, f64) = (100.0, 60.0, 42.0, 0.22);
+/// The spark, two rounded bars crossing like the ring's own stroke: centre x, centre y, how far
+/// each arm reaches from the centre (to the end of its round cap), and the bars' thickness.
+pub const SPARK: (f64, f64, f64, f64) = (100.0, 60.0, 34.0, 20.0);
 /// The spark's resting turn: its long points on the diagonals, an ×.
 pub const SPARK_REST_DEG: f64 = 45.0;
 /// The mark's box in logo units: x, y, width, height.
@@ -58,17 +59,30 @@ impl Pose {
     pub const FULL: Pose = Pose { ring: 1.0, head_glow: 0.0, spark_scale: 1.0, spark_turn: 0.0, glint: 0.0 };
 }
 
-/// The spark's eight corners (long points at even indices), turned `turn_deg` past rest and scaled.
-pub fn spark_points(scale: f64, turn_deg: f64) -> [(f64, f64); 8] {
-    let (cx, cy, r, waist) = SPARK;
-    let mut pts = [(0.0, 0.0); 8];
-    for (i, p) in pts.iter_mut().enumerate() {
-        let rad = if i % 2 == 0 { r } else { r * waist } * scale;
-        let a = (SPARK_REST_DEG + turn_deg + 45.0 * i as f64).to_radians();
-        *p = (cx + rad * a.sin(), cy - rad * a.cos());
+/// The spark's outline, turned `turn_deg` past rest and scaled: a plus of two bars with round
+/// ends (each end a half circle of [`CAP_STEPS`] segments), turned to an × at rest.
+pub fn spark_points(scale: f64, turn_deg: f64) -> Vec<(f64, f64)> {
+    let (cx, cy, reach, thick) = SPARK;
+    let t = thick / 2.0;
+    let h = reach - t;
+    let mut plus = Vec::with_capacity(4 * (CAP_STEPS + 2));
+    // Clockwise from the top arm's left edge: each arm's round end, then the inner corner.
+    let arms = [(0.0, -h, 180.0, (t, -t)), (h, 0.0, 270.0, (t, t)), (0.0, h, 0.0, (-t, t)), (-h, 0.0, 90.0, (-t, -t))];
+    for (ex, ey, from, corner) in arms {
+        for k in 0..=CAP_STEPS {
+            let a = (from + 180.0 * k as f64 / CAP_STEPS as f64).to_radians();
+            plus.push((ex + t * a.cos(), ey + t * a.sin()));
+        }
+        plus.push(corner);
     }
-    pts
+    let a = (SPARK_REST_DEG + turn_deg).to_radians();
+    plus.into_iter()
+        .map(|(x, y)| (cx + scale * (x * a.cos() - y * a.sin()), cy + scale * (x * a.sin() + y * a.cos())))
+        .collect()
 }
+
+/// Segments in each of the spark's round ends.
+const CAP_STEPS: usize = 12;
 
 /// The ring's two ends, left then right.
 pub fn ring_ends() -> [(f64, f64); 2] {

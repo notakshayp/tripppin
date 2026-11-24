@@ -12,7 +12,7 @@ set -eu
 # The mark, in logo units (the box is 146 x 175 from 27, 12). Keep in step with logo.rs.
 ARC='M52.72 77.06 A60 60 0 1 0 147.28 77.06'
 ARC_LEN=268.08 # 60 * (360 - 2 * 52) degrees, in radians
-SPARK='M129.70 30.30 109.24 60.00 129.70 89.70 100.00 69.24 70.30 89.70 90.76 60.00 70.30 30.30 100.00 50.76Z'
+SPARK='M109.90 35.96 A10 10 0 0 1 124.04 50.10 L114.14 60.00 L124.04 69.90 A10 10 0 0 1 109.90 84.04 L100.00 74.14 L90.10 84.04 A10 10 0 0 1 75.96 69.90 L85.86 60.00 L75.96 50.10 A10 10 0 0 1 90.10 35.96 L100.00 45.86Z'
 FEDORA=quay.io/fedora/fedora:45
 DM_MONO_REV=85f32a0254c400b643d7ce589b91a2ad29bea73b
 
@@ -118,6 +118,6 @@ done
 echo "  $theme/ring-1..24.png"
 { svg 292 350; mark '#f2f5ef' none 0 0 292; echo '</svg>'; } > "$tmp/ring.svg"
 png ring "$theme/ring.png"
-{ svg 192 192; printf '<path transform="translate(96 96) scale(2) translate(-100 -46)" d="%s" fill="#57d99a"/>' "$SPARK"; echo '</svg>'; } > "$tmp/spark.svg"
+{ svg 192 192; printf '<path transform="translate(96 96) scale(2) translate(-100 -60)" d="%s" fill="#57d99a"/>' "$SPARK"; echo '</svg>'; } > "$tmp/spark.svg"
 png spark "$theme/spark.png"
 rm -rf "$tmp"
