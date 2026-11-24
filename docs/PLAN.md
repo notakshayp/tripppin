@@ -116,6 +116,7 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 - [x] Apps: Thunar, Text Editor, Loupe, Papers, Calculator, Celluloid, File Roller, System Monitor, Disks; Firefox on first boot
 - [x] Behaviour: USB automount, low battery, updates staged with rollback (greenboot), crash notices, the model freed first when memory runs low, a welcome tour
 - [x] Polish pass: sharp text at a whole-number scale, a compact layout, icons throughout, a movable orb, spring motion everywhere (DESKTOP.md, "Polish pass")
+- [x] Design system: sentence case, readable type, tokens with a quiet green accent, a Sharp / Default / Round corners setting, a real Settings title bar, the computer called "tripppin" (UX-REVIEW.md)
 - [x] The mark's spark is an × and the sparkle burst is gone everywhere; logging in goes from the login screen to a logo splash with no text console in between (DESKTOP.md, "The mark and the way in")
 - [x] Laptop fixes from the first test: the red lock screen (root cause and a self-restarting lock), icons-only bar, a battery ring, the logo opening the apps, quick settings as one pill with working on/off tiles (DESKTOP.md, "Laptop fixes")
 - [ ] Checked on the laptop: Wi-Fi, Bluetooth, sound devices, brightness, battery, the boot splash, a real USB stick and printer
@@ -125,7 +126,7 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 
 For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our own flow; parked until the OS itself is in good shape.
 
-- [ ] `trip install`: a full-screen installer in our design (lowercase, DM Mono, forest green, the logo intro as the welcome)
+- [ ] `trip install`: a full-screen installer in our design (sentence case, Inter, forest green as an accent, the logo intro as the welcome)
 - [ ] Flow: welcome, language and keyboard, Wi-Fi, disk (one clear warning), account, install with progress, done
 - [ ] Engine: `bootc install to-disk`; our app is only the front end
 - [ ] ISO that boots into our installer instead of Anaconda (image-builder's installer ISO type)

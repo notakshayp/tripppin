@@ -187,7 +187,10 @@ pub fn set(c: Corners) -> std::io::Result<()> {
     write_ours(&home.join("fuzzel/fuzzel.ini"), (!default).then(|| fuzzel_ini(c)))?;
     // The bar reloads its style on SIGUSR2; quick settings on request.
     let _ = Command::new("pkill").args(["-USR2", "-x", "waybar"]).status();
-    let _ = Command::new("swaync-client").args(["-rs", "-sw"]).status();
+    // Only when it's running: asking swaync-client otherwise starts it through D-Bus.
+    if Command::new("pgrep").args(["-x", "swaync"]).status().is_ok_and(|s| s.success()) {
+        let _ = Command::new("swaync-client").args(["-rs", "-sw"]).status();
+    }
     Ok(())
 }
 
