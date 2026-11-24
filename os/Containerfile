@@ -171,7 +171,7 @@ RUN set -e; src=/usr/share/icons/Papirus; dst=/usr/share/icons/Tripppin; \
 RUN cd /usr/share/applications \
     && for f in blueman-manager blueman-adapters foot-server footclient qt5ct qt6ct system-config-printer \
          thunar-bulk-rename thunar-settings network.cycles.wdisplays org.pulseaudio.pavucontrol \
-         org.gnome.FileRoller org.gnome.SimpleScan; do \
+         org.gnome.FileRoller org.gnome.SimpleScan panel-preferences thunar-volman-settings; do \
          [ ! -f "$f.desktop" ] || sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$f.desktop"; \
        done \
     && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \
