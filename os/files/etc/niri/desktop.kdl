@@ -142,7 +142,10 @@ binds {
     Mod+D { spawn "fuzzel"; }
     Mod+N { spawn "swaync-client" "-t" "-sw"; }
     Mod+Escape { spawn "tripppin-power"; }
-    Mod+L { spawn "tripppin-ui" "lock"; }
+    // Lock. Also works while locked, so if the lock screen ever dies (niri shows red), the
+    // same keys bring it back (niri hands a dead lock to the next lock screen).
+    Mod+L allow-when-locked=true { spawn "tripppin-ui" "lock"; }
+    Ctrl+Mod+L allow-when-locked=true { spawn "tripppin-ui" "lock"; }
     Mod+Q { close-window; }
     Mod+F { fullscreen-window; }
     Mod+T { toggle-window-floating; }
