@@ -100,10 +100,19 @@ window.clear {
     font-family: "DM Mono", monospace;
 }
 
-/* One focus ring for everything you can reach with the keyboard. */
+/* No focus ring follows the pointer around: GTK marks focus as "visible" for the rest of a
+   window's life after any key press, so a ring on everything would trail every click. Only
+   controls show a quiet neutral ring, and only while they have keyboard focus. */
 *:focus-visible {
-    outline: 2px solid var(--accent-line);
-    outline-offset: 2px;
+    outline: none;
+}
+
+button:focus-visible,
+switch:focus-visible,
+checkbutton:focus-visible,
+dropdown:focus-visible {
+    outline: 1px solid rgba(242, 245, 239, 0.28);
+    outline-offset: 1px;
 }
 
 entry:focus-within,
@@ -1907,4 +1916,19 @@ window.fb .fb-card {
 
 list.list-card > row:selected .ai-model .row-title {
     color: var(--accent);
+}
+
+.desktop-icon {
+    padding: 6px 4px;
+    border-radius: var(--r-md);
+}
+
+.desktop-icon.selected {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.desktop-label {
+    font-size: var(--t-body);
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }

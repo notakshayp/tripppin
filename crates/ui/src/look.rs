@@ -65,7 +65,7 @@ impl Corners {
 
     fn radii(self) -> Radii {
         match self {
-            Corners::Sharp => Radii { xs: 2, sm: 3, md: 4, lg: 5, xl: 6, control: 4, window: 4 },
+            Corners::Sharp => Radii { xs: 2, sm: 3, md: 4, lg: 4, xl: 4, control: 4, window: 0 },
             Corners::Default => Radii { xs: 4, sm: 6, md: 8, lg: 12, xl: 16, control: 8, window: 10 },
             Corners::Round => Radii { xs: 6, sm: 10, md: 14, lg: 20, xl: 26, control: 9999, window: 18 },
         }
@@ -148,6 +148,36 @@ fn fuzzel_ini(c: Corners) -> String {
     )
 }
 
+/// Sets the window corner radius in a GTK `gtk.css` that came from Tripppin (the skel copy
+/// starts with "Tripppin colours"): `--window-radius` and the `border-radius` inside any
+/// `window.background` rule. Someone's own file is left alone.
+pub fn window_radius_css(old: &str, px: u32) -> Option<String> {
+    if !old.lines().next().is_some_and(|l| l.contains("Tripppin colours")) {
+        return None;
+    }
+    let mut in_window = false;
+    let mut out = String::with_capacity(old.len());
+    for line in old.lines() {
+        let t = line.trim_start();
+        let indent = &line[..line.len() - t.len()];
+        if t.starts_with("window.background") && t.ends_with('{') {
+            in_window = true;
+        }
+        if t.starts_with("--window-radius:") {
+            out.push_str(&format!("{indent}--window-radius: {px}px;"));
+        } else if in_window && t.starts_with("border-radius:") {
+            out.push_str(&format!("{indent}border-radius: {px}px;"));
+        } else {
+            out.push_str(line);
+        }
+        out.push('\n');
+        if t.starts_with('}') {
+            in_window = false;
+        }
+    }
+    Some(out)
+}
+
 /// Writes `text` to `path`, or removes the file when `text` is None, unless the file is
 /// someone's own (it exists without our mark).
 fn write_ours(path: &Path, text: Option<String>) -> std::io::Result<()> {
@@ -185,6 +215,15 @@ pub fn set(c: Corners) -> std::io::Result<()> {
     write_ours(&home.join("swaync/style.css"), (!default).then(|| swaync_css(c)))?;
     write_ours(&home.join("wlogout/style.css"), (!default).then(|| wlogout_css(c)))?;
     write_ours(&home.join("fuzzel/fuzzel.ini"), (!default).then(|| fuzzel_ini(c)))?;
+    // Every GTK app's own window corners, so the window itself changes shape, not just niri's
+    // outline around it. GTK reloads these files by itself.
+    for gtk in ["gtk-4.0", "gtk-3.0"] {
+        let path = home.join(gtk).join("gtk.css");
+        if let Some(new) = std::fs::read_to_string(&path).ok().and_then(|old| window_radius_css(&old, c.radii().window))
+        {
+            std::fs::write(&path, new)?;
+        }
+    }
     // The bar reloads its style on SIGUSR2; quick settings on request.
     let _ = Command::new("pkill").args(["-USR2", "-x", "waybar"]).status();
     // Only when it's running: asking swaync-client otherwise starts it through D-Bus.
@@ -197,6 +236,16 @@ pub fn set(c: Corners) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn window_corners_follow_the_choice() {
+        let ours = "/* Tripppin colours for every GTK 4 app */\n:root {\n    --window-radius: 10px;\n}\nwindow.background,\nwindow.background.csd {\n    border-radius: 10px;\n}\nbutton {\n    border-radius: 10px;\n}\n";
+        let sharp = window_radius_css(ours, 4).unwrap();
+        assert!(sharp.contains("--window-radius: 4px;"));
+        assert!(sharp.contains("window.background.csd {\n    border-radius: 4px;"));
+        assert!(sharp.contains("button {\n    border-radius: 10px;"), "only windows change");
+        assert_eq!(window_radius_css("/* mine */\nwindow {}\n", 4), None);
+    }
 
     #[test]
     fn ids_round_trip() {

@@ -19,8 +19,8 @@ layout {
 
     focus-ring {
         width 1
-        // A muted green hairline, not a neon frame: it says which window has focus, quietly.
-        active-color "#57d99a80"
+        // A neutral hairline: it says which window has focus without a coloured frame.
+        active-color "#f2f5ef3d"
         inactive-color "#f2f5ef1a"
     }
     border {
@@ -60,6 +60,8 @@ spawn-at-startup "tripppin-ui" "splash"
 // The wallpaper: the person's choice (Settings → Appearance), else ours.
 // A built-in wallpaper is read from the image, so it follows updates; the copy in ~/.config is for one's own picture.
 spawn-at-startup "sh" "-c" "c=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin; w=/usr/share/tripppin/wallpapers/$(cat \"$c/wallpaper-name\" 2>/dev/null).png; [ -f \"$w\" ] || w=$c/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
+// The desktop: right-click menu and the icons of ~/Desktop, above the wallpaper.
+spawn-at-startup "tripppin-ui" "desktop"
 spawn-at-startup "waybar"
 spawn-at-startup "swaync"
 // Asks for your password when an app needs an administrator (GTK3, so it takes our theme).
