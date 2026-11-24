@@ -13,11 +13,10 @@
 use crate::jobs;
 use crate::model::{self, ContextFull, Message, ToolCall};
 use crate::session::Session;
-use crate::term::{ACCENT, DIM, RESET};
+use crate::tui::Terminal;
 use anyhow::{Result, bail};
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use std::io::{self, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -296,26 +295,6 @@ pub trait Ui {
     fn usage(&mut self, _usage: &crate::model::Usage) {}
     /// The task plan changed: the steps and which are done.
     fn plan(&mut self, _steps: &[crate::model::PlanStep]) {}
-}
-
-/// Progress printed to the terminal, the way the AI shell shows it.
-pub struct Terminal;
-
-impl Ui for Terminal {
-    fn text(&mut self, piece: &str) {
-        let mut out = io::stdout();
-        let _ = write!(out, "{piece}");
-        let _ = out.flush();
-    }
-    fn step(&mut self, label: &str, detail: &str) {
-        println!("{ACCENT}▸{RESET} {DIM}{label}{RESET} {detail}");
-    }
-    fn output(&mut self, line: &str) {
-        println!("{DIM}  │ {line}{RESET}");
-    }
-    fn note(&mut self, text: &str) {
-        println!("{DIM}{text}{RESET}");
-    }
 }
 
 /// How a task ended.
@@ -690,11 +669,10 @@ pub fn once(task: &str) -> Result<()> {
     let cancel = AtomicBool::new(false);
     let mut session = Session::new("terminal");
     session.ask(task);
-    let done = run(&mut session, &cancel, &mut Terminal)?;
-    if let Some(stats) = done.stats {
-        eprintln!("{DIM}{stats}{RESET}");
-    }
-    Ok(())
+    let mut ui = Terminal::new(None);
+    let done = run(&mut session, &cancel, &mut ui);
+    ui.finish(done.as_ref().ok().and_then(|d| d.stats.as_deref()));
+    done.map(|_| ())
 }
 
 #[cfg(test)]
