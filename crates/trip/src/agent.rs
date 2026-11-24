@@ -289,6 +289,13 @@ pub trait Ui {
     fn step_done(&mut self, _ok: bool) {}
     /// The model is working out its next move (no output to show yet).
     fn thinking(&mut self) {}
+    /// What the agent is waiting on right now, in a few words ("loading the model",
+    /// "reading 3,200 tokens", "writing"), so a quiet moment never looks like a hang.
+    fn waiting(&mut self, _what: &str) {}
+    /// Token counts after each model reply.
+    fn usage(&mut self, _usage: &crate::model::Usage) {}
+    /// The task plan changed: the steps and which are done.
+    fn plan(&mut self, _steps: &[crate::model::PlanStep]) {}
 }
 
 /// Progress printed to the terminal, the way the AI shell shows it.

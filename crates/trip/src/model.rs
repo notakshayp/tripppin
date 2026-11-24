@@ -409,6 +409,31 @@ pub struct ToolCall {
     pub arguments: String,
 }
 
+/// Token counts for one model reply, and how full the context is.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Usage {
+    /// Tokens the model read for this reply (the whole conversation sent).
+    pub prompt: usize,
+    /// Of those, how many came from the server's cache rather than being read again.
+    pub cached: usize,
+    /// Tokens the model wrote.
+    pub completion: usize,
+    /// The model's context size, when known (0 otherwise).
+    pub context: usize,
+    /// Writing speed.
+    pub tokens_per_sec: f64,
+    /// Running totals for the whole session.
+    pub session_prompt: usize,
+    pub session_completion: usize,
+}
+
+/// One step of the task plan the agent keeps in its notebook.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PlanStep {
+    pub text: String,
+    pub done: bool,
+}
+
 /// What came back from one streamed reply.
 pub struct Reply {
     pub text: String,
