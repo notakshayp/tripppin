@@ -58,7 +58,8 @@ spawn-at-startup "tripppin-ui" "displays"
 // until the bar and the orb are up (at most a few seconds); then it fades into the desktop.
 spawn-at-startup "tripppin-ui" "splash"
 // The wallpaper: the person's choice (Settings → Appearance), else ours.
-spawn-at-startup "sh" "-c" "w=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
+// A built-in wallpaper is read from the image, so it follows updates; the copy in ~/.config is for one's own picture.
+spawn-at-startup "sh" "-c" "c=${XDG_CONFIG_HOME:-$HOME/.config}/tripppin; w=/usr/share/tripppin/wallpapers/$(cat \"$c/wallpaper-name\" 2>/dev/null).png; [ -f \"$w\" ] || w=$c/wallpaper; [ -f \"$w\" ] || w=/usr/share/tripppin/wallpaper.png; exec swaybg -i \"$w\" -m fill"
 spawn-at-startup "waybar"
 spawn-at-startup "swaync"
 // Asks for your password when an app needs an administrator (GTK3, so it takes our theme).

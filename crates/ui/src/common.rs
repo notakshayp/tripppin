@@ -344,7 +344,7 @@ pub fn long_date() -> String {
     glib::DateTime::now_local()
         .ok()
         .and_then(|t| t.format("%A, %-d %B").ok())
-        .map(|s| s.to_lowercase())
+        .map(|s| s.to_string())
         .unwrap_or_default()
 }
 
