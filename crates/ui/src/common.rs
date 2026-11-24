@@ -161,6 +161,7 @@ pub mod icons {
     pub const CAPS: char = '\u{e04a}';
     pub const HISTORY: char = '\u{e1f5}';
     pub const CHEVRON_DOWN: char = '\u{e06d}';
+    pub const CHEVRON_LEFT: char = '\u{e06e}';
     pub const CHEVRON_RIGHT: char = '\u{e06f}';
     pub const TERMINAL: char = '\u{e181}';
     pub const NEW: char = '\u{e172}';
