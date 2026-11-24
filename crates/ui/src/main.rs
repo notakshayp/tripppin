@@ -8,10 +8,13 @@
 //! - `settings`: the Settings app.
 //! - `askpass`: the password pop-up for administrator commands the AI runs.
 //! - `displays`: gives each screen a whole-number scale at login, so text stays sharp.
+//! - `battery-ring`: the bar's battery ring, as an SVG for waybar.
+//! - `toggle`: the on/off tiles in quick settings.
 
 mod accounts;
 mod apps;
 mod askpass;
+mod battery;
 mod bt;
 mod calendar;
 mod common;
@@ -31,6 +34,7 @@ mod pointer;
 mod power;
 mod printers;
 mod privacy;
+mod quick;
 mod region;
 mod settings;
 mod snd;
@@ -67,6 +71,13 @@ fn main() -> ExitCode {
         display::use_crisp_scales();
         return ExitCode::SUCCESS;
     }
+    // Not a screen either: run by waybar every 30 seconds.
+    if args.first().map(String::as_str) == Some("battery-ring") {
+        return battery::run();
+    }
+    if args.first().map(String::as_str) == Some("toggle") {
+        return quick::main(&args[1..]);
+    }
     use_software_rendering_without_3d();
     match args.first().map(String::as_str) {
         Some("orb") => orb::run(),
@@ -84,7 +95,7 @@ fn main() -> ExitCode {
         Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | askpass | displays"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | askpass | displays | battery-ring | toggle <what> [--state]"
             );
             ExitCode::from(2)
         }
