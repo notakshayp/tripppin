@@ -1202,13 +1202,13 @@ mod tests {
     fn compacts_old_tool_output_first() {
         let big = "x".repeat(5000);
         let mut s = session_with(vec![
-            Message::system(),
+            Message(serde_json::json!({ "role": "system", "content": "s".repeat(4000) })),
             Message::user("task"),
             Message::tool("a", &big),
             Message::tool("b", &big),
             Message::tool("c", &big),
         ]);
-        let d = compact(&mut s, 8500).unwrap();
+        let d = compact(&mut s, 11000).unwrap();
         assert_eq!((d.outputs_trimmed, d.steps.len()), (2, 0), "only output was trimmed");
         let h = &s.history;
         assert_eq!(h[2].0["content"], TRIMMED);
@@ -1257,7 +1257,7 @@ mod tests {
         h.push(Message::user("task"));
         let mut s = session_with(h);
         s.turns[0].start = 5;
-        let d = compact(&mut s, 8500).unwrap();
+        let d = compact(&mut s, 11000).unwrap();
         assert_eq!(d.requests, ["first question"]);
         assert_eq!(s.forgotten, 1);
         assert_eq!(s.history[1].0["content"], "second question");

@@ -11,6 +11,8 @@
 //! - `displays`: gives each screen a whole-number scale at login, so text stays sharp.
 //! - `battery-ring`: the bar's battery ring, as an SVG for waybar.
 //! - `toggle`: the on/off tiles in quick settings.
+//! - `snap`: puts the focused window in a half, a quarter, or fills the screen.
+//! - `widgets`: the desktop widgets host, and `widgets add/list/test/remove/pin` to manage them.
 
 mod accounts;
 mod apps;
@@ -38,6 +40,7 @@ mod privacy;
 mod quick;
 mod region;
 mod settings;
+mod snap;
 mod snd;
 mod splash;
 mod storage;
@@ -45,6 +48,7 @@ mod switch;
 mod system;
 mod watch;
 mod welcome;
+mod widgets;
 
 use gtk::glib::ExitCode;
 
@@ -95,10 +99,11 @@ fn main() -> ExitCode {
         Some("welcome") => welcome::run(),
         Some("splash") => splash::run(),
         Some("switch") => switch::run(),
-        Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
+        Some("snap") => snap::run(args.get(1).map(String::as_str).unwrap_or("")),
+        Some("widgets") => widgets::cli(&args[1..]),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state]"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state]"
             );
             ExitCode::from(2)
         }

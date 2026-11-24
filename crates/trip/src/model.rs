@@ -20,6 +20,13 @@ const MAX_REPLY_TOKENS: u32 = 2048;
 const MODELS_DIR: &str = "/var/lib/tripppin/models";
 const LLAMA_SERVER: &str = "/usr/bin/llama-server";
 const IDLE_UNLOAD_SECS: u32 = 900;
+/// How the model puts a widget on the desktop (crates/ui widgets host).
+const WIDGETS: &str = "Desktop widgets: to put a widget on the desktop, write a folder with widget.toml and one \
+script (Python 3 standard library or sh) that prints the JSON described in /usr/share/doc/tripppin/WIDGETS.md \
+(read it first). Run `tripppin-ui widgets test <dir>` and fix any errors, then `tripppin-ui widgets add <dir>`. \
+For a particular screen, list them with `tripppin-ui widgets outputs` and use `tripppin-ui widgets pin <name> <output>`. \
+Tell the person that `tripppin-ui widgets remove <name>` takes it away.";
+
 const SYSTEM_PROMPT: &str = "You are the assistant built into Tripppin, a Linux operating system based on Fedora \
 with its own desktop. The person asks you from the orb (a pop-up on the desktop) or from the terminal. You have tools: \
 exec runs shell commands on their machine, read_file / write_file work with files, plan and done keep your task \
@@ -434,7 +441,7 @@ pub struct Message(pub serde_json::Value);
 impl Message {
     pub fn system() -> Self {
         Message(
-            serde_json::json!({ "role": "system", "content": format!("{SYSTEM_PROMPT}\n\n{}", crate::permissions::summary()) }),
+            serde_json::json!({ "role": "system", "content": format!("{SYSTEM_PROMPT}\n\n{WIDGETS}\n\n{}", crate::permissions::summary()) }),
         )
     }
     pub fn user(text: &str) -> Self {
