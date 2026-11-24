@@ -21,28 +21,28 @@ type Card = (&'static str, &'static str, &'static str, Option<(&'static str, &'s
 
 const CARDS: [Card; 4] = [
     (
-        "welcome to tripppin",
-        "a computer you can talk to. the ai runs here, on this machine: what you ask stays with you.",
+        "Welcome to Tripppin",
+        "A computer you can talk to. The AI runs here, on this machine: what you ask stays with you.",
         "",
         None,
     ),
     (
-        "ask in plain words",
-        "press super + space, or click the orb in the corner, and say what you want: \"install vlc\", \"what's using my disk\", \"make the text bigger\". it does the steps and shows you each one.",
-        "super + space",
+        "Ask in plain words",
+        "Press Super + Space, or click the orb in the corner, and say what you want: \"install VLC\", \"what's using my disk\", \"make the text bigger\". It does the steps and shows you each one.",
+        "Super + Space",
         None,
     ),
     (
-        "find your way around",
-        "apps are on super + a, or type an app's name after super + space. quick settings and notifications are on super + n. alt + tab switches windows, super + arrows snap them. super + / shows every shortcut.",
-        "super + /",
-        Some(("show the shortcuts", &["tripppin-ui", "keys"])),
+        "Find your way around",
+        "Apps are on Super + A, or type an app's name after Super + Space. Quick settings and notifications are on Super + N. Alt + Tab switches windows, Super + arrows snap them. Super + / shows every shortcut.",
+        "Super + /",
+        Some(("Show the shortcuts", &["tripppin-ui", "keys"])),
     ),
     (
-        "make it yours",
-        "wallpaper, wi-fi, sound, displays, accounts and updates are all in settings. new apps come from flathub: ask the orb, or open settings → apps.",
+        "Make it yours",
+        "Wallpaper, Wi-Fi, sound, displays, accounts and updates are all in settings. New apps come from Flathub: ask the orb, or open Settings → apps.",
         "",
-        Some(("open settings", &["tripppin-ui", "settings"])),
+        Some(("Open settings", &["tripppin-ui", "settings"])),
     ),
 ];
 
@@ -64,7 +64,7 @@ fn build(app: &gtk::Application) {
     common::load_css();
     let window = gtk::ApplicationWindow::builder()
         .application(app)
-        .title("welcome")
+        .title("Welcome")
         .default_width(620)
         .default_height(520)
         .build();
@@ -79,10 +79,10 @@ fn build(app: &gtk::Application) {
     let mut cards: Vec<Card> = Vec::new();
     if !online() && crate::nm::has_wifi() {
         cards.push((
-            "connect to the internet",
-            "the ai works without it, but updates, new apps and the browser need it.",
+            "Connect to the internet",
+            "The AI works without it, but updates, new apps and the browser need it.",
             "",
-            Some(("choose a wi-fi network", &["tripppin-ui", "settings", "wifi"])),
+            Some(("Choose a Wi-Fi network", &["tripppin-ui", "settings", "wifi"])),
         ));
     }
     cards.extend(CARDS);
@@ -108,7 +108,7 @@ fn build(app: &gtk::Application) {
     let dots = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     dots.set_hexpand(true);
     dots.set_valign(gtk::Align::Center);
-    let next = gtk::Button::with_label("next");
+    let next = gtk::Button::with_label("Next");
     next.add_css_class("pill");
     foot.append(&dots);
     foot.append(&next);

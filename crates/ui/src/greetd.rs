@@ -22,7 +22,7 @@ pub enum Outcome {
 impl Greetd {
     pub fn connect() -> Result<Self> {
         let path = std::env::var("GREETD_SOCK").context("GREETD_SOCK isn't set; is greetd running this?")?;
-        Ok(Greetd { sock: UnixStream::connect(&path).with_context(|| format!("connecting to {path}"))? })
+        Ok(Greetd { sock: UnixStream::connect(&path).with_context(|| format!("Connecting to {path}"))? })
     }
 
     fn send(&mut self, msg: &Value) -> Result<Value> {
@@ -52,7 +52,7 @@ impl Greetd {
                         }
                         Some("secret") | Some("visible") => {
                             self.cancel();
-                            return Ok(Outcome::Refused("it asked for more than a password".into()));
+                            return Ok(Outcome::Refused("It asked for more than a password".into()));
                         }
                         _ => Value::Null,
                     };
@@ -69,7 +69,7 @@ impl Greetd {
                     self.cancel();
                     return Ok(Outcome::Refused(describe(&reply)));
                 }
-                other => bail!("greetd sent something unexpected: {other:?}"),
+                other => bail!("Greetd sent something unexpected: {other:?}"),
             }
         }
     }
@@ -81,7 +81,7 @@ impl Greetd {
 
 fn describe(reply: &Value) -> String {
     match reply["error_type"].as_str() {
-        Some("auth_error") => "that's not it. try again.".into(),
-        _ => reply["description"].as_str().unwrap_or("something went wrong").to_lowercase(),
+        Some("auth_error") => "That's not it. Try again.".into(),
+        _ => reply["description"].as_str().unwrap_or("Something went wrong").to_lowercase(),
     }
 }

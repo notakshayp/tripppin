@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=power & battery settings
-Comment=settings → power & battery
+Name=Power & battery settings
+Comment=Settings → power & battery
 Exec=tripppin-ui settings power
 Icon=battery
 Keywords=battery;sleep;lock;power mode;suspend;

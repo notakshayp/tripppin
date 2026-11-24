@@ -193,7 +193,7 @@ fn build(app: &gtk::Application, windows: Vec<Window>) -> Rc<Switcher> {
             img.set_pixel_size(56);
             img.upcast()
         } else {
-            let letter = w.title.chars().next().map(|c| c.to_lowercase().to_string()).unwrap_or_default();
+            let letter = w.title.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default();
             let l = label(&letter, &["avatar"]);
             l.set_size_request(56, 56);
             l.set_halign(gtk::Align::Center);
@@ -201,7 +201,7 @@ fn build(app: &gtk::Application, windows: Vec<Window>) -> Rc<Switcher> {
             l.upcast()
         };
         card.append(&picture);
-        let title = label(&w.title.to_lowercase(), &["switch-title"]);
+        let title = label(&w.title, &["switch-title"]);
         title.set_ellipsize(gtk::pango::EllipsizeMode::End);
         title.set_max_width_chars(16);
         title.set_xalign(0.5);

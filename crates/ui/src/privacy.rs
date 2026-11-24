@@ -83,7 +83,7 @@ pub fn set_screen_reader(on: bool) {
     }
 }
 
-pub const CURSOR_SIZES: [(u32, &str); 4] = [(24, "normal"), (32, "large"), (48, "larger"), (64, "largest")];
+pub const CURSOR_SIZES: [(u32, &str); 4] = [(24, "Normal"), (32, "Large"), (48, "Larger"), (64, "Largest")];
 
 pub fn cursor_size() -> u32 {
     gsettings_get("org.gnome.desktop.interface", "cursor-size").parse().unwrap_or(24)

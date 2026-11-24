@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=accounts settings
-Comment=settings → accounts
+Name=Accounts settings
+Comment=Settings → accounts
 Exec=tripppin-ui settings accounts
 Icon=system-users
 Keywords=user;password;picture;login;people;

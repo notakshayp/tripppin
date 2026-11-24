@@ -23,10 +23,10 @@ impl Default for Keyboard {
 
 /// Ways to switch layout. Super+Space is the orb's, so it isn't offered.
 pub const SWITCHES: [(&str, &str); 4] = [
-    ("grp:alt_shift_toggle", "alt + shift"),
-    ("grp:ctrl_shift_toggle", "ctrl + shift"),
-    ("grp:caps_toggle", "caps lock"),
-    ("grp:menu_toggle", "menu key"),
+    ("grp:alt_shift_toggle", "Alt + Shift"),
+    ("grp:ctrl_shift_toggle", "Ctrl + Shift"),
+    ("grp:caps_toggle", "Caps lock"),
+    ("grp:menu_toggle", "Menu key"),
 ];
 pub const DELAYS: [(u32, &str); 3] = [(250, "short"), (400, "medium"), (600, "long")];
 pub const RATES: [(u32, &str); 3] = [(15, "slow"), (25, "normal"), (40, "fast")];

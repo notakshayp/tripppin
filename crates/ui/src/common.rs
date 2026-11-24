@@ -328,10 +328,10 @@ pub fn pulse_dot(size: i32) -> gtk::DrawingArea {
 
 pub fn clock() -> String {
     let format = if crate::region::twelve_hour() { "%-I:%M %p" } else { "%H:%M" };
-    glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_lowercase()).unwrap_or_default()
+    glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_string()).unwrap_or_default()
 }
 
-/// "sunday, 22 november"
+/// "Sunday, 22 November"
 pub fn long_date() -> String {
     glib::DateTime::now_local()
         .ok()
@@ -399,45 +399,45 @@ pub fn current_user() -> String {
 /// Settings → Keyboard. Keep in step with os/files/etc/niri/desktop.kdl.
 pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
     (
-        "tripppin",
+        "Tripppin",
         &[
-            ("ask tripppin", "super + space"),
-            ("terminal", "super + return"),
-            ("apps", "super + a, or type its name after super + space"),
-            ("quick settings", "super + n"),
-            ("clipboard history", "super + v"),
-            ("emoji", "super + ."),
-            ("these shortcuts", "super + /"),
+            ("Ask Tripppin", "Super + Space"),
+            ("terminal", "Super + Return"),
+            ("apps", "Super + A, or type its name after Super + Space"),
+            ("Quick settings", "Super + N"),
+            ("Clipboard history", "Super + V"),
+            ("emoji", "Super + ."),
+            ("These shortcuts", "Super + /"),
         ],
     ),
     (
-        "windows",
+        "Windows",
         &[
-            ("close a window", "super + q"),
-            ("move a window", "super + drag"),
-            ("resize a window", "super + right-drag"),
-            ("full screen", "super + f"),
-            ("float or tile a window", "super + t"),
-            ("switch windows", "alt + tab"),
-            ("see every window", "super + tab"),
-            ("snap left or right", "super + ← →"),
-            ("fill the screen", "super + ↑ (again to undo)"),
-            ("centre a window", "super + ↓"),
-            ("snap to a corner", "super + alt + arrows"),
-            ("workspace 1, 2, 3", "super + 1, 2, 3"),
-            ("move a window to 1, 2, 3", "super + shift + 1, 2, 3"),
+            ("Close a window", "Super + Q"),
+            ("Move a window", "Super + drag"),
+            ("Resize a window", "Super + right-drag"),
+            ("Full screen", "Super + F"),
+            ("Float or tile a window", "Super + T"),
+            ("Switch windows", "Alt + Tab"),
+            ("See every window", "Super + Tab"),
+            ("Snap left or right", "Super + ← →"),
+            ("Fill the screen", "Super + ↑ (again to undo)"),
+            ("Centre a window", "Super + ↓"),
+            ("Snap to a corner", "Super + Alt + arrows"),
+            ("Workspace 1, 2, 3", "Super + 1, 2, 3"),
+            ("Move a window to 1, 2, 3", "Super + Shift + 1, 2, 3"),
         ],
     ),
     (
-        "system",
+        "System",
         &[
-            ("lock", "super + l"),
-            ("power menu", "super + escape"),
-            ("screenshot of an area", "print"),
-            ("screenshot of the screen", "ctrl + print"),
-            ("screenshot of a window", "alt + print"),
-            ("draw on the last screenshot", "super + shift + s"),
-            ("record the screen", "super + shift + r"),
+            ("lock", "Super + L"),
+            ("Power menu", "Super + Escape"),
+            ("Screenshot of an area", "print"),
+            ("Screenshot of the screen", "Ctrl + Print"),
+            ("Screenshot of a window", "Alt + Print"),
+            ("Draw on the last screenshot", "Super + Shift + S"),
+            ("Record the screen", "Super + Shift + R"),
         ],
     ),
 ];

@@ -43,13 +43,13 @@ pub fn usage() -> Usage {
     let trash = du(&h.join(".local/share/Trash"));
     let cache = du(&h.join(".cache"));
     let mut parts = vec![
-        ("your files", du(&h).saturating_sub(trash + cache)),
+        ("Your files", du(&h).saturating_sub(trash + cache)),
         ("apps", du(Path::new("/var/lib/flatpak")) + du(&h.join(".local/share/flatpak"))),
-        ("ai models", du(&trip::model::models_dir())),
-        ("trash and caches", trash + cache),
+        ("AI models", du(&trip::model::models_dir())),
+        ("Trash and caches", trash + cache),
     ];
     let counted: u64 = parts.iter().map(|p| p.1).sum();
-    parts.push(("the system and its previous version", used.saturating_sub(counted)));
+    parts.push(("The system and its previous version", used.saturating_sub(counted)));
     parts.sort_by_key(|p| std::cmp::Reverse(p.1));
     Usage { total, used, parts, trash, cache }
 }
@@ -148,7 +148,7 @@ pub fn eject(d: &Drive) -> Result<(), String> {
         if !out.status.success() {
             let err = String::from_utf8_lossy(&out.stderr).to_lowercase();
             return Err(if err.contains("busy") {
-                "something is still using it; close its files and try again".into()
+                "Something is still using it; close its files and try again".into()
             } else {
                 err.trim().to_string()
             });

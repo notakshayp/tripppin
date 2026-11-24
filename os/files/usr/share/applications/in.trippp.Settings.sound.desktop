@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=sound settings
-Comment=settings → sound
+Name=Sound settings
+Comment=Settings → sound
 Exec=tripppin-ui settings sound
 Icon=audio-volume-high
 Keywords=volume;speaker;microphone;mic;headphones;output;input;

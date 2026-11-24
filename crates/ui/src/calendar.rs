@@ -52,14 +52,14 @@ fn build(app: &gtk::Application) -> gtk::Window {
     let card = gtk::Box::new(gtk::Orientation::Vertical, 14);
     card.add_css_class("calendar-card");
     let now = glib::DateTime::now_local().ok();
-    let day = now.as_ref().and_then(|t| t.format("%A").ok()).map(|s| s.to_lowercase()).unwrap_or_default();
-    let date = now.as_ref().and_then(|t| t.format("%-d %B %Y").ok()).map(|s| s.to_lowercase()).unwrap_or_default();
+    let day = now.as_ref().and_then(|t| t.format("%A").ok()).map(|s| s.to_string()).unwrap_or_default();
+    let date = now.as_ref().and_then(|t| t.format("%-d %B %Y").ok()).map(|s| s.to_string()).unwrap_or_default();
     card.append(&label(&day, &["calendar-day"]));
     card.append(&label(&date, &["calendar-date"]));
     let month = gtk::Calendar::new();
     month.add_css_class("month");
     card.append(&month);
-    let events = label("no events · connecting a calendar comes in a later update", &["row-sub"]);
+    let events = label("No events · connecting a calendar comes in a later update", &["row-sub"]);
     events.set_wrap(true);
     events.set_xalign(0.0);
     events.set_max_width_chars(34);
