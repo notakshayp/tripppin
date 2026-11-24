@@ -1208,7 +1208,7 @@ mod tests {
             Message::tool("b", &big),
             Message::tool("c", &big),
         ]);
-        let d = compact(&mut s, 8000).unwrap();
+        let d = compact(&mut s, 8500).unwrap();
         assert_eq!((d.outputs_trimmed, d.steps.len()), (2, 0), "only output was trimmed");
         let h = &s.history;
         assert_eq!(h[2].0["content"], TRIMMED);
@@ -1257,7 +1257,7 @@ mod tests {
         h.push(Message::user("task"));
         let mut s = session_with(h);
         s.turns[0].start = 5;
-        let d = compact(&mut s, 8000).unwrap();
+        let d = compact(&mut s, 8500).unwrap();
         assert_eq!(d.requests, ["first question"]);
         assert_eq!(s.forgotten, 1);
         assert_eq!(s.history[1].0["content"], "second question");
