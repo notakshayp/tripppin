@@ -1,0 +1,11 @@
+#!/bin/sh
+# The login screen, as greetd runs it on tty1 (/etc/greetd/config.toml): a small niri session
+# showing tripppin-ui greeter. niri's own messages go to the journal rather than the console,
+# and the console is kept plain ink, so nothing but ink shows while the screen changes hands
+# (before the login screen draws, and between it and the desktop).
+/usr/libexec/tripppin-ink-console
+systemd-cat -t tripppin-greeter niri -c /etc/tripppin/greeter-niri.kdl
+status=$?
+# If niri couldn't start, greetd will retry; leave the console readable meanwhile.
+[ "$status" -eq 0 ] || /usr/libexec/tripppin-ink-console reset
+exit "$status"

@@ -4,6 +4,10 @@ case $- in *i*) ;; *) return 0 ;; esac
 [ -t 1 ] || return 0
 [ -n "$TRIPPPIN_LOGO_SHOWN" ] && return 0
 [ -n "$TRIPPPIN_NO_LOGO" ] && return 0
+# Never on the way into the desktop: tty1 is the login screen's and the desktop's (greetd),
+# where the splash shows the logo instead; nor inside a graphical session.
+case "$(tty)" in /dev/tty1) return 0 ;; esac
+[ -n "$WAYLAND_DISPLAY$NIRI_SOCKET" ] && return 0
 export TRIPPPIN_LOGO_SHOWN=1
 command -v trip >/dev/null 2>&1 || return 0
 # kmscon gives logins a pseudo-terminal and draws 24-bit colour; tell programs so.
