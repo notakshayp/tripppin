@@ -53,30 +53,30 @@
         {
           "label": "\ue1ae   wi-fi",
           "type": "toggle",
-          "command": "sh -c 'if ! nmcli -t -f TYPE device | grep -qx wifi; then notify-send -a \"quick settings\" -i network-wireless-disabled \"no wi-fi on this computer\" \"there is no wi-fi adapter, so it uses a wired connection.\"; exit 0; fi; [ \"$SWAYNC_TOGGLE_STATE\" = true ] && nmcli radio wifi on || nmcli radio wifi off'",
-          "update-command": "sh -c 'nmcli -t -f TYPE device | grep -qx wifi && [ \"$(nmcli radio wifi)\" = enabled ] && echo true || echo false'"
+          "command": "tripppin-ui toggle wifi",
+          "update-command": "tripppin-ui toggle wifi --state"
         },
         {
           "label": "\ue05c   bluetooth",
           "type": "toggle",
-          "command": "sh -c 'if ! bluetoothctl list | grep -q Controller; then notify-send -a \"quick settings\" -i bluetooth-disabled \"no bluetooth on this computer\" \"there is no bluetooth adapter.\"; exit 0; fi; [ \"$SWAYNC_TOGGLE_STATE\" = true ] && bluetoothctl power on || bluetoothctl power off'",
-          "update-command": "sh -c 'bluetoothctl show | grep -q \"Powered: yes\" && echo true || echo false'"
+          "command": "tripppin-ui toggle bluetooth",
+          "update-command": "tripppin-ui toggle bluetooth --state"
         },
         {
           "label": "\ue1de   airplane",
           "type": "toggle",
-          "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && nmcli radio all off || nmcli radio all on'",
-          "update-command": "sh -c '[ \"$(nmcli radio wifi)\" = disabled ] && [ \"$(nmcli radio wwan)\" != enabled ] && echo true || echo false'"
+          "command": "tripppin-ui toggle airplane",
+          "update-command": "tripppin-ui toggle airplane --state"
         },
         {
           "label": "\ue11e   night light",
           "type": "toggle",
-          "command": "sh -c '[ \"$SWAYNC_TOGGLE_STATE\" = true ] && (pgrep -x wlsunset || setsid wlsunset -T 4500 -t 3500 >/dev/null 2>&1 &) || pkill -x wlsunset'",
-          "update-command": "sh -c 'pgrep -x wlsunset >/dev/null && echo true || echo false'"
+          "command": "tripppin-ui toggle night-light",
+          "update-command": "tripppin-ui toggle night-light --state"
         },
         {
           "label": "\ue14e   screenshot",
-          "command": "sh -c 'swaync-client -cp; sleep 0.4; grim -g \"$(slurp)\" - | swappy -f -'"
+          "command": "swaync-client -cp; sleep 0.4; slurp | grim -g - - | swappy -f -"
         },
         {
           "label": "\ue10b   lock",

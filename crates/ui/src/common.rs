@@ -351,14 +351,7 @@ pub fn wifi_name() -> Option<String> {
 
 /// The battery's charge in percent, if there's a battery.
 pub fn battery() -> Option<u8> {
-    let dir = std::fs::read_dir("/sys/class/power_supply").ok()?;
-    for entry in dir.flatten() {
-        let path = entry.path();
-        if std::fs::read_to_string(path.join("type")).is_ok_and(|t| t.trim() == "Battery") {
-            return std::fs::read_to_string(path.join("capacity")).ok()?.trim().parse().ok();
-        }
-    }
-    None
+    crate::battery::read(std::path::Path::new("/sys/class/power_supply")).map(|c| c.percent)
 }
 
 /// Where the desktop's small shared state lives (the orb's status, what finished last).

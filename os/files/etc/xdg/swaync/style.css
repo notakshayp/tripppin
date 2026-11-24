@@ -87,27 +87,40 @@ button:active { transform: scale(0.96); }
 }
 .widget-title > button:hover { color: #eef2ee; background: #222b28; }
 
-/* Tiles: icon and name; neutral when off, a soft green tint when on. */
+/* Tiles: raised buttons that lift under the pointer and sink when pressed. Off: a quiet
+   grey tile. On: filled forest green with paper text, so the state reads at a glance. */
 .widget-buttons-grid { padding: 2px 0; }
+/* The tile itself shows hover, not a second box behind it. */
+.widget-buttons-grid > flowbox > flowboxchild,
+.widget-buttons-grid > flowbox > flowboxchild:hover,
+.widget-buttons-grid > flowbox > flowboxchild:selected { background: transparent; outline: none; }
 .widget-buttons-grid > flowbox > flowboxchild > button {
   min-width: 100px;
   min-height: 44px;
   margin: 4px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid rgba(242, 245, 239, 0.07);
-  background: #1a2220;
-  color: #eef2ee;
+  border: 1px solid rgba(242, 245, 239, 0.08);
+  background: rgba(242, 245, 239, 0.05);
+  color: #d9e1dd;
   font-size: 13px;
   font-weight: 500;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
-.widget-buttons-grid > flowbox > flowboxchild > button:hover { background: #222b28; }
+.widget-buttons-grid > flowbox > flowboxchild > button:hover {
+  border-color: rgba(242, 245, 239, 0.16);
+  background: rgba(242, 245, 239, 0.10);
+  color: #f2f5ef;
+}
+.widget-buttons-grid > flowbox > flowboxchild > button:active { background: rgba(242, 245, 239, 0.03); }
 .widget-buttons-grid > flowbox > flowboxchild > button.toggle:checked,
 .widget-buttons-grid > flowbox > flowboxchild > button.active {
-  background: rgba(87, 217, 154, 0.14);
-  border-color: rgba(87, 217, 154, 0.45);
-  color: #eef2ee;
+  background: #1f6b45;
+  border-color: rgba(87, 217, 154, 0.35);
+  color: #f2f5ef;
 }
+.widget-buttons-grid > flowbox > flowboxchild > button.toggle:checked:hover,
+.widget-buttons-grid > flowbox > flowboxchild > button.active:hover { background: #267a50; }
 
 .widget-volume, .widget-slider, .widget-backlight {
   padding: 8px 14px;

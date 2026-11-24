@@ -1,6 +1,10 @@
 # When the computer is left alone (the default; Settings → Power writes ~/.config/tripppin/idle).
-timeout 270 'tripppin-ui dim' resume 'pkill -f "^(/usr/bin/)?tripppin-ui dim"'
+# swayidle runs with -w and waits for every command: the fade runs in the background, and
+# `tripppin-ui lock` returns as soon as the screen is locked.
+timeout 270 'tripppin-ui dim &' resume 'pkill -f "^(/usr/bin/)?tripppin-ui dim"'
 timeout 300 'tripppin-ui lock'
 timeout 600 'niri msg action power-off-monitors' resume 'niri msg action power-on-monitors'
 timeout 1800 'systemctl suspend'
 before-sleep 'tripppin-ui lock'
+# loginctl lock-session
+lock 'tripppin-ui lock'
