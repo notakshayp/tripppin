@@ -374,6 +374,7 @@ fn rename_box(dir: &Path, pop: &gtk::Popover, e: &Entry, x: f64, y: f64) {
 fn entry_widget(shared: &Shared, s: &Surface, e: &Entry) -> gtk::Box {
     let cell = gtk::Box::new(gtk::Orientation::Vertical, 4);
     cell.add_css_class("desktop-icon");
+    cell.set_widget_name(&e.path.to_string_lossy());
     cell.set_size_request(CELL_W - 8, CELL_H - 8);
     if s.selected.borrow().as_deref() == Some(e.path.as_path()) {
         cell.add_css_class("selected");
@@ -400,8 +401,8 @@ fn entry_widget(shared: &Shared, s: &Surface, e: &Entry) -> gtk::Box {
             open(&en);
         } else {
             *sel.borrow_mut() = Some(en.path.clone());
-            let sh = shared2.clone();
-            glib::idle_add_local_once(move || restyle(&sh));
+            // Only the highlight moves: rebuilding the icons here would swallow a double-click.
+            mark_selected(&shared2, &en.path);
         }
     });
     cell.add_controller(left);
@@ -421,6 +422,20 @@ fn entry_widget(shared: &Shared, s: &Surface, e: &Entry) -> gtk::Box {
 }
 
 /// Redraws every screen's icons (cheap: a handful of widgets).
+/// Moves the selection highlight to the icon for `path`, on every screen.
+fn mark_selected(shared: &Shared, path: &std::path::Path) {
+    let name = path.to_string_lossy();
+    for s in &shared.borrow().surfaces {
+        for w in s.icons.borrow().iter() {
+            if w.widget_name() == name.as_ref() {
+                w.add_css_class("selected");
+            } else {
+                w.remove_css_class("selected");
+            }
+        }
+    }
+}
+
 fn restyle(shared: &Shared) {
     let d = shared.borrow();
     let list = entries(&d.dir);
