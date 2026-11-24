@@ -230,6 +230,32 @@ pub fn spinner(size: i32) -> gtk::DrawingArea {
     area
 }
 
+/// A small green dot that breathes while something is under way: quieter than the spinner,
+/// for a status line. Holds still when animations are off.
+pub fn pulse_dot(size: i32) -> gtk::DrawingArea {
+    let area = gtk::DrawingArea::new();
+    area.set_content_width(size);
+    area.set_content_height(size);
+    area.set_can_target(false);
+    area.add_css_class("pulse-dot");
+    area.set_draw_func(|a, cr, w, h| {
+        let animate = gtk::Settings::default().is_none_or(|s| s.is_gtk_enable_animations());
+        let t = if animate { a.frame_clock().map_or(0.0, |c| c.frame_time() as f64 / 1_000_000.0) } else { 0.0 };
+        // One breath every 1.4 s: the dot swells a little and brightens, then settles.
+        let k = 0.5 - 0.5 * (t * std::f64::consts::TAU / 1.4).cos();
+        let (w, h) = (f64::from(w), f64::from(h));
+        let full = w.min(h) / 2.0;
+        cr.set_source_rgba(GREEN.0, GREEN.1, GREEN.2, 0.45 + 0.55 * k);
+        cr.arc(w / 2.0, h / 2.0, full * (0.6 + 0.4 * k), 0.0, std::f64::consts::TAU);
+        cr.fill().ok();
+    });
+    area.add_tick_callback(|a, _| {
+        a.queue_draw();
+        glib::ControlFlow::Continue
+    });
+    area
+}
+
 pub fn clock() -> String {
     let format = if crate::region::twelve_hour() { "%-I:%M %p" } else { "%H:%M" };
     glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_lowercase()).unwrap_or_default()

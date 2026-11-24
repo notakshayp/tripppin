@@ -3,6 +3,10 @@
 //! Click it or press Super+Space (`tripppin-ui orb --toggle`) and a glowing bar asks what you
 //! want. While it works, a card next to the orb shows each step live: done, running (with the
 //! command's latest output) and the answer. The same agent as the terminal does the work.
+//! The header says what it's waiting on with a running clock and a breathing dot; a hairline
+//! under it fills with the context used (and sweeps while it works). A plan, when the agent
+//! keeps one, sits as a checklist at the top of the request; each request ends with a dim line
+//! of the tokens it took, and the footer keeps the conversation's total.
 //! Drag the orb and it springs to the nearest corner; right-click tucks it away to a small
 //! dot. The card minimises back into the orb.
 //!
@@ -22,6 +26,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use trip::agent::{self, Ui};
+use trip::model::{PlanStep, Usage};
 use trip::session::Session;
 
 const SUGGESTIONS: [&str; 3] = ["free up some space", "connect my headphones", "what changed today?"];
@@ -127,6 +132,12 @@ enum Event {
     Note(String),
     StepDone(bool),
     Thinking,
+    /// What it's waiting on, in a few words.
+    Waiting(String),
+    /// Token counts after a model reply.
+    Usage(Usage),
+    /// The task plan, whole, each time it changes.
+    Plan(Vec<PlanStep>),
     /// Finished, with the session back from the agent's thread.
     Done(Result<(), String>, Box<Session>),
 }
@@ -152,6 +163,15 @@ impl Ui for Sender {
     }
     fn thinking(&mut self) {
         let _ = self.0.send_blocking(Event::Thinking);
+    }
+    fn waiting(&mut self, what: &str) {
+        let _ = self.0.send_blocking(Event::Waiting(what.to_string()));
+    }
+    fn usage(&mut self, usage: &Usage) {
+        let _ = self.0.send_blocking(Event::Usage(usage.clone()));
+    }
+    fn plan(&mut self, steps: &[PlanStep]) {
+        let _ = self.0.send_blocking(Event::Plan(steps.to_vec()));
     }
 }
 
@@ -232,6 +252,84 @@ pub fn markup(text: &str) -> String {
 
 fn short(path: &str) -> String {
     path.rsplit('/').find(|s| !s.is_empty()).unwrap_or(path).to_string()
+}
+
+/// A token count, short: 230, 1.2k, 38k, 1.4m.
+pub fn tokens(n: usize) -> String {
+    let one_place = |x: f64, unit: &str| {
+        let s = format!("{x:.1}");
+        format!("{}{unit}", s.strip_suffix(".0").unwrap_or(&s))
+    };
+    match n {
+        0..1000 => n.to_string(),
+        1000..10_000 => one_place(n as f64 / 1000.0, "k"),
+        10_000..1_000_000 => format!("{}k", (n as f64 / 1000.0).round()),
+        _ => one_place(n as f64 / 1_000_000.0, "m"),
+    }
+}
+
+/// How full the model's context is, in percent, when its size is known.
+pub fn context_percent(u: &Usage) -> Option<u32> {
+    (u.context > 0).then(|| (((u.prompt + u.completion) as f64 / u.context as f64) * 100.0).round().min(100.0) as u32)
+}
+
+/// What one request has cost so far: every model reply it took, added up.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TurnTokens {
+    pub prompt: usize,
+    pub cached: usize,
+    pub completion: usize,
+    /// From the latest reply.
+    pub tokens_per_sec: f64,
+    pub context: Option<u32>,
+    pub replies: usize,
+}
+
+impl TurnTokens {
+    pub fn add(&mut self, u: &Usage) {
+        self.prompt += u.prompt;
+        self.cached += u.cached;
+        self.completion += u.completion;
+        self.replies += 1;
+        if u.tokens_per_sec > 0.0 {
+            self.tokens_per_sec = u.tokens_per_sec;
+        }
+        if let Some(p) = context_percent(u) {
+            self.context = Some(p);
+        }
+    }
+
+    /// "1.2k in · 230 out · 14 tok/s · context 38%"
+    pub fn line(&self) -> String {
+        let mut words = vec![format!("{} in", tokens(self.prompt))];
+        if self.cached > 0 {
+            words.push(format!("{} cached", tokens(self.cached)));
+        }
+        words.push(format!("{} out", tokens(self.completion)));
+        let tps = self.tokens_per_sec;
+        if tps > 0.0 {
+            words.push(if tps < 10.0 { format!("{tps:.1} tok/s") } else { format!("{tps:.0} tok/s") });
+        }
+        if let Some(p) = self.context {
+            words.push(format!("context {p}%"));
+        }
+        words.join(" · ")
+    }
+}
+
+/// The status line's words, kept to one short line ("running dnf install -y vlc…").
+pub fn clip(text: &str, max: usize) -> String {
+    let text = text.trim();
+    if text.chars().count() <= max {
+        return text.to_string();
+    }
+    let cut: String = text.chars().take(max.saturating_sub(1)).collect();
+    format!("{}…", cut.trim_end())
+}
+
+/// The plan's step to work on now: the first not yet done.
+pub fn current_step(steps: &[PlanStep]) -> Option<usize> {
+    steps.iter().position(|s| !s.done)
 }
 
 /// The round mark for a finished step: the icon centred in its circle both ways.
@@ -388,11 +486,67 @@ impl StepRow {
     }
 }
 
-/// One request in the card: what was asked (for follow-ups), its steps and the answer.
+/// One line of the plan checklist: its mark (ticked, current or still to come) and words.
+struct PlanRow {
+    root: gtk::Box,
+    mark: gtk::Stack,
+    text: gtk::Label,
+}
+
+impl PlanRow {
+    fn new(text: &str) -> Self {
+        let mark = gtk::Stack::new();
+        mark.add_css_class("plan-mark");
+        mark.set_valign(gtk::Align::Start);
+        mark.set_transition_type(gtk::StackTransitionType::Crossfade);
+        mark.set_transition_duration(160);
+        let todo = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        todo.add_css_class("plan-todo");
+        todo.set_halign(gtk::Align::Center);
+        todo.set_valign(gtk::Align::Center);
+        let now = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        now.add_css_class("plan-now");
+        now.set_halign(gtk::Align::Center);
+        now.set_valign(gtk::Align::Center);
+        let done = common::icon(icons::CHECK, &["plan-done"]);
+        done.set_halign(gtk::Align::Center);
+        done.set_valign(gtk::Align::Center);
+        mark.add_named(&todo, Some("todo"));
+        mark.add_named(&now, Some("now"));
+        mark.add_named(&done, Some("done"));
+        let text = label(text, &["plan-text"]);
+        text.set_wrap(true);
+        text.set_hexpand(true);
+        let root = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        root.add_css_class("plan-step");
+        root.append(&mark);
+        root.append(&text);
+        PlanRow { root, mark, text }
+    }
+
+    fn show(&self, state: &str) {
+        self.mark.set_visible_child_name(state);
+        for s in ["todo", "now", "done"] {
+            if s == state {
+                self.root.add_css_class(s);
+            } else {
+                self.root.remove_css_class(s);
+            }
+        }
+    }
+}
+
+/// One request in the card: what was asked (for follow-ups), its plan, steps and answer, and
+/// what it cost in tokens.
 struct TurnView {
     root: gtk::Box,
+    plan_box: gtk::Box,
+    plan_caption: gtk::Label,
+    plan_rows: RefCell<Vec<PlanRow>>,
     steps_box: gtk::Box,
     answer: gtk::Label,
+    usage: gtk::Label,
+    tokens: RefCell<TurnTokens>,
     steps: RefCell<Vec<Rc<StepRow>>>,
 }
 
@@ -409,15 +563,88 @@ impl TurnView {
             root.append(&you);
             common::play(&you, "rise");
         }
+        // The plan, once the agent writes one: a checklist that ticks itself off in place.
+        let plan_box = gtk::Box::new(gtk::Orientation::Vertical, 3);
+        plan_box.add_css_class("plan");
+        plan_box.set_visible(false);
+        let plan_caption = label("plan", &["plan-caption"]);
+        plan_box.append(&plan_caption);
         let steps_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
         let answer = label("", &["answer"]);
         answer.set_wrap(true);
         answer.set_max_width_chars(42);
         answer.set_selectable(true);
         answer.set_visible(false);
+        let usage = label("", &["turn-usage"]);
+        usage.set_wrap(true);
+        usage.set_visible(false);
+        root.append(&plan_box);
         root.append(&steps_box);
         root.append(&answer);
-        Rc::new(TurnView { root, steps_box, answer, steps: RefCell::new(Vec::new()) })
+        root.append(&usage);
+        Rc::new(TurnView {
+            root,
+            plan_box,
+            plan_caption,
+            plan_rows: RefCell::new(Vec::new()),
+            steps_box,
+            answer,
+            usage,
+            tokens: RefCell::new(TurnTokens::default()),
+            steps: RefCell::new(Vec::new()),
+        })
+    }
+
+    /// Shows the plan, reusing the rows already there so it updates in place rather than
+    /// flashing: done steps ticked, the current one highlighted.
+    fn set_plan(&self, steps: &[PlanStep]) {
+        let mut rows = self.plan_rows.borrow_mut();
+        while rows.len() > steps.len() {
+            if let Some(row) = rows.pop() {
+                self.plan_box.remove(&row.root);
+            }
+        }
+        let current = current_step(steps);
+        for (i, step) in steps.iter().enumerate() {
+            if i == rows.len() {
+                let row = PlanRow::new(&step.text);
+                self.plan_box.append(&row.root);
+                common::play(&row.root, "fade");
+                rows.push(row);
+            } else if rows[i].text.text() != step.text {
+                rows[i].text.set_text(&step.text);
+            }
+            let state = if step.done {
+                "done"
+            } else if Some(i) == current {
+                "now"
+            } else {
+                "todo"
+            };
+            rows[i].show(state);
+        }
+        let done = steps.iter().filter(|s| s.done).count();
+        self.plan_caption.set_text(&format!("plan · {done} of {}", steps.len()));
+        if !steps.is_empty() && !self.plan_box.is_visible() {
+            common::play(&self.plan_box, "fade");
+        }
+        self.plan_box.set_visible(!steps.is_empty());
+    }
+
+    /// Adds a model reply's tokens to this request's line under it.
+    fn add_usage(&self, u: &Usage) {
+        let mut t = self.tokens.borrow_mut();
+        t.add(u);
+        self.usage.set_text(&t.line());
+        self.usage.set_tooltip_text(Some(&format!(
+            "{} model repl{} for this request",
+            t.replies,
+            if t.replies == 1 { "y" } else { "ies" }
+        )));
+        if !self.usage.is_visible() {
+            self.usage.set_visible(true);
+            common::play(&self.usage, "fade");
+        }
     }
 
     fn add_step(&self, row: Rc<StepRow>) {
@@ -442,11 +669,60 @@ impl TurnView {
     }
 }
 
+/// The hairline under the card's header: how full the model's context is, with a soft sweep
+/// running along it while the agent works.
+#[derive(Clone, Copy, Debug, Default)]
+struct Meter {
+    /// Context used, 0 to 1, once a reply has said.
+    fill: Option<f64>,
+    busy: bool,
+}
+
+fn meter(state: Rc<Cell<Meter>>) -> gtk::DrawingArea {
+    let area = gtk::DrawingArea::new();
+    area.add_css_class("context-meter");
+    area.set_content_height(2);
+    area.set_hexpand(true);
+    area.set_draw_func(move |a, cr, w, h| {
+        let m = state.get();
+        let (w, h) = (f64::from(w), f64::from(h));
+        // A neutral hairline the whole width, the context used in green over it.
+        cr.set_source_rgba(0.949, 0.961, 0.937, 0.07);
+        cr.rectangle(0.0, 0.0, w, h);
+        cr.fill().ok();
+        if let Some(f) = m.fill {
+            let (r, g, b) = common::GREEN;
+            cr.set_source_rgba(r, g, b, 0.55);
+            cr.rectangle(0.0, 0.0, w * f.clamp(0.0, 1.0), h);
+            cr.fill().ok();
+        }
+        let animate = gtk::Settings::default().is_none_or(|s| s.is_gtk_enable_animations());
+        if m.busy && animate {
+            // A soft-edged light that crosses every 1.8 s, easing in and out.
+            let t = a.frame_clock().map_or(0.0, |c| c.frame_time() as f64 / 1_000_000.0);
+            let k = (t / 1.8).fract();
+            let k = 0.5 - 0.5 * (k * std::f64::consts::PI).cos();
+            let seg = w * 0.28;
+            let x = -seg + (w + seg) * k;
+            let grad = gtk::cairo::LinearGradient::new(x, 0.0, x + seg, 0.0);
+            let (r, g, b) = common::GREEN;
+            grad.add_color_stop_rgba(0.0, r, g, b, 0.0);
+            grad.add_color_stop_rgba(0.5, r, g, b, 0.8);
+            grad.add_color_stop_rgba(1.0, r, g, b, 0.0);
+            cr.set_source(&grad).ok();
+            cr.rectangle(x, 0.0, seg, h);
+            cr.fill().ok();
+        }
+    });
+    area
+}
+
 struct State {
     cancel: Arc<AtomicBool>,
     busy: bool,
     started: Option<Instant>,
-    phase: &'static str,
+    /// What it's doing or waiting on, for the status line.
+    phase: String,
     answer: String,
     /// The conversation in the card; away in the agent's thread while it works.
     session: Option<Session>,
@@ -473,6 +749,9 @@ struct Orb {
     asked: gtk::Label,
     status: gtk::Label,
     working: gtk::DrawingArea,
+    meter: gtk::DrawingArea,
+    meter_state: Rc<Cell<Meter>>,
+    total: gtk::Label,
     scroller: gtk::ScrolledWindow,
     inner: gtk::Box,
     follow: gtk::Entry,
@@ -672,11 +951,13 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let caption = label("you asked", &["caption"]);
     caption.set_hexpand(true);
     caption.set_valign(gtk::Align::Center);
-    let status = label("", &["caption", "live"]);
+    let status = label("", &["caption", "orb-status"]);
     status.set_valign(gtk::Align::Center);
     status.set_margin_end(4);
-    // Moving while it works, so it never looks stuck, even before the first step.
-    let working = common::spinner(12);
+    status.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    status.set_max_width_chars(34);
+    // Breathing while it works, so it never looks stuck, even before the first step.
+    let working = common::pulse_dot(8);
     working.set_valign(gtk::Align::Center);
     working.set_visible(false);
     let history = icon_button(icons::HISTORY, "earlier requests");
@@ -752,9 +1033,19 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     terminal.set_halign(gtk::Align::Start);
     let stop = gtk::Button::with_label("stop");
     stop.add_css_class("stop");
+    // The conversation's tokens so far, dim, beside the stop button.
+    let total = label("", &["session-usage"]);
+    total.set_valign(gtk::Align::Center);
+    total.set_margin_end(10);
+    total.set_visible(false);
     foot.append(&terminal);
+    foot.append(&total);
     foot.append(&stop);
+    let meter_state = Rc::new(Cell::new(Meter::default()));
+    let context_meter = meter(meter_state.clone());
+    context_meter.set_visible(false);
     body.append(&top);
+    body.append(&context_meter);
     body.append(&pages);
     body.append(&foot);
     card.set_child(Some(&body));
@@ -777,6 +1068,9 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
         asked,
         status,
         working,
+        meter: context_meter,
+        meter_state,
+        total,
         scroller,
         inner,
         follow,
@@ -793,7 +1087,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
             cancel: Arc::new(AtomicBool::new(false)),
             busy: false,
             started: None,
-            phase: "",
+            phase: String::new(),
             answer: String::new(),
             session: None,
             session_id: None,
@@ -1246,6 +1540,10 @@ impl Orb {
         }
         self.scroller.set_min_content_height(0);
         self.pages.set_visible_child_name("talk");
+        // A different conversation: its tokens start again.
+        self.meter_state.set(Meter::default());
+        self.meter.set_visible(false);
+        self.total.set_visible(false);
     }
 
     /// Back to the ask bar for something unrelated.
@@ -1274,13 +1572,24 @@ impl Orb {
             let mut st = self.state.borrow_mut();
             st.busy = true;
             st.started = Some(Instant::now());
-            st.phase = "thinking";
+            st.phase = "thinking".into();
             st.answer.clear();
             st.cancel = cancel.clone();
             st.turn = Some(view);
         }
         self.button.add_css_class("working");
         self.working.set_visible(true);
+        self.meter_state.set(Meter { busy: true, ..self.meter_state.get() });
+        self.meter.set_visible(true);
+        // The meter's sweep runs only while it works.
+        let weak = Rc::downgrade(self);
+        self.meter.add_tick_callback(move |m, _| {
+            m.queue_draw();
+            match weak.upgrade() {
+                Some(orb) if orb.state.borrow().busy => glib::ControlFlow::Continue,
+                _ => glib::ControlFlow::Break,
+            }
+        });
         write_status("● working");
         self.show_card();
         self.tick();
@@ -1310,6 +1619,8 @@ impl Orb {
                 if done {
                     break;
                 }
+                // Straight away, not at the next second, so the status keeps up with each event.
+                orb.tick();
             }
         });
     }
@@ -1319,9 +1630,37 @@ impl Orb {
         format!("{}:{:02}", secs / 60, secs % 60)
     }
 
+    /// The status line: what it's doing or waiting on, and a clock that keeps running.
     fn tick(&self) {
-        let phase = self.state.borrow().phase;
-        self.status.set_text(&format!("{phase} · {}", self.elapsed()));
+        let phase = clip(&self.state.borrow().phase, 40);
+        let text = format!("{phase} · {}", self.elapsed());
+        self.status.set_text(&text);
+        self.status.set_tooltip_text(Some(&self.state.borrow().phase));
+    }
+
+    /// A reply's tokens: the line under the request, the context meter and the session total.
+    fn show_usage(&self, turn: &TurnView, u: &Usage) {
+        turn.add_usage(u);
+        if let Some(p) = context_percent(u) {
+            self.meter_state.set(Meter { fill: Some(f64::from(p) / 100.0), ..self.meter_state.get() });
+            self.meter.set_tooltip_text(Some(&format!(
+                "context {p}% full · {} of {} tokens",
+                tokens(u.prompt + u.completion),
+                tokens(u.context)
+            )));
+            self.meter.set_visible(true);
+            self.meter.queue_draw();
+        }
+        let all = u.session_prompt + u.session_completion;
+        if all > 0 {
+            self.total.set_text(&format!("session {}", tokens(all)));
+            self.total.set_tooltip_text(Some(&format!(
+                "this conversation so far: {} tokens read, {} written",
+                tokens(u.session_prompt),
+                tokens(u.session_completion)
+            )));
+            self.total.set_visible(true);
+        }
     }
 
     /// Grows the list with its content up to `MAX_LIST`, then it scrolls; keeps the newest in view.
@@ -1344,19 +1683,34 @@ impl Orb {
         let Some(turn) = st.turn.clone() else { return };
         match event {
             Event::Text(piece) => {
-                st.phase = "answering";
+                st.phase = "answering".into();
                 st.answer.push_str(&piece);
                 turn.set_answer(&st.answer);
                 self.scroll_to_end();
             }
-            Event::Thinking => st.phase = "thinking",
+            Event::Thinking => st.phase = "thinking".into(),
+            Event::Waiting(what) => {
+                if !what.trim().is_empty() {
+                    st.phase = what;
+                }
+            }
+            Event::Usage(u) => {
+                drop(st);
+                self.show_usage(&turn, &u);
+                self.scroll_to_end();
+            }
+            Event::Plan(steps) => {
+                drop(st);
+                turn.set_plan(&steps);
+                self.scroll_to_end();
+            }
             Event::StepDone(ok) => {
                 if let Some(last) = turn.last() {
                     last.finish(ok);
                 }
             }
             Event::Step(kind, detail) => {
-                st.phase = "working";
+                st.phase = describe(&kind, &detail);
                 if let Some(last) = turn.last() {
                     last.finish(true);
                 }
@@ -1404,6 +1758,10 @@ impl Orb {
                 }
                 self.button.remove_css_class("working");
                 self.working.set_visible(false);
+                let m = Meter { busy: false, ..self.meter_state.get() };
+                self.meter_state.set(m);
+                self.meter.set_visible(m.fill.is_some());
+                self.meter.queue_draw();
                 self.stop.set_label("close");
                 self.follow_row.set_visible(true);
                 write_status("");
@@ -1545,7 +1903,50 @@ fn app_matches(apps: &[crate::apps::App], text: &str) -> Vec<crate::apps::App> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Corner, app_matches, describe, markup, parse_prefs};
+    use super::{
+        Corner, TurnTokens, app_matches, clip, context_percent, current_step, describe, markup, parse_prefs, tokens,
+    };
+    use trip::model::{PlanStep, Usage};
+
+    #[test]
+    fn counts_tokens_briefly() {
+        assert_eq!(tokens(230), "230");
+        assert_eq!(tokens(1000), "1k");
+        assert_eq!(tokens(1234), "1.2k");
+        assert_eq!(tokens(38_400), "38k");
+        assert_eq!(tokens(1_400_000), "1.4m");
+    }
+
+    #[test]
+    fn adds_up_a_request() {
+        let reply = |prompt, completion, tps| Usage {
+            prompt,
+            completion,
+            context: 8192,
+            tokens_per_sec: tps,
+            ..Usage::default()
+        };
+        let mut t = TurnTokens::default();
+        t.add(&reply(1000, 30, 12.4));
+        t.add(&reply(1100, 200, 14.2));
+        assert_eq!(t.line(), "2.1k in · 230 out · 14 tok/s · context 16%");
+        t.add(&Usage { prompt: 40, cached: 1500, completion: 5, tokens_per_sec: 4.3, ..Usage::default() });
+        assert_eq!(t.line(), "2.1k in · 1.5k cached · 235 out · 4.3 tok/s · context 16%");
+        assert_eq!(context_percent(&Usage::default()), None);
+    }
+
+    #[test]
+    fn keeps_the_status_short() {
+        assert_eq!(clip("loading the model", 40), "loading the model");
+        assert_eq!(clip("running dnf install -y vlc", 12), "running dnf…");
+    }
+
+    #[test]
+    fn finds_the_current_plan_step() {
+        let step = |text: &str, done| PlanStep { text: text.into(), done };
+        assert_eq!(current_step(&[step("a", true), step("b", false), step("c", false)]), Some(1));
+        assert_eq!(current_step(&[step("a", true)]), None);
+    }
 
     #[test]
     fn finds_apps_by_name() {
