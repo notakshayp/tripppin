@@ -13,9 +13,9 @@ ring_image = Image("ring.png");
 spark_image = Image("spark.png");
 x = Window.GetX() + Window.GetWidth() / 2 - ring_image.GetWidth() / 2;
 y = Window.GetY() + Window.GetHeight() / 2 - ring_image.GetHeight() / 2 - 20;
-// The spark's centre: (100, 54) in logo units, from the box's corner at (27, 12), at 2x.
+// The spark's centre: (100, 60) in logo units, from the box's corner at (27, 12), at 2x.
 spark_cx = x + 146;
-spark_cy = y + 84;
+spark_cy = y + 96;
 
 ring = Sprite();
 ring.SetPosition(x, y, 1);

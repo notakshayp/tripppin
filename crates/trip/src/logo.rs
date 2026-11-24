@@ -22,7 +22,7 @@ pub const GAP_DEG: f64 = 52.0;
 /// How far round the ring goes, in degrees.
 pub const SPAN: f64 = 360.0 - 2.0 * GAP_DEG;
 /// The spark: centre x, centre y, point length, waist ratio.
-pub const SPARK: (f64, f64, f64, f64) = (100.0, 54.0, 42.0, 0.22);
+pub const SPARK: (f64, f64, f64, f64) = (100.0, 60.0, 42.0, 0.22);
 /// The spark's resting turn: its long points on the diagonals, an ×.
 pub const SPARK_REST_DEG: f64 = 45.0;
 /// The mark's box in logo units: x, y, width, height.
@@ -459,8 +459,8 @@ mod tests {
 
     #[test]
     fn geometry() {
-        assert!(in_spark(100.0, 54.0, 1.0, 0.0));
-        assert!(!in_spark(140.0, 54.0, 1.0, 0.0));
+        assert!(in_spark(100.0, 60.0, 1.0, 0.0));
+        assert!(!in_spark(140.0, 60.0, 1.0, 0.0));
         assert!(ring_at(40.0, 114.0, 1.0).is_some());
         assert!(ring_at(100.0, 54.0, 1.0).is_none()); // the gap
         let [(lx, ly), (rx, ry)] = ring_ends();
