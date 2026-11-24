@@ -83,6 +83,8 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [x] Tools: `exec` (bash, live output, timeout, sudo prompts work), `read_file`, `write_file`
 - [x] Task notebook and compaction for small models: the model's plan and notes plus one line per step, shown at every step; old steps dropped when the context fills (the notebook keeps them); every session saved and listed (`/history`, the orb's history), continued in the terminal
 - [x] Administrator commands: sudo asks through a pop-up showing the command; Settings → AI can allow installs, services or updates without a password
+- [x] AI permissions ([AI-PERMISSIONS.md](AI-PERMISSIONS.md)): a level (ask every time, allow what I pick, full administrator with risky commands still asking) and nine areas, kept in a root-owned policy and a sudoers rule checked by visudo; the agent's sudo never reuses a cached password, and every administrator command is logged and listed under Settings → AI → Activity
+- [ ] Tell the agent its permissions: include `trip::permissions::summary()` in the harness system prompt
 - [x] Tool-call verifier: unknown tools, bad JSON, missing or mistyped fields and calls written as text go back to the model with the exact problem; 3 retries before giving up
 - [x] Flatpak with Flathub in the image, so the agent can install apps
 - [ ] Safety: permission modes, a second check on risky steps, undo (M4)
@@ -92,6 +94,8 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 ## M7: Agents + bring your own model (started early)
 
 - [x] Settings → AI: guided cloud providers (OpenAI, Anthropic, Google Gemini, DeepSeek, Sarvam AI, OpenRouter, Groq) or your own server, with the provider's model list
+- [x] Models appear only after the key checks out, from each provider's own list endpoint (Anthropic's headers, OpenRouter's key check and tool-capable models, Groq's active ones, Sarvam's fixed pair), with a default preselected, search, and plain errors for a refused key or no network
+- [x] Several local models: download any that fits (size, memory need, progress, cancel and resume), keep several, switch the one in use (restarts `tripppin-llm`), delete to free space (`trip::models`)
 - [x] Other local models with native tool calling: Gemma 4 (E4B, 12B, 26B-A4B), Granite 4.1 8B; each family gets its own sampling
 - [ ] Background jobs that outlive the request
 
