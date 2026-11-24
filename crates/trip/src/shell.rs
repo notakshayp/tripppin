@@ -365,7 +365,8 @@ fn context_size(info: &Info) -> usize {
     }
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let _ = tx.send(model::context_tokens());
+        let info = model::server_info();
+        let _ = tx.send(if info.loading { 0 } else { info.context });
     });
     rx.recv_timeout(Duration::from_millis(400)).unwrap_or(0)
 }

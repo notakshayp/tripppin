@@ -5,6 +5,8 @@
 //! on 127.0.0.1:8086 with the best installed model; `trip ask` talks to it.
 
 use anyhow::{Context, Result, bail};
+use hwdetect::gguf::{self, ModelShape};
+use hwdetect::serving::{self, Accel, Placement, ServePlan};
 use hwdetect::{Catalog, Tier};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -20,14 +22,18 @@ const LLAMA_SERVER: &str = "/usr/bin/llama-server";
 const IDLE_UNLOAD_SECS: u32 = 900;
 const SYSTEM_PROMPT: &str = "You are the assistant built into Tripppin, a Linux operating system based on Fedora \
 with its own desktop. The person asks you from the orb (a pop-up on the desktop) or from the terminal. You have tools: \
-exec runs shell commands on their machine, read_file / write_file work with files, and note writes in your task \
-notebook. When they ask you to do something, do it with the tools instead of explaining how, check the result, and \
-keep going until it's done or you're truly stuck. Then answer briefly and plainly, in a few short lines.
+exec runs shell commands on their machine, read_file / write_file work with files, plan and done keep your task \
+plan, and note writes in your task notebook. When they ask you to do something, do it with the tools instead of \
+explaining how, check the result, and keep going until it's done or you're truly stuck. Then answer briefly and \
+plainly, in a few short lines.
 
 How to work:
-- For a task of more than two steps, first write a short plan with note. Note important facts as you find them.
-- Your task notebook (the request, your notes and every step with its result) is shown to you after the newest \
-message. Read it before each step; don't redo steps marked ok.
+- For a task of more than two steps, first write a plan with plan: short steps, each one thing you can do and check.
+- Work on one step at a time. Do it, check it worked, then call done with its number and how you checked. If a \
+step can't be done, rewrite the plan or tell the person what's blocking you.
+- Note important facts as you find them.
+- Your task notebook (the request, your plan, your notes and every step with its result) is shown to you after the \
+newest message. Read it before each step; don't redo steps marked ok.
 - One command per step; check its output before the next. If something fails twice the same way, stop and tell the \
 person what's blocking you.
 
@@ -313,8 +319,35 @@ fn sha256_file(path: &Path) -> Result<String> {
     Ok(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
+/// How to run `tier` on this machine: placement, context and caches sized from its memory
+/// and GPU and from the model file's own shape (see `hwdetect::serving`).
+pub fn serve_plan(tier: &Tier, model_path: &Path) -> ServePlan {
+    let (memory, accel) = match hwdetect::detect() {
+        Ok(hw) => (hw.memory_bytes, Accel::from_hardware(&hw, hwdetect::igpu_pool_bytes())),
+        // Off Linux (tests, a Mac): assume a 16 GB machine without a GPU.
+        Err(_) => (16 << 30, Accel::None),
+    };
+    let shape = gguf::read_shape(model_path).unwrap_or_else(|e| {
+        eprintln!("can't read the model's shape ({e:#}); assuming a large KV cache");
+        fallback_shape(tier)
+    });
+    serving::plan(memory, accel, &shape, tier.size_bytes, tier.context)
+}
+
+/// A model we can't read: plain attention on every layer at 160 KiB per token (an 8B model),
+/// so the context is sized on the safe side.
+fn fallback_shape(tier: &Tier) -> ModelShape {
+    ModelShape {
+        arch: "unknown".into(),
+        layers: 40,
+        train_context: tier.context,
+        kv_values_full: 40 * 8 * 256,
+        ..Default::default()
+    }
+}
+
 /// The llama.cpp server arguments for a model. Kept separate so it can be tested.
-pub fn server_args(tier: &Tier, model_path: &Path) -> Vec<String> {
+pub fn server_args(model_path: &Path, plan: &ServePlan) -> Vec<String> {
     let mut args: Vec<String> = vec![
         "--model".into(),
         model_path.display().to_string(),
@@ -325,18 +358,43 @@ pub fn server_args(tier: &Tier, model_path: &Path) -> Vec<String> {
         "--port".into(),
         PORT.to_string(),
         "--ctx-size".into(),
-        tier.context.to_string(),
+        plan.context.to_string(),
         "--jinja".into(),
         // One person at a time: the whole context goes to one conversation.
         "--parallel".into(),
         "1".into(),
-        // Put every layer on the GPU when there is one; llama.cpp falls back to the CPU otherwise.
-        "--n-gpu-layers".into(),
-        "99".into(),
+        // A q8_0 KV cache takes half the memory of f16; quantizing V needs flash attention.
+        "--flash-attn".into(),
+        "on".into(),
+        "--cache-type-k".into(),
+        plan.cache.name().into(),
+        "--cache-type-v".into(),
+        plan.cache.name().into(),
+        // Prompt caching: each turn reads only what's new. Checkpoints let models with recurrent
+        // or sliding-window layers (Qwen3.5, Gemma) go back to where the new part starts;
+        // cache reuse shifts matching chunks after the harness drops old messages (plain
+        // attention only; llama.cpp turns it off where it can't work).
+        "--ctx-checkpoints".into(),
+        plan.checkpoints.to_string(),
+        "--cache-reuse".into(),
+        "256".into(),
+        "--cache-ram".into(),
+        plan.cache_ram_mib.to_string(),
+        // The harness compacts the conversation itself; shifting would cut tool calls in half.
+        "--no-context-shift".into(),
         // Free the memory when nobody has asked anything for a while.
         "--sleep-idle-seconds".into(),
         IDLE_UNLOAD_SECS.to_string(),
     ];
+    match plan.placement {
+        // Leave every GPU alone (llvmpipe, Mesa's software Vulkan, would otherwise count as one).
+        Placement::Cpu => args.extend(["--device", "none", "--n-gpu-layers", "0", "--fit", "off"].map(String::from)),
+        // llama.cpp measures the GPU's free memory and puts as many layers there as fit,
+        // leaving the margin free for the desktop.
+        Placement::Gpu { margin_mib } => {
+            args.extend(["--fit".to_string(), "on".into(), "--fit-target".into(), margin_mib.to_string()])
+        }
+    }
     if let Ok(extra) = std::env::var("TRIPPPIN_LLAMA_ARGS") {
         args.extend(extra.split_whitespace().map(String::from));
     }
@@ -348,9 +406,11 @@ pub fn serve() -> Result<()> {
     let catalog = Catalog::builtin()?;
     let dir = models_dir();
     let tier = active_tier(&catalog, &dir).context("no model is installed yet. Run: sudo trip model pull")?;
-    let args = server_args(tier, &dir.join(&tier.file));
+    let path = dir.join(&tier.file);
+    let plan = serve_plan(tier, &path);
+    let args = server_args(&path, &plan);
     let bin = std::env::var("TRIPPPIN_LLAMA_SERVER").unwrap_or_else(|_| LLAMA_SERVER.to_string());
-    eprintln!("starting {} with {}", bin, tier.model);
+    eprintln!("starting {} with {}: {}", bin, tier.model, plan.why);
     exec(&bin, &args)
 }
 
@@ -428,7 +488,7 @@ pub struct Usage {
 }
 
 /// One step of the task plan the agent keeps in its notebook.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlanStep {
     pub text: String,
     pub done: bool,
@@ -443,6 +503,96 @@ pub struct Reply {
     pub first_word: Option<Duration>,
     pub tokens_per_sec: f64,
     pub cancelled: bool,
+    /// Token counts from the server (zero when it sent none). `context` and the session
+    /// totals are left for the agent to fill in.
+    pub usage: Usage,
+}
+
+/// What happens while a reply streams in.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Event<'a> {
+    /// The server is reading the prompt: `total` tokens, `cached` of them from its cache,
+    /// `done` read so far (llama.cpp only).
+    Reading { total: usize, cached: usize, done: usize },
+    /// The first token of the answer (or of a tool call) arrived.
+    Writing,
+    /// A piece of the answer.
+    Text(&'a str),
+}
+
+/// The local model server's state, from `/props` (which doesn't wake a sleeping server).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ServerInfo {
+    /// The next request has to load the model first (starting up, or asleep after being idle).
+    pub loading: bool,
+    /// The context size in tokens.
+    pub context: usize,
+}
+
+/// Asks the local server how it is. Another server (a cloud key) is assumed ready, with a
+/// 32k-token budget: longer prompts cost more and help little.
+pub fn server_info() -> ServerInfo {
+    if endpoint().is_some() {
+        return ServerInfo { loading: false, context: 32768 };
+    }
+    let url = format!("http://127.0.0.1:{PORT}/props");
+    let resp = http()
+        .get(&url)
+        .config()
+        .timeout_global(Some(Duration::from_secs(3)))
+        .http_status_as_error(false)
+        .build()
+        .call();
+    let Ok(mut resp) = resp else { return ServerInfo { loading: true, context: 8192 } };
+    if resp.status().as_u16() != 200 {
+        return ServerInfo { loading: true, context: 8192 };
+    }
+    let props: serde_json::Value =
+        resp.body_mut().read_to_string().ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+    parse_props(&props)
+}
+
+fn parse_props(props: &serde_json::Value) -> ServerInfo {
+    ServerInfo {
+        loading: props.get("is_sleeping").and_then(|v| v.as_bool()).unwrap_or(false),
+        context: props
+            .pointer("/default_generation_settings/n_ctx")
+            .and_then(|n| n.as_u64())
+            .map_or(8192, |n| n as usize),
+    }
+}
+
+/// Token counts in a streamed chunk: llama.cpp's `timings` (with its own cache count) or the
+/// OpenAI-style `usage` other servers send at the end.
+fn read_usage(chunk: &serde_json::Value, usage: &mut Usage) -> bool {
+    let n = |v: &serde_json::Value, p: &str| v.pointer(p).and_then(|x| x.as_u64()).map(|x| x as usize);
+    let mut found = false;
+    if let Some(u) = chunk.get("usage").filter(|u| u.is_object()) {
+        usage.prompt = n(u, "/prompt_tokens").unwrap_or(usage.prompt);
+        usage.completion = n(u, "/completion_tokens").unwrap_or(usage.completion);
+        usage.cached = n(u, "/prompt_tokens_details/cached_tokens").unwrap_or(usage.cached);
+        found = true;
+    }
+    if let Some(t) = chunk.get("timings").filter(|t| t.is_object()) {
+        if let (Some(cache), Some(read)) = (n(t, "/cache_n"), n(t, "/prompt_n")) {
+            usage.cached = cache;
+            usage.prompt = usage.prompt.max(cache + read);
+        }
+        usage.completion = n(t, "/predicted_n").unwrap_or(usage.completion);
+        if let Some(tps) = t.get("predicted_per_second").and_then(|x| x.as_f64()).filter(|x| x.is_finite() && *x > 0.0)
+        {
+            usage.tokens_per_sec = tps;
+        }
+        found = true;
+    }
+    found
+}
+
+/// Prompt progress in a streamed chunk (llama.cpp with `return_progress`).
+fn read_progress(chunk: &serde_json::Value) -> Option<(usize, usize, usize)> {
+    let p = chunk.get("prompt_progress")?;
+    let n = |k: &str| p.get(k).and_then(|x| x.as_u64()).map(|x| x as usize);
+    Some((n("total")?, n("cache").unwrap_or(0), n("processed").unwrap_or(0)))
 }
 
 impl Reply {
@@ -461,24 +611,33 @@ fn unavailable() -> anyhow::Error {
     }
 }
 
-/// Streams a reply to `messages`, calling `on_text` for each piece of text. With `tools`, the model
-/// may answer with tool calls instead, which come back in `Reply::calls`. Stops early when `cancel` is set.
+/// The most tokens one reply may take; the agent keeps this much of the context free.
+pub const REPLY_TOKENS: usize = MAX_REPLY_TOKENS as usize;
+
+/// Streams a reply to `messages`, telling `on_event` as the prompt is read and each piece of
+/// text arrives. With `tools`, the model may answer with tool calls instead, which come back in
+/// `Reply::calls`. Stops early when `cancel` is set.
 pub fn stream(
     messages: &[Message],
     tools: Option<&serde_json::Value>,
     cancel: &AtomicBool,
-    mut on_text: impl FnMut(&str),
+    mut on_event: impl FnMut(Event),
 ) -> Result<Reply> {
     let msgs: Vec<_> = messages.iter().map(|m| &m.0).collect();
     let remote = endpoint();
     let mut body = serde_json::json!({
         "model": "tripppin",
         "stream": true,
+        // Token counts at the end: llama.cpp adds its timings and cache hits.
+        "stream_options": { "include_usage": true },
         "messages": msgs,
         // Answers and tool calls don't need the model's long thinking pass.
         "chat_template_kwargs": { "enable_thinking": false },
         // A reply is a few lines or a tool call; anything longer has gone wrong.
-        "max_tokens": MAX_REPLY_TOKENS
+        "max_tokens": MAX_REPLY_TOKENS,
+        // llama.cpp: report progress while it reads the prompt, and reuse its cache.
+        "return_progress": true,
+        "cache_prompt": true
     });
     if remote.is_none() {
         let family = Catalog::builtin().ok().and_then(|c| active_tier(&c, &models_dir()).map(|t| t.model.clone()));
@@ -493,7 +652,7 @@ pub fn stream(
         // Other servers get the plain OpenAI request; llama.cpp's extra knobs can be refused.
         Some(e) => {
             if let Some(map) = body.as_object_mut() {
-                for k in ["chat_template_kwargs", "top_k", "min_p"] {
+                for k in ["chat_template_kwargs", "top_k", "min_p", "return_progress", "cache_prompt"] {
                     map.remove(k);
                 }
             }
@@ -524,6 +683,7 @@ pub fn stream(
     let (mut text, mut first, mut pieces, mut cancelled) = (String::new(), None, 0u32, false);
     let mut calls: Vec<ToolCall> = Vec::new();
     let mut cut_off = false;
+    let mut usage = Usage::default();
     for line in reader.lines() {
         if cancel.load(Ordering::Relaxed) {
             cancelled = true;
@@ -541,20 +701,32 @@ pub fn stream(
         if chunk.pointer("/choices/0/finish_reason").and_then(|r| r.as_str()) == Some("length") {
             cut_off = true;
         }
-        if let Some(piece) = delta_text(&chunk) {
-            first.get_or_insert_with(|| start.elapsed());
+        if first.is_none()
+            && let Some((total, cached, done)) = read_progress(&chunk)
+        {
+            on_event(Event::Reading { total, cached, done });
+        }
+        read_usage(&chunk, &mut usage);
+        let piece = delta_text(&chunk);
+        let called = merge_tool_calls(&chunk, &mut calls);
+        if (piece.is_some() || called) && first.is_none() {
+            first = Some(start.elapsed());
+            on_event(Event::Writing);
+        }
+        if let Some(piece) = piece {
             pieces += 1;
-            on_text(&piece);
+            on_event(Event::Text(&piece));
             text.push_str(&piece);
         }
-        if merge_tool_calls(&chunk, &mut calls) {
-            first.get_or_insert_with(|| start.elapsed());
+        if called {
             pieces += 1;
         }
     }
-    let tokens_per_sec =
+    let measured =
         first.map_or(0.0, |t: Duration| f64::from(pieces) / start.elapsed().saturating_sub(t).as_secs_f64().max(0.001));
-    Ok(Reply { text, cut_off, calls, first_word: first, tokens_per_sec, cancelled })
+    let tokens_per_sec = if usage.tokens_per_sec > 0.0 { usage.tokens_per_sec } else { measured };
+    usage.tokens_per_sec = tokens_per_sec;
+    Ok(Reply { text, cut_off, calls, first_word: first, tokens_per_sec, cancelled, usage })
 }
 
 /// Each model family's recommended sampling for answers without a thinking pass. Qwen's presence
@@ -595,28 +767,14 @@ fn server_error(status: u16, body: &str) -> anyhow::Error {
     anyhow::anyhow!("the model server said no ({status}): {message}")
 }
 
-/// How many tokens the running model can hold, from llama.cpp's /props. 8192 if it can't say.
-pub fn context_tokens() -> usize {
-    if endpoint().is_some() {
-        return 32768;
-    }
-    let url = format!("http://127.0.0.1:{PORT}/props");
-    http()
-        .get(&url)
-        .call()
-        .ok()
-        .and_then(|mut r| r.body_mut().read_to_string().ok())
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
-        .and_then(|v| v.pointer("/default_generation_settings/n_ctx").and_then(|n| n.as_u64()))
-        .map_or(8192, |n| n as usize)
-}
-
 /// Sends one question and prints the streamed answer (`trip ask`, for scripts and testing).
 pub fn ask(question: &str) -> Result<()> {
     let mut out = io::stdout().lock();
-    let reply = stream(&[Message::system(), Message::user(question)], None, &AtomicBool::new(false), |t| {
-        let _ = write!(out, "{t}");
-        let _ = out.flush();
+    let reply = stream(&[Message::system(), Message::user(question)], None, &AtomicBool::new(false), |e| {
+        if let Event::Text(t) = e {
+            let _ = write!(out, "{t}");
+            let _ = out.flush();
+        }
     })?;
     writeln!(out)?;
     if let Some(note) = reply.stats() {
@@ -713,15 +871,68 @@ mod tests {
         assert!(!merge_tool_calls(&serde_json::json!({"choices":[{"delta":{"content":"x"}}]}), &mut calls));
     }
 
+    fn plan_for(placement: Placement, context: u32) -> ServePlan {
+        ServePlan {
+            placement,
+            context,
+            cache: serving::CacheType::Q8_0,
+            cache_ram_mib: 1024,
+            checkpoints: 8,
+            estimate_bytes: 0,
+            why: String::new(),
+        }
+    }
+
     #[test]
-    fn server_stays_local_and_uses_the_tier_context() {
-        let catalog = Catalog::builtin().unwrap();
-        let tier = &catalog.tiers[0];
-        let args = server_args(tier, Path::new("/m/x.gguf"));
+    fn server_stays_local_and_uses_the_planned_context() {
+        let args = server_args(Path::new("/m/x.gguf"), &plan_for(Placement::Gpu { margin_mib: 2048 }, 32768));
         let joined = args.join(" ");
         assert!(joined.contains("--host 127.0.0.1"));
-        assert!(joined.contains(&format!("--ctx-size {}", tier.context)));
+        assert!(joined.contains("--ctx-size 32768"));
         assert!(joined.contains("--model /m/x.gguf"));
+        assert!(joined.contains("--flash-attn on --cache-type-k q8_0 --cache-type-v q8_0"));
+        assert!(joined.contains("--ctx-checkpoints 8 --cache-reuse 256 --cache-ram 1024"));
+        assert!(joined.contains("--fit on --fit-target 2048"));
+        assert!(!joined.contains("--n-gpu-layers"), "llama.cpp fits the layers on a GPU");
+        let cpu = server_args(Path::new("/m/x.gguf"), &plan_for(Placement::Cpu, 16384)).join(" ");
+        assert!(cpu.contains("--device none --n-gpu-layers 0 --fit off"));
+    }
+
+    #[test]
+    fn the_tier_context_is_the_most_a_plan_asks_for() {
+        let catalog = Catalog::builtin().unwrap();
+        let tier = catalog.tiers.iter().find(|t| t.id == "cpu-16").unwrap();
+        // No model file here, so the safe fallback shape is used.
+        let plan = serve_plan(tier, Path::new("/nonexistent.gguf"));
+        assert!(plan.context <= tier.context && plan.context >= serving::MIN_CONTEXT);
+    }
+
+    #[test]
+    fn reads_usage_from_llama_cpp_and_cloud_servers() {
+        let mut u = Usage::default();
+        let llama = serde_json::json!({
+            "choices": [],
+            "usage": { "prompt_tokens": 5000, "completion_tokens": 40, "prompt_tokens_details": { "cached_tokens": 4800 } },
+            "timings": { "cache_n": 4800, "prompt_n": 200, "predicted_n": 40, "predicted_per_second": 18.5 }
+        });
+        assert!(read_usage(&llama, &mut u));
+        assert_eq!((u.prompt, u.cached, u.completion, u.tokens_per_sec), (5000, 4800, 40, 18.5));
+        let mut u = Usage::default();
+        let cloud = serde_json::json!({ "choices": [], "usage": { "prompt_tokens": 900, "completion_tokens": 12 } });
+        assert!(read_usage(&cloud, &mut u));
+        assert_eq!((u.prompt, u.cached, u.completion), (900, 0, 12));
+        assert!(!read_usage(&serde_json::json!({"choices":[{"delta":{"content":"x"}}]}), &mut u));
+        assert!(!read_usage(&serde_json::json!({"usage": null}), &mut u));
+    }
+
+    #[test]
+    fn reads_prompt_progress_and_props() {
+        let chunk = serde_json::json!({"choices":[],"prompt_progress":{"total":3000,"cache":2000,"processed":2500,"time_ms":10}});
+        assert_eq!(read_progress(&chunk), Some((3000, 2000, 2500)));
+        assert_eq!(read_progress(&serde_json::json!({"choices":[]})), None);
+        let props = serde_json::json!({"default_generation_settings":{"n_ctx":32768},"is_sleeping":true});
+        assert_eq!(parse_props(&props), ServerInfo { loading: true, context: 32768 });
+        assert_eq!(parse_props(&serde_json::json!({})), ServerInfo { loading: false, context: 8192 });
     }
 
     #[test]
