@@ -11,6 +11,6 @@
     52%{transform:none;animation-timing-function:ease-in-out}62%,100%{transform:rotate(90deg)}}
   @media (prefers-reduced-motion: reduce){ .arc,.spark{animation:none} .arc{stroke-dashoffset:0} }
 </style>
-<path class="arc ink" pathLength="1" d="M52.72 77.06 A60 60 0 1 0 147.28 77.06"/>
-<path class="spark green" d="M109.90 35.96 A10 10 0 0 1 124.04 50.10 L114.14 60.00 L124.04 69.90 A10 10 0 0 1 109.90 84.04 L100.00 74.14 L90.10 84.04 A10 10 0 0 1 75.96 69.90 L85.86 60.00 L75.96 50.10 A10 10 0 0 1 90.10 35.96 L100.00 45.86Z"/>
+<path class="arc ink" pathLength="1" d="M58.32 70.84 A60 60 0 1 0 141.68 70.84"/>
+<path class="spark green" d="M100.00 14.00 106.11 43.89 136.00 50.00 106.11 56.11 100.00 86.00 93.89 56.11 64.00 50.00 93.89 43.89Z"/>
 </svg>
