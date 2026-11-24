@@ -77,13 +77,13 @@ pub fn strength(signal: u8) -> &'static str {
 }
 
 fn nmcli(args: &[&str]) -> Result<String, String> {
-    let out = Command::new("nmcli").args(args).output().map_err(|e| format!("couldn't run nmcli: {e}"))?;
+    let out = Command::new("nmcli").args(args).output().map_err(|e| format!("Couldn't run nmcli: {e}"))?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
         let err = String::from_utf8_lossy(&out.stderr);
         let err = err.trim().trim_start_matches("Error: ");
-        Err(if err.is_empty() { "nmcli failed".to_string() } else { err.to_lowercase() })
+        Err(if err.is_empty() { "Nmcli failed".to_string() } else { err.to_lowercase() })
     }
 }
 

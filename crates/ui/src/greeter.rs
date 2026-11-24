@@ -8,6 +8,35 @@ use gtk::glib;
 use gtk::prelude::*;
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
+/// The desktop session greetd starts: it keeps the text console blank and ink, then runs
+/// niri-session (os/files/usr/libexec/tripppin-session).
+const SESSION: &str = "/usr/libexec/tripppin-session";
+
+/// Once logged in: everything on the login screen fades, leaving plain ink, and then the
+/// greeter quits. greetd starts the desktop only after that, and the desktop opens on the
+/// same ink with the splash (`tripppin-ui splash`), so ink is all there is in between.
+fn fade_to_ink(app: &gtk::Application) {
+    let Some(window) = app.active_window() else {
+        app.quit();
+        return;
+    };
+    let Some(content) = window.child() else {
+        app.quit();
+        return;
+    };
+    let start = std::time::Instant::now();
+    let app = app.clone();
+    content.add_tick_callback(move |c, _| {
+        let t = (start.elapsed().as_secs_f64() / 0.25).min(1.0);
+        c.set_opacity(1.0 - common::ease_out(t));
+        if t >= 1.0 {
+            app.quit();
+            return glib::ControlFlow::Break;
+        }
+        glib::ControlFlow::Continue
+    });
+}
+
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder().application_id("in.trippp.Greeter").build();
     app.connect_activate(build);
@@ -54,19 +83,19 @@ fn build(app: &gtk::Application) {
     form.set_size_request(380, -1);
     let who = gtk::Box::new(gtk::Orientation::Horizontal, 14);
     let name = common::display_name(&user);
-    let initial = name.chars().next().map(|c| c.to_lowercase().to_string()).unwrap_or_default();
+    let initial = name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default();
     let avatar = gtk::Label::new(Some(&initial));
     avatar.add_css_class("avatar");
     let names = gtk::Box::new(gtk::Orientation::Vertical, 0);
     names.set_valign(gtk::Align::Center);
-    names.append(&label(&name.to_lowercase(), &["who"]));
-    names.append(&label("tripppin desktop", &["status"]));
+    names.append(&label(&name, &["who"]));
+    names.append(&label("Tripppin desktop", &["status"]));
     who.append(&avatar);
     who.append(&names);
     // More than one person: a name field instead of a fixed name.
     let username = gtk::Entry::new();
     username.add_css_class("pw");
-    username.set_placeholder_text(Some("user name"));
+    username.set_placeholder_text(Some("User name"));
     let name_pill = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     name_pill.add_css_class("pw-pill");
     username.set_hexpand(true);
@@ -76,12 +105,12 @@ fn build(app: &gtk::Application) {
     let password = gtk::PasswordEntry::new();
     password.add_css_class("pw");
     password.set_hexpand(true);
-    password.set_placeholder_text(Some("password"));
+    password.set_placeholder_text(Some("Password"));
     let go = gtk::Button::new();
     go.add_css_class("go");
     go.set_valign(gtk::Align::Center);
     go.set_child(Some(&common::arrow(false)));
-    go.set_tooltip_text(Some("log in"));
+    go.set_tooltip_text(Some("Log in"));
     pill.append(&password);
     pill.append(&go);
     let error = label("", &["error"]);
@@ -94,7 +123,7 @@ fn build(app: &gtk::Application) {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         let chips: std::rc::Rc<std::cell::RefCell<Vec<gtk::Button>>> = std::rc::Rc::default();
         let add_chip = |login: Option<&str>| {
-            let shown = login.map(common::display_name).unwrap_or_else(|| "other".into()).to_lowercase();
+            let shown = login.map(common::display_name).unwrap_or_else(|| "Other".into());
             let chip = gtk::Button::new();
             chip.add_css_class("person");
             let inner = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -132,7 +161,7 @@ fn build(app: &gtk::Application) {
     }
     form.append(&pill);
     // Caps lock: the keyboard's light says so, checked a few times a second.
-    let caps = label("caps lock is on", &["caps-warning"]);
+    let caps = label("Caps lock is on", &["caps-warning"]);
     caps.set_visible(crate::osd::caps_lock() == Some(true));
     {
         let caps = caps.clone();
@@ -143,11 +172,11 @@ fn build(app: &gtk::Application) {
     }
     form.append(&caps);
     form.append(&error);
-    let forgot = gtk::Button::with_label("forgot your password?");
+    let forgot = gtk::Button::with_label("Forgot your password?");
     forgot.add_css_class("link");
     forgot.set_halign(gtk::Align::Start);
     let help = label(
-        "another administrator on this computer can set a new one in settings → accounts. if you're the only one, the password can't be recovered: your files stay safe, but tripppin has to be installed again.",
+        "Another administrator on this computer can set a new one in Settings → accounts. If you're the only one, the password can't be recovered: your files stay safe, but Tripppin has to be installed again.",
         &["status"],
     );
     help.set_wrap(true);
@@ -169,18 +198,18 @@ fn build(app: &gtk::Application) {
     status.set_margin_end(48);
     status.set_margin_bottom(40);
     if let Some(ssid) = common::wifi_name() {
-        status.append(&label(&format!("wi-fi · {}", ssid.to_lowercase()), &["status"]));
+        status.append(&label(&format!("Wi-Fi · {}", ssid), &["status"]));
     }
     if let Some(b) = common::battery() {
-        status.append(&label(&format!("battery {b}%"), &["status"]));
+        status.append(&label(&format!("Battery {b}%"), &["status"]));
     }
     let power = gtk::MenuButton::new();
-    power.set_label("power");
+    power.set_label("Power");
     power.set_always_show_arrow(false);
     power.add_css_class("status");
     let menu = gtk::gio::Menu::new();
-    menu.append(Some("shut down"), Some("app.poweroff"));
-    menu.append(Some("restart"), Some("app.reboot"));
+    menu.append(Some("Shut down"), Some("app.poweroff"));
+    menu.append(Some("Restart"), Some("app.reboot"));
     power.set_menu_model(Some(&menu));
     for (name, verb) in [("poweroff", "poweroff"), ("reboot", "reboot")] {
         let action = gtk::gio::SimpleAction::new(name, None);
@@ -209,9 +238,9 @@ fn build(app: &gtk::Application) {
             if who.is_empty() || pw.is_empty() {
                 return;
             }
-            let result = Greetd::connect().and_then(|mut g| g.login(&who, &pw, &["niri-session"]));
+            let result = Greetd::connect().and_then(|mut g| g.login(&who, &pw, &[SESSION]));
             match result {
-                Ok(Outcome::Started) => app.quit(),
+                Ok(Outcome::Started) => fade_to_ink(&app),
                 Ok(Outcome::Refused(why)) => {
                     error.set_text(&why);
                     error.set_visible(true);

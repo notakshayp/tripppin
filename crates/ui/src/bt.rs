@@ -60,12 +60,12 @@ pub fn kind_word(icon: &str) -> &'static str {
 
 fn ctl(args: &[&str]) -> Result<String, String> {
     let out =
-        Command::new("bluetoothctl").args(args).output().map_err(|e| format!("couldn't run bluetoothctl: {e}"))?;
+        Command::new("bluetoothctl").args(args).output().map_err(|e| format!("Couldn't run bluetoothctl: {e}"))?;
     let text = String::from_utf8_lossy(&out.stdout).into_owned();
     if out.status.success() && !text.contains("Failed") && !text.contains("not available") {
         Ok(text)
     } else {
-        let line = text.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("bluetooth failed");
+        let line = text.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("Bluetooth failed");
         Err(line.trim().to_lowercase())
     }
 }

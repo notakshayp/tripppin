@@ -60,7 +60,7 @@ pub fn status() -> Status {
 /// "nightly" from "ostree-image-signed:docker://ghcr.io/notakshayp/tripppin:nightly".
 pub fn channel(image: &str) -> String {
     if image.contains("oci-archive:") {
-        return "a local test build".to_string();
+        return "A local test build".to_string();
     }
     image
         .rsplit_once(':')
@@ -112,7 +112,7 @@ pub fn os_release_value(text: &str, key: &str) -> Option<String> {
 
 pub fn pretty_name() -> String {
     let text = std::fs::read_to_string("/usr/lib/os-release").unwrap_or_default();
-    os_release_value(&text, "PRETTY_NAME").unwrap_or_else(|| "tripppin".into()).to_lowercase()
+    os_release_value(&text, "PRETTY_NAME").unwrap_or_else(|| "Tripppin".into())
 }
 
 pub fn hostname() -> String {
@@ -165,7 +165,7 @@ mod tests {
         assert_eq!(s.staged.unwrap().version, "45.2");
         assert_eq!(s.previous.unwrap().version, "45.0");
         assert_eq!(channel("ostree-image-signed:docker://ghcr.io/x/tripppin:nightly"), "nightly");
-        assert_eq!(channel("ostree-unverified-image:oci-archive:/var/tmp/t.tar"), "a local test build");
+        assert_eq!(channel("ostree-unverified-image:oci-archive:/var/tmp/t.tar"), "A local test build");
         assert_eq!(
             os_release_value("NAME=\"Tripppin\"\nPRETTY_NAME=\"Tripppin 0.1\"\n", "PRETTY_NAME").as_deref(),
             Some("Tripppin 0.1")

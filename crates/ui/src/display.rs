@@ -59,7 +59,7 @@ pub fn parse_outputs(json: &str) -> Vec<Output> {
                 .unwrap_or_default();
             let make = o["make"].as_str().unwrap_or("");
             let model = o["model"].as_str().unwrap_or("");
-            let title = format!("{make} {model}").trim().to_lowercase();
+            let title = format!("{make} {model}").trim().to_string();
             Output {
                 name: o["name"].as_str().unwrap_or("").to_string(),
                 title: if title.is_empty() { "screen".into() } else { title },
@@ -93,7 +93,7 @@ fn niri(args: &[&str]) -> Result<(), String> {
 }
 
 /// niri's names for rotations, from the words we show.
-pub const ROTATIONS: [(&str, &str); 4] = [("normal", "normal"), ("90°", "90"), ("180°", "180"), ("270°", "270")];
+pub const ROTATIONS: [(&str, &str); 4] = [("Normal", "normal"), ("90°", "90"), ("180°", "180"), ("270°", "270")];
 pub const SCALES: [f64; 6] = [1.0, 1.25, 1.5, 1.75, 2.0, 2.5];
 
 /// The scale that keeps text crisp: a whole number, so every pixel lines up. 2 for
@@ -130,7 +130,7 @@ pub fn apply(o: &Output, mode: &Mode, scale: f64, transform: &str) -> Result<(),
     niri(&["msg", "output", &o.name, "mode", &mode.spec()])?;
     niri(&["msg", "output", &o.name, "scale", &format!("{scale}")])?;
     niri(&["msg", "output", &o.name, "transform", transform])?;
-    remember(&o.name, mode, scale, transform).map_err(|e| format!("applied, but couldn't save it: {e}"))
+    remember(&o.name, mode, scale, transform).map_err(|e| format!("Applied, but couldn't save it: {e}"))
 }
 
 fn config_dir() -> PathBuf {
@@ -258,7 +258,7 @@ mod tests {
         let outs = parse_outputs(json);
         assert_eq!(outs.len(), 1);
         let o = &outs[0];
-        assert_eq!(o.title, "red hat, inc. qemu monitor");
+        assert_eq!(o.title, "Red Hat, Inc. QEMU Monitor");
         assert_eq!(o.current, Some(0));
         assert_eq!(o.scale, 1.25);
         assert_eq!(o.transform, "normal");

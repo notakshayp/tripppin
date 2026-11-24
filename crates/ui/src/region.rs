@@ -74,10 +74,10 @@ pub fn set_twelve_hour(on: bool) -> std::io::Result<()> {
 
 /// Languages people pick from, as (locale, name). Only those installed show up.
 pub const LANGUAGES: [(&str, &str); 17] = [
-    ("C.UTF-8", "english (basic)"),
-    ("en_IN.UTF-8", "english (india)"),
-    ("en_US.UTF-8", "english (us)"),
-    ("en_GB.UTF-8", "english (uk)"),
+    ("C.UTF-8", "English (basic)"),
+    ("en_IN.UTF-8", "English (India)"),
+    ("en_US.UTF-8", "English (US)"),
+    ("en_GB.UTF-8", "English (UK)"),
     ("hi_IN.UTF-8", "हिन्दी · hindi"),
     ("bn_IN.UTF-8", "বাংলা · bengali"),
     ("ta_IN.UTF-8", "தமிழ் · tamil"),
@@ -87,10 +87,10 @@ pub const LANGUAGES: [(&str, &str); 17] = [
     ("ml_IN.UTF-8", "മലയാളം · malayalam"),
     ("gu_IN.UTF-8", "ગુજરાતી · gujarati"),
     ("pa_IN.UTF-8", "ਪੰਜਾਬੀ · punjabi"),
-    ("es_ES.UTF-8", "español · spanish"),
-    ("fr_FR.UTF-8", "français · french"),
-    ("de_DE.UTF-8", "deutsch · german"),
-    ("pt_BR.UTF-8", "português · portuguese"),
+    ("es_ES.UTF-8", "Español · Spanish"),
+    ("fr_FR.UTF-8", "Français · French"),
+    ("de_DE.UTF-8", "Deutsch · German"),
+    ("pt_BR.UTF-8", "Português · Portuguese"),
 ];
 
 /// `locale -a` prints "en_US.utf8", or just "hi_IN" for languages only built as UTF-8;

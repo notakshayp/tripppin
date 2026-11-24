@@ -1,7 +1,10 @@
-/* Matches the mockup: ink pill, DM Mono, paper for what matters, green for live. */
+/* The bar: an ink strip with a neutral hairline, Inter at a readable 13 px with even-width
+   digits, paper for what matters, green only for what is live. Corner radii are the Default
+   look; Settings → Appearance → Corners writes ~/.config/waybar/style.css over this. */
 * {
-    font-family: "DM Mono", lucide, monospace;
-    font-size: 12px;
+    font-family: Inter, lucide, sans-serif;
+    font-size: 13px;
+    font-feature-settings: "tnum";
     min-height: 0;
     border: none;
     border-radius: 0;
@@ -9,10 +12,10 @@
 }
 
 window#waybar {
-    background: rgba(20, 27, 25, 0.82);
-    border: 1px solid #222d2a;
-    border-radius: 12px;
-    color: #b7c3bd;
+    background: rgba(20, 26, 24, 0.9);
+    border: 1px solid rgba(242, 245, 239, 0.07);
+    border-radius: 10px;
+    color: #c3cdc8;
 }
 
 #image.logo {
@@ -63,34 +66,62 @@ window#waybar {
     color: #f2f5ef;
 }
 
-#custom-orb,
-#network,
-#pulseaudio,
-#battery {
+#custom-orb {
     padding: 0 7px;
 }
 
-/* Icons answer the pointer: a soft green lift, eased like everything else. */
-#network,
-#pulseaudio,
-#bluetooth,
-#battery,
+/* Icons answer the pointer: a quiet neutral lift, eased like everything else. */
 #custom-notifications,
 #custom-power,
 #custom-clock,
 #language {
-    border-radius: 8px;
+    border-radius: 6px;
     margin: 4px 1px;
     transition: background 180ms ease, color 180ms ease;
 }
 
-#network:hover,
-#pulseaudio:hover,
-#bluetooth:hover,
 #custom-clock:hover,
-#language:hover {
+#language:hover,
+#custom-power:hover,
+#custom-notifications:hover {
     background: rgba(242, 245, 239, 0.07);
     color: #f2f5ef;
+}
+
+/* Quick settings: network, bluetooth, volume and battery as one pill, with a hairline edge
+   so it reads as a single control; the whole pill lifts together on hover. */
+#quick {
+    margin: 4px 4px;
+    padding: 0 3px;
+    border-radius: 9px;
+    background: rgba(242, 245, 239, 0.04);
+    border: 1px solid rgba(242, 245, 239, 0.08);
+    transition: background 180ms ease, border-color 180ms ease;
+}
+
+#quick:hover {
+    background: rgba(242, 245, 239, 0.09);
+    border-color: rgba(242, 245, 239, 0.14);
+}
+
+#quick:hover #network,
+#quick:hover #bluetooth,
+#quick:hover #pulseaudio {
+    color: #f2f5ef;
+}
+
+#network,
+#pulseaudio,
+#bluetooth {
+    padding: 0 6px;
+}
+
+#image.battery {
+    padding: 0 6px 0 4px;
+}
+
+#image.battery.empty {
+    padding: 0;
 }
 
 #custom-clock {
@@ -103,7 +134,7 @@ window#waybar {
 
 #custom-notifications {
     padding: 0 8px;
-    color: #8a9a93;
+    color: #c3cdc8;
 }
 
 #custom-notifications.notification,
@@ -117,26 +148,28 @@ window#waybar {
     color: #b7c3bd;
 }
 
-#custom-power:hover,
-#custom-notifications:hover {
-    color: #57d99a;
-    background: rgba(87, 217, 154, 0.10);
-}
-
-#battery.warning:not(.charging) {
-    color: #f0a868;
-}
-
 /* Recording the screen: a red dot, the one place red appears, so it can't be missed. */
 #custom-recording {
     color: #ff8a7a;
     margin-right: 6px;
 }
 
-#language,
-#bluetooth {
+#language {
     padding: 0 8px;
     color: #b7c3bd;
+}
+
+#bluetooth {
+    color: #b7c3bd;
+}
+
+/* Off, or nothing connected to: dimmer, so "on" is the state that stands out. */
+#bluetooth.off,
+#bluetooth.disabled,
+#network.disconnected,
+#network.disabled,
+#pulseaudio.muted {
+    color: #6f7d77;
 }
 
 #bluetooth.connected {
@@ -150,8 +183,8 @@ window#waybar {
 #tray menu {
     background: #141b19;
     color: #f2f5ef;
-    border: 1px solid #2f3d38;
-    border-radius: 12px;
+    border: 1px solid rgba(242, 245, 239, 0.13);
+    border-radius: 8px;
 }
 
 #privacy {

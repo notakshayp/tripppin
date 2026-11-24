@@ -7,7 +7,7 @@
 # a new one, and that PR runs the full image pipeline before it can merge.
 
 # ---- Rust tools -------------------------------------------------------------
-FROM quay.io/fedora/fedora:45@sha256:62d5eaec1e8a34f6cb94934f806420754611834c7eef8a4f50b9cdbcd1c90c10 AS build
+FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS build
 RUN dnf -y install --setopt=install_weak_deps=False cargo rust gcc gtk4-devel gtk4-layer-shell-devel && dnf clean all
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rustfmt.toml ./
@@ -17,7 +17,7 @@ RUN cargo build --release --locked -p trip -p tripppin-ui
 
 # ---- llama.cpp ------------------------------------------------------------
 # Pinned release, Vulkan backend (falls back to the CPU when there's no GPU).
-FROM quay.io/fedora/fedora:45@sha256:62d5eaec1e8a34f6cb94934f806420754611834c7eef8a4f50b9cdbcd1c90c10 AS llama
+FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS llama
 ARG LLAMA_CPP_TAG=v1.0.0
 RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ vulkan-headers vulkan-loader-devel glslc spirv-headers-devel && dnf clean all
 RUN git clone --depth 1 --branch "$LLAMA_CPP_TAG" https://github.com/ggml-org/llama.cpp /src/llama.cpp
@@ -116,21 +116,35 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     && dnf clean all
 
 COPY os/files/ /
+# The desktop widgets reference, for people and for the AI (`tripppin-ui widgets guide`).
+COPY docs/WIDGETS.md /usr/share/doc/tripppin/WIDGETS.md
 
-# Branding. Keep ID and VERSION_ID as Fedora's so bootc and the image builder still
-# recognise the base; change only what people see.
-RUN sed -i \
+# Branding. Keep ID, ID_LIKE, VERSION_ID, CPE_NAME and the Fedora support fields: bootc,
+# bootc-image-builder, dnf ($releasever) and Anaconda read those to recognise the base.
+# Change only what people see: the name, a VARIANT (display only; no VARIANT_ID, which
+# Fedora's tooling uses to pick editions), the logo icon and colour, the home page, and
+# DEFAULT_HOSTNAME, the name systemd gives a machine with no /etc/hostname (Fedora's says
+# "fedora"). Machines that were already called "fedora" are renamed once by
+# tripppin-hostname.service.
+RUN set -e; f=/usr/lib/os-release; \
+    sed -i \
       -e 's/^NAME=.*/NAME="Tripppin"/' \
       -e 's/^PRETTY_NAME=.*/PRETTY_NAME="Tripppin 0.1 (Fedora 45 base)"/' \
-      -e 's/^VARIANT=.*/VARIANT="Tripppin"/' \
-      /usr/lib/os-release
+      -e 's/^DEFAULT_HOSTNAME=.*/DEFAULT_HOSTNAME="tripppin"/' \
+      -e 's/^LOGO=.*/LOGO=tripppin/' \
+      -e 's/^ANSI_COLOR=.*/ANSI_COLOR="0;38;2;87;217;154"/' \
+      -e 's|^HOME_URL=.*|HOME_URL="https://trippp.in/"|' \
+      "$f"; \
+    grep -q '^DEFAULT_HOSTNAME=' "$f" || echo 'DEFAULT_HOSTNAME="tripppin"' >> "$f"; \
+    grep -q '^VARIANT=' "$f" || echo 'VARIANT="Tripppin"' >> "$f"; \
+    grep -qx 'ID=fedora' "$f"; grep -qx 'DEFAULT_HOSTNAME="tripppin"' "$f"
 
 # The login banner: the logo in text, then the system name and terminal.
 RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } > /etc/issue
 
 # The desktop starts on tty1 through greetd; other consoles (Ctrl+Alt+F2…) are kmscon.
 RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service firewalld.service cups.socket \
-      tripppin-firefox.service greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
+      tripppin-firefox.service tripppin-hostname.service greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
     && systemctl set-default graphical.target \
     && dconf update \
     && fc-cache -f
@@ -151,6 +165,20 @@ RUN set -e; src=/usr/share/icons/Papirus; dst=/usr/share/icons/Tripppin; \
     test -f "$dst/48x48/places/folder.svg"
 
 # The boot splash: our Plymouth theme, built into the initramfs so it shows from the start.
+# A clean app list: hide helpers, duplicates of our Settings pages and Fedora's tool windows
+# (they still open from files and links), and give the two everyday apps plain names.
+# Settings' own pages are found by searching "Settings" words instead of listing 20 entries.
+RUN cd /usr/share/applications \
+    && for f in blueman-manager blueman-adapters foot-server footclient qt5ct qt6ct system-config-printer \
+         thunar-bulk-rename thunar-settings network.cycles.wdisplays org.pulseaudio.pavucontrol \
+         org.gnome.FileRoller org.gnome.SimpleScan; do \
+         [ ! -f "$f.desktop" ] || sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$f.desktop"; \
+       done \
+    && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \
+    && sed -i -e '/^Name\[/d' -e 's/^Name=Foot$/Name=Terminal/' foot.desktop \
+    && sed -i -e '/^Name\[/d' -e 's/^Name=Thunar File Manager$/Name=Files/' thunar.desktop \
+    && ! grep -q NoDisplay in.trippp.Settings.desktop
+
 RUN plymouth-set-default-theme tripppin \
     && kver=$(cd /usr/lib/modules && echo *) \
     && DRACUT_NO_XATTR=1 dracut -f --no-hostonly --reproducible "/usr/lib/modules/$kver/initramfs.img" "$kver" \

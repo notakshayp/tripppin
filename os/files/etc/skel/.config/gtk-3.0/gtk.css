@@ -31,7 +31,7 @@
 
 window.background,
 window.background.csd {
-    border-radius: 16px;
+    border-radius: 10px;
 }
 
 /* The button that does the thing (Authenticate, Save, OK) in green, like ours. */

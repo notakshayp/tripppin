@@ -35,10 +35,10 @@ Open a terminal and type what you want in plain words. A model running on your o
 
 ## In the terminal
 
-Logging in plays the logo: the ring draws itself, the spark spins in, and a short system summary appears beside it. Run it any time with `trip logo`.
+Logging in on a text console plays the logo: the ring draws itself, the × spins in, and a short system summary appears beside it. Run it any time with `trip logo`. (Logging in to the desktop plays the same intro as a full-screen splash instead.)
 
 <p align="center">
-  <img src="brand/terminal-logo.png" alt="Six frames of the terminal logo animation: the ring drawing, the spark spinning in, sparkles bursting, and the final logo" width="720">
+  <img src="brand/terminal-logo.png" alt="Six frames of the terminal logo animation: the ring drawing, the × spark spinning in and settling, and the final logo" width="720">
 </p>
 
 ## Try it
@@ -109,10 +109,10 @@ CI builds the same image for x86_64 and arm64 on every PR that touches `os/`, `c
 |---|---|
 | [`brand/logo.svg`](brand/logo.svg) | The mark in ink, for light backgrounds |
 | [`brand/logo-themed.svg`](brand/logo-themed.svg) | Switches between light and dark with the viewer's theme |
-| [`brand/logo-animated.svg`](brand/logo-animated.svg) | The intro: ring draws, spark pops, sparkles burst |
+| [`brand/logo-animated.svg`](brand/logo-animated.svg) | The intro: the ring draws itself, the × spins in and settles, then turns a quarter now and then |
 | [`brand/social/`](brand/social) | 1024×1024 avatars: dark, light, green |
 
-The power symbol with a spark where its line would be: switch it on, and there's intelligence inside. One colour (ink or paper) with a green spark. Don't outline it, add effects or separate the spark from the ring.
+The power symbol with a spark where its line would be: switch it on, and there's intelligence inside. The spark is an ×, two arrows meeting in the middle, sitting in the ring's opening. One colour (ink or paper) with a green spark. Don't outline it, add effects or separate the spark from the ring. Every raster (social images, app icon, wallpapers, boot splash, terminal frames) comes from `scripts/brand-assets.sh`.
 
 ## Rules
 

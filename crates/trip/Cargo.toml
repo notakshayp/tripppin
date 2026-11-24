@@ -13,11 +13,15 @@ anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+toml.workspace = true
 hwdetect.workspace = true
 ureq.workspace = true
 sha2.workspace = true
 reedline.workspace = true
 ctrlc.workspace = true
+crossterm.workspace = true
+nu-ansi-term.workspace = true
+unicode-width.workspace = true
 
 [lints]
 workspace = true

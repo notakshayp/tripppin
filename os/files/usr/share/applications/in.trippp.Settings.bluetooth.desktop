@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=bluetooth settings
-Comment=settings → bluetooth
+Name=Bluetooth settings
+Comment=Settings → Bluetooth
 Exec=tripppin-ui settings bluetooth
 Icon=bluetooth
 Keywords=pair;headphones;speaker;mouse;keyboard;

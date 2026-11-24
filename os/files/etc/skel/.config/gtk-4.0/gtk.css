@@ -47,10 +47,10 @@
     --success-color: #57d99a;
     --warning-color: #e8c26e;
     --error-color: #e0786b;
-    --window-radius: 16px;
+    --window-radius: 10px;
 }
 
 window.background,
 window.background.csd {
-    border-radius: 16px;
+    border-radius: 10px;
 }

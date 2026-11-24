@@ -47,9 +47,9 @@ pub fn battery() -> Option<Battery> {
 /// One line for the page's status: "84% · 2.1 hours left" or "charging · 84%".
 pub fn summary(b: &Battery) -> String {
     match b.state.as_str() {
-        "charging" if !b.time_left.is_empty() => format!("charging · {}% · full in {}", b.percent, b.time_left),
-        "charging" => format!("charging · {}%", b.percent),
-        "fully-charged" => "fully charged · plugged in".to_string(),
+        "charging" if !b.time_left.is_empty() => format!("Charging · {}% · full in {}", b.percent, b.time_left),
+        "charging" => format!("Charging · {}%", b.percent),
+        "fully-charged" => "Fully charged · plugged in".to_string(),
         _ if !b.time_left.is_empty() => format!("{}% · {} left", b.percent, b.time_left),
         _ => format!("{}%", b.percent),
     }
@@ -103,13 +103,16 @@ fn idle_file() -> PathBuf {
 }
 
 /// The swayidle config for these timings. Lock and screen-off happen on battery and mains;
-/// "before-sleep" locks first so the computer never wakes up unlocked.
+/// "before-sleep" locks first so the computer never wakes up unlocked, and "lock" answers
+/// `loginctl lock-session`. `tripppin-ui lock` returns once locked, so swayidle (run with -w)
+/// carries on and the screen still turns off and sleeps while locked.
 pub fn swayidle_config(idle: &Idle) -> String {
     let mut out = String::from("# When the computer is left alone. Written by tripppin settings.\n");
     if idle.lock > 0 {
-        // Fade the screen half a minute first, so locking never comes as a surprise.
+        // Fade the screen half a minute first, so locking never comes as a surprise. In the
+        // background: swayidle -w waits for each command, and the fade lasts until you're back.
         out.push_str(&format!(
-            "timeout {} 'tripppin-ui dim' resume 'pkill -f \"^(/usr/bin/)?tripppin-ui dim\"'\n",
+            "timeout {} 'tripppin-ui dim &' resume 'pkill -f \"^(/usr/bin/)?tripppin-ui dim\"'\n",
             idle.lock * 60 - 30
         ));
         out.push_str(&format!("timeout {} 'tripppin-ui lock'\n", idle.lock * 60));
@@ -124,6 +127,7 @@ pub fn swayidle_config(idle: &Idle) -> String {
         out.push_str(&format!("timeout {} 'systemctl suspend'\n", idle.sleep * 60));
     }
     out.push_str("before-sleep 'tripppin-ui lock'\n");
+    out.push_str("lock 'tripppin-ui lock'\n");
     out
 }
 

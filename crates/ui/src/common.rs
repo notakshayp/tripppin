@@ -1,19 +1,45 @@
 //! Pieces every screen shares: the stylesheet, the logo, and small facts about the machine.
 
 use gtk::prelude::*;
-use gtk::{cairo, gdk, glib};
+use gtk::{cairo, gdk, gio, glib};
 use std::path::PathBuf;
+use trip::logo;
 
 pub const INK: (f64, f64, f64) = (0.949, 0.961, 0.937);
 pub const GREEN: (f64, f64, f64) = (0.341, 0.851, 0.604);
 
-/// Loads the Tripppin stylesheet for the whole app.
+thread_local! {
+    /// The corner radii on top of the stylesheet, and the watch on the file that picks them.
+    static CORNERS: std::cell::RefCell<Option<(gtk::CssProvider, gio::FileMonitor)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Loads the Tripppin stylesheet for the whole app, with the corners chosen in Settings →
+/// Appearance; when that choice changes, every running screen restyles itself.
 pub fn load_css() {
+    let Some(display) = gdk::Display::default() else { return };
     let provider = gtk::CssProvider::new();
     provider.load_from_string(include_str!("style.css"));
-    if let Some(display) = gdk::Display::default() {
-        gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
-    }
+    gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    CORNERS.with(|slot| {
+        if slot.borrow().is_some() {
+            return;
+        }
+        let corners = gtk::CssProvider::new();
+        corners.load_from_string(&crate::look::css(crate::look::current()));
+        gtk::style_context_add_provider_for_display(&display, &corners, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
+        // The folder must exist for the watch to see the file appear.
+        if let Some(dir) = crate::look::file().parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let Ok(monitor) =
+            gio::File::for_path(crate::look::file()).monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE)
+        else {
+            return;
+        };
+        let watched = corners.clone();
+        monitor.connect_changed(move |_, _, _, _| watched.load_from_string(&crate::look::css(crate::look::current())));
+        *slot.borrow_mut() = Some((corners, monitor));
+    });
 }
 
 /// A label with the given CSS classes.
@@ -26,56 +52,99 @@ pub fn label(text: &str, classes: &[&str]) -> gtk::Label {
     l
 }
 
-/// Draws the power-spark mark into a box whose width is `w` (the mark is 146 x 175 units).
-fn draw_mark(cr: &cairo::Context, x: f64, y: f64, w: f64, ring: (f64, f64, f64, f64), spark: (f64, f64, f64, f64)) {
-    let s = w / 146.0;
+type Rgba = (f64, f64, f64, f64);
+
+/// Draws the power-spark mark into a box whose width is `w`, as it stands at `pose`.
+/// Every drawing of the mark on the desktop goes through here; the geometry (and the intro's
+/// timing) is `trip::logo`'s, the same as the terminal's and the brand files'.
+pub fn draw_mark_posed(cr: &cairo::Context, x: f64, y: f64, w: f64, ring: Rgba, spark: Rgba, pose: logo::Pose) {
+    let (bx, by, bw, _) = logo::BOX;
+    let s = w / bw;
     cr.save().ok();
     cr.translate(x, y);
     cr.scale(s, s);
-    cr.translate(-27.0, -12.0);
-    // The ring: centre (100, 114), radius 60, open +-44 degrees around the top.
-    let start = (-90.0f64 + 44.0).to_radians();
-    let end = (-90.0f64 - 44.0 + 360.0).to_radians();
-    cr.set_source_rgba(ring.0, ring.1, ring.2, ring.3);
-    cr.set_line_width(22.0);
-    cr.set_line_cap(cairo::LineCap::Round);
-    cr.arc(100.0, 114.0, 60.0, start, end);
-    cr.stroke().ok();
-    // The spark: a four-point star at (100, 50).
-    let pts = [
-        (100.00, 14.00),
-        (106.11, 43.89),
-        (136.00, 50.00),
-        (106.11, 56.11),
-        (100.00, 86.00),
-        (93.89, 56.11),
-        (64.00, 50.00),
-        (93.89, 43.89),
-    ];
-    cr.move_to(pts[0].0, pts[0].1);
-    for p in &pts[1..] {
-        cr.line_to(p.0, p.1);
+    cr.translate(-bx, -by);
+    // The ring, drawn from its left end down and round (cairo's angles run clockwise from +x).
+    let (cx, cy, r, width) = logo::RING;
+    if pose.ring > 0.0 {
+        let left = (-90.0 - logo::GAP_DEG).to_radians();
+        cr.set_source_rgba(ring.0, ring.1, ring.2, ring.3);
+        cr.set_line_width(width);
+        cr.set_line_cap(cairo::LineCap::Round);
+        cr.arc_negative(cx, cy, r, left, left - (logo::SPAN * pose.ring.min(1.0)).to_radians());
+        cr.stroke().ok();
     }
-    cr.close_path();
-    cr.set_source_rgba(spark.0, spark.1, spark.2, spark.3);
-    cr.fill().ok();
+    // The spark: an × in the ring's opening.
+    if pose.spark_scale > 0.0 {
+        let pts = logo::spark_points(pose.spark_scale, pose.spark_turn);
+        cr.move_to(pts[0].0, pts[0].1);
+        for p in &pts[1..] {
+            cr.line_to(p.0, p.1);
+        }
+        cr.close_path();
+        cr.set_source_rgba(spark.0, spark.1, spark.2, spark.3);
+        cr.fill().ok();
+    }
     cr.restore().ok();
+}
+
+/// Draws the finished mark into a box whose width is `w` (the mark is 146 x 175 units).
+pub fn draw_mark(cr: &cairo::Context, x: f64, y: f64, w: f64, ring: Rgba, spark: Rgba) {
+    draw_mark_posed(cr, x, y, w, ring, spark, logo::Pose::FULL);
+}
+
+/// The mark's height for a given width.
+pub fn mark_height(width: f64) -> f64 {
+    width * logo::BOX.3 / logo::BOX.2
 }
 
 /// The full mark, paper ring and green spark, `width` px wide (and 175/146 as tall).
 pub fn logo(width: i32) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
     area.set_content_width(width);
-    area.set_content_height((f64::from(width) * 175.0 / 146.0).round() as i32);
+    area.set_content_height(mark_height(f64::from(width)).round() as i32);
     area.set_can_target(false);
     // Always the asked-for size, centred, however much room the parent gives it.
     area.set_halign(gtk::Align::Center);
     area.set_valign(gtk::Align::Center);
     let size = f64::from(width);
     area.set_draw_func(move |_, cr, w, h| {
-        let height = size * 175.0 / 146.0;
-        let (x, y) = ((f64::from(w) - size) / 2.0, (f64::from(h) - height) / 2.0);
+        let (x, y) = ((f64::from(w) - size) / 2.0, (f64::from(h) - mark_height(size)) / 2.0);
         draw_mark(cr, x, y, size, (INK.0, INK.1, INK.2, 1.0), (GREEN.0, GREEN.1, GREEN.2, 1.0));
+    });
+    area
+}
+
+/// The mark playing its intro (the ring draws itself, the × spins in and settles), then,
+/// if `waiting`, making a gentle quarter turn every couple of seconds. It starts when first
+/// shown. With reduce motion on, it's the finished mark, still.
+pub fn animated_logo(width: i32, waiting: bool) -> gtk::DrawingArea {
+    let area = logo(width);
+    if crate::display::reduce_motion() {
+        return area;
+    }
+    let size = f64::from(width);
+    let start: std::rc::Rc<std::cell::Cell<Option<i64>>> = Default::default();
+    {
+        let start = start.clone();
+        area.set_draw_func(move |a, cr, w, h| {
+            let now = a.frame_clock().map_or(0, |c| c.frame_time());
+            let t = (now - start.get().unwrap_or(now)) as f64 / 1_000_000.0;
+            let mut pose = logo::intro_pose(t);
+            if waiting {
+                pose.spark_turn += logo::waiting_turn(t - logo::INTRO_SECS);
+            }
+            let (x, y) = ((f64::from(w) - size) / 2.0, (f64::from(h) - mark_height(size)) / 2.0);
+            draw_mark_posed(cr, x, y, size, (INK.0, INK.1, INK.2, 1.0), (GREEN.0, GREEN.1, GREEN.2, 1.0), pose);
+        });
+    }
+    area.add_tick_callback(move |a, clock| {
+        let now = clock.frame_time();
+        let began = start.get().unwrap_or(now);
+        start.set(Some(began));
+        let t = (now - began) as f64 / 1_000_000.0;
+        a.queue_draw();
+        if waiting || t < logo::INTRO_SECS + 0.1 { glib::ControlFlow::Continue } else { glib::ControlFlow::Break }
     });
     area
 }
@@ -161,6 +230,7 @@ pub mod icons {
     pub const CAPS: char = '\u{e04a}';
     pub const HISTORY: char = '\u{e1f5}';
     pub const CHEVRON_DOWN: char = '\u{e06d}';
+    pub const CHEVRON_LEFT: char = '\u{e06e}';
     pub const CHEVRON_RIGHT: char = '\u{e06f}';
     pub const TERMINAL: char = '\u{e181}';
     pub const NEW: char = '\u{e172}';
@@ -230,17 +300,51 @@ pub fn spinner(size: i32) -> gtk::DrawingArea {
     area
 }
 
-pub fn clock() -> String {
-    let format = if crate::region::twelve_hour() { "%-I:%M %p" } else { "%H:%M" };
-    glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_lowercase()).unwrap_or_default()
+/// A small green dot that breathes while something is under way: quieter than the spinner,
+/// for a status line. Holds still when animations are off.
+pub fn pulse_dot(size: i32) -> gtk::DrawingArea {
+    let area = gtk::DrawingArea::new();
+    area.set_content_width(size);
+    area.set_content_height(size);
+    area.set_can_target(false);
+    area.add_css_class("pulse-dot");
+    area.set_draw_func(|a, cr, w, h| {
+        let animate = gtk::Settings::default().is_none_or(|s| s.is_gtk_enable_animations());
+        let t = if animate { a.frame_clock().map_or(0.0, |c| c.frame_time() as f64 / 1_000_000.0) } else { 0.0 };
+        // One breath every 1.4 s: the dot swells a little and brightens, then settles.
+        let k = 0.5 - 0.5 * (t * std::f64::consts::TAU / 1.4).cos();
+        let (w, h) = (f64::from(w), f64::from(h));
+        let full = w.min(h) / 2.0;
+        cr.set_source_rgba(GREEN.0, GREEN.1, GREEN.2, 0.45 + 0.55 * k);
+        cr.arc(w / 2.0, h / 2.0, full * (0.6 + 0.4 * k), 0.0, std::f64::consts::TAU);
+        cr.fill().ok();
+    });
+    area.add_tick_callback(|a, _| {
+        a.queue_draw();
+        glib::ControlFlow::Continue
+    });
+    area
 }
 
-/// "sunday, 22 november"
+/// The monitor plugged into connector `name` (`eDP-1`, `HDMI-A-1`), as niri names outputs.
+pub fn monitor_named(name: &str) -> Option<gdk::Monitor> {
+    let monitors = gdk::Display::default()?.monitors();
+    (0..monitors.n_items())
+        .filter_map(|i| monitors.item(i).and_downcast::<gdk::Monitor>())
+        .find(|m| m.connector().as_deref() == Some(name))
+}
+
+pub fn clock() -> String {
+    let format = if crate::region::twelve_hour() { "%-I:%M %p" } else { "%H:%M" };
+    glib::DateTime::now_local().ok().and_then(|t| t.format(format).ok()).map(|s| s.to_string()).unwrap_or_default()
+}
+
+/// "Sunday, 22 November"
 pub fn long_date() -> String {
     glib::DateTime::now_local()
         .ok()
         .and_then(|t| t.format("%A, %-d %B").ok())
-        .map(|s| s.to_lowercase())
+        .map(|s| s.to_string())
         .unwrap_or_default()
 }
 
@@ -255,14 +359,7 @@ pub fn wifi_name() -> Option<String> {
 
 /// The battery's charge in percent, if there's a battery.
 pub fn battery() -> Option<u8> {
-    let dir = std::fs::read_dir("/sys/class/power_supply").ok()?;
-    for entry in dir.flatten() {
-        let path = entry.path();
-        if std::fs::read_to_string(path.join("type")).is_ok_and(|t| t.trim() == "Battery") {
-            return std::fs::read_to_string(path.join("capacity")).ok()?.trim().parse().ok();
-        }
-    }
-    None
+    crate::battery::read(std::path::Path::new("/sys/class/power_supply")).map(|c| c.percent)
 }
 
 /// Where the desktop's small shared state lives (the orb's status, what finished last).
@@ -310,45 +407,50 @@ pub fn current_user() -> String {
 /// Settings → Keyboard. Keep in step with os/files/etc/niri/desktop.kdl.
 pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
     (
-        "tripppin",
+        "Tripppin",
         &[
-            ("ask tripppin", "super + space"),
-            ("terminal", "super + return"),
-            ("apps", "super + a, or type its name after super + space"),
-            ("quick settings", "super + n"),
-            ("clipboard history", "super + v"),
-            ("emoji", "super + ."),
-            ("these shortcuts", "super + /"),
+            ("Ask Tripppin", "Super + Space"),
+            ("terminal", "Super + Return"),
+            ("apps", "Super + A, or type its name after Super + Space"),
+            ("Quick settings", "Super + N"),
+            ("Clipboard history", "Super + V"),
+            ("emoji", "Super + ."),
+            ("These shortcuts", "Super + /"),
         ],
     ),
     (
-        "windows",
+        "Windows",
         &[
-            ("close a window", "super + q"),
-            ("move a window", "super + drag"),
-            ("resize a window", "super + right-drag"),
-            ("full screen", "super + f"),
-            ("float or tile a window", "super + t"),
-            ("switch windows", "alt + tab"),
-            ("see every window", "super + tab"),
-            ("snap left or right", "super + ← →"),
-            ("fill the screen", "super + ↑ (again to undo)"),
-            ("centre a window", "super + ↓"),
-            ("snap to a corner", "super + alt + arrows"),
-            ("workspace 1, 2, 3", "super + 1, 2, 3"),
-            ("move a window to 1, 2, 3", "super + shift + 1, 2, 3"),
+            ("Close a window", "Super + Q"),
+            ("Move a window", "Super + drag"),
+            ("Resize a window", "Super + right-drag"),
+            ("Full screen", "Super + F"),
+            ("Float or tile a window", "Super + T"),
+            ("Switch windows", "Alt + Tab"),
+            ("See every window", "Super + Tab"),
+            ("Snap left or right", "Super + ← →"),
+            ("Fill the screen", "Super + ↑ (again to undo)"),
+            ("Centre a window", "Super + ↓"),
+            ("Snap to a corner", "Super + Alt + arrows"),
+            ("Snap by dragging", "Drag to an edge or a corner"),
+            ("Halves (again for ⅓, ⅔)", "Ctrl + Alt + arrows"),
+            ("Quarters", "Ctrl + Alt + U, I, J, K"),
+            ("Fill or centre", "Ctrl + Alt + Return, C"),
+            ("Back to before snapping", "Ctrl + Alt + Backspace"),
+            ("Workspace 1, 2, 3", "Super + 1, 2, 3"),
+            ("Move a window to 1, 2, 3", "Super + Shift + 1, 2, 3"),
         ],
     ),
     (
-        "system",
+        "System",
         &[
-            ("lock", "super + l"),
-            ("power menu", "super + escape"),
-            ("screenshot of an area", "print"),
-            ("screenshot of the screen", "ctrl + print"),
-            ("screenshot of a window", "alt + print"),
-            ("draw on the last screenshot", "super + shift + s"),
-            ("record the screen", "super + shift + r"),
+            ("lock", "Super + L"),
+            ("Power menu", "Super + Escape"),
+            ("Screenshot of an area", "print"),
+            ("Screenshot of the screen", "Ctrl + Print"),
+            ("Screenshot of a window", "Alt + Print"),
+            ("Draw on the last screenshot", "Super + Shift + S"),
+            ("Record the screen", "Super + Shift + R"),
         ],
     ),
 ];

@@ -1,6 +1,7 @@
-// The tripppin bar: a floating pill. Left: logo, workspaces, the focused app.
-// Centre: the date. Right: what the orb is doing, then icons: network, bluetooth, volume,
-// battery, notifications, power (Lucide, from the icon font, in Pango spans).
+// The tripppin bar: a floating pill. Left: the logo (opens the apps), workspaces, the
+// focused app. Centre: the date. Right: what the orb is doing, then icons only (Lucide, from
+// the icon font, in Pango spans): keyboard layout, background apps, one pill for quick
+// settings (network, bluetooth, volume and the battery ring), notifications and power.
 {
     "layer": "top",
     "position": "top",
@@ -11,13 +12,14 @@
     "spacing": 0,
     "modules-left": ["image#logo", "niri/workspaces", "niri/window"],
     "modules-center": ["custom/clock"],
-    "modules-right": ["custom/recording", "privacy", "custom/orb", "niri/language", "network", "bluetooth", "pulseaudio", "battery", "tray", "custom/notifications", "custom/power"],
+    "modules-right": ["custom/recording", "privacy", "custom/orb", "niri/language", "tray", "group/quick", "custom/notifications", "custom/power"],
 
     "image#logo": {
         "path": "/usr/share/tripppin/logo-bar.png",
         "size": 16,
         "tooltip": true,
-        "tooltip-format": "apps (super + a)",
+        "tooltip-format": "Apps (Super + A)",
+        "cursor": "pointer",
         "on-click": "fuzzel"
     },
     "niri/workspaces": { "format": "{icon}", "format-icons": { "default": "", "active": "" } },
@@ -25,34 +27,36 @@
         "format": "{app_id}",
         "max-length": 32,
         "rewrite": {
-            "foot": "terminal",
-            "swappy": "screenshot",
-            "in\\.trippp\\.Welcome": "welcome",
-            "polkit-mate-authentication-agent-1": "password",
-            "footclient": "terminal",
-            "org\\.mozilla\\.firefox|firefox": "firefox",
-            "org\\.videolan\\.VLC": "vlc",
-            "org\\.gnome\\.Nautilus": "files",
-            "in\\.trippp\\.Settings": "settings",
-            "in\\.trippp\\.FirstBoot": "welcome",
-            "in\\.trippp\\.Orb": "tripppin",
-            "org\\.gnome\\.TextEditor": "text editor",
-            "org\\.gnome\\.Calculator": "calculator",
-            "org\\.pulseaudio\\.pavucontrol": "sound",
-            "blueman-manager": "bluetooth",
-            "nm-connection-editor": "network"
+            "foot": "Terminal",
+            "swappy": "Screenshot",
+            "in\\.trippp\\.Welcome": "Welcome",
+            "polkit-mate-authentication-agent-1": "Password",
+            "footclient": "Terminal",
+            "org\\.mozilla\\.firefox|firefox": "Firefox",
+            "org\\.videolan\\.VLC": "VLC",
+            "org\\.gnome\\.Nautilus": "Files",
+            "in\\.trippp\\.Settings": "Settings",
+            "in\\.trippp\\.FirstBoot": "Welcome",
+            "in\\.trippp\\.Orb": "Tripppin",
+            "org\\.gnome\\.TextEditor": "Text editor",
+            "org\\.gnome\\.Calculator": "Calculator",
+            "org\\.pulseaudio\\.pavucontrol": "Sound",
+            "blueman-manager": "Bluetooth",
+            "nm-connection-editor": "Network"
         }
     },
     "custom/clock": {
-        "exec": "f=%H:%M; [ \"$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/clock 2>/dev/null)\" = 12 ] && f='%-I:%M %p'; date \"+%a %d %b · $f\" | tr '[:upper:]' '[:lower:]'",
+        "exec": "f=%H:%M; [ \"$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/clock 2>/dev/null)\" = 12 ] && f='%-I:%M %p'; date \"+%a %d %b · $f\"",
         "interval": 15,
         "tooltip": false,
         "on-click": "tripppin-ui calendar"
     },
+    // Recording the screen: a red dot (click to stop).
     "custom/recording": {
-        "exec": "pgrep -x wf-recorder >/dev/null && echo '● rec' || echo ''",
+        "exec": "pgrep -x wf-recorder >/dev/null && echo \"<span font_family='lucide' font_size='11pt' rise='-1pt'></span>\" || echo ''",
         "interval": 1,
         "tooltip": false,
+        "cursor": "pointer",
         "on-click": "pkill -INT -x wf-recorder"
     },
     "custom/orb": {
@@ -70,67 +74,103 @@
             { "type": "screenshare", "tooltip": true }
         ]
     },
-    // The keyboard layout, for people with more than one (Settings → Keyboard).
+    // The keyboard layout, for people with more than one (Settings → Keyboard); its name is
+    // in the tooltip.
     "niri/language": {
-        "format": "{short}",
+        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "tooltip-format": "Keyboard: {long}",
+        "cursor": "pointer",
         "on-click": "tripppin-ui settings keyboard"
-    },
-    "bluetooth": {
-        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05c</span>",
-        "format-disabled": "",
-        "format-off": "",
-        "format-no-controller": "",
-        "format-connected": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue1b8</span>",
-        "tooltip-format-connected": "{device_enumerate}",
-        "tooltip-format-enumerate-connected": "{device_alias}",
-        "on-click": "tripppin-ui settings bluetooth"
     },
     // Apps that live in the background (chat apps, sync tools) keep their icons here.
     "tray": {
         "icon-size": 15,
         "spacing": 8
     },
+
+    // Everything in this pill opens quick settings (swaync's panel): one control, one hover.
+    // Right-click goes to the matching page of Settings (or mutes, for the volume).
+    "group/quick": {
+        "orientation": "inherit",
+        "modules": ["network", "bluetooth", "pulseaudio", "image#battery"]
+    },
     "network": {
-        "format-wifi": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue1ae</span>",
-        "format-ethernet": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue620</span>",
-        "format-disconnected": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue1af</span>",
-        "tooltip-format-wifi": "{essid} · {signalStrength}%",
-        "tooltip-format-ethernet": "wired",
-        "tooltip-format-disconnected": "offline",
-        "on-click": "swaync-client -t -sw"
+        "format-wifi": "<span font_family='lucide' font_size='11pt' rise='-1pt'>{icon}</span>",
+        "format-icons": ["", "", "", ""],
+        "format-ethernet": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "format-linked": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "format-disconnected": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "format-disabled": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "tooltip-format-wifi": "Wi-Fi: {essid} ({signalStrength}%)\nClick for quick settings",
+        "tooltip-format-ethernet": "Wired\nClick for quick settings",
+        "tooltip-format-linked": "Wired, no internet\nClick for quick settings",
+        "tooltip-format-disconnected": "Offline\nClick for quick settings",
+        "tooltip-format-disabled": "Networking is off\nClick for quick settings",
+        "cursor": "pointer",
+        "on-click": "swaync-client -t -sw",
+        "on-click-right": "tripppin-ui settings wifi"
+    },
+    "bluetooth": {
+        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "format-off": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "format-disabled": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        // No adapter at all: nothing to show or switch.
+        "format-no-controller": "",
+        "format-connected": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "tooltip-format": "Bluetooth is on\nClick for quick settings",
+        "tooltip-format-off": "Bluetooth is off\nClick for quick settings",
+        "tooltip-format-disabled": "Bluetooth is off\nClick for quick settings",
+        "tooltip-format-connected": "{device_enumerate}\nClick for quick settings",
+        "tooltip-format-enumerate-connected": "{device_alias}",
+        "cursor": "pointer",
+        "on-click": "swaync-client -t -sw",
+        "on-click-right": "tripppin-ui settings bluetooth"
     },
     "pulseaudio": {
         "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'>{icon}</span>",
-        "format-muted": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue1ac</span>",
-        "format-icons": { "default": ["\ue1a9", "\ue1aa", "\ue1ab"] },
-        "tooltip-format": "volume {volume}%",
+        "format-muted": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "format-bluetooth": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "format-bluetooth-muted": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+        "format-icons": { "default": ["", "", ""] },
+        "tooltip-format": "Volume {volume}%\nClick for quick settings",
+        "cursor": "pointer",
         "on-click": "swaync-client -t -sw",
         "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
+    // A ring that fills with charge (tripppin-ui battery-ring draws it): green, amber below
+    // 20%, red below 10%, a bolt when plugged in. Every 30 s, and at once when the power
+    // changes (a udev rule sends signal 8). Nothing on a machine with no battery.
+    "image#battery": {
+        "exec": "tripppin-ui battery-ring",
+        "size": 16,
+        "interval": 30,
+        "signal": 8,
+        "tooltip": true,
+        "cursor": "pointer",
+        "on-click": "swaync-client -t -sw",
+        "on-click-right": "tripppin-ui settings power"
+    },
+
     "custom/notifications": {
         "exec": "swaync-client -swb",
         "return-type": "json",
         "format": "{icon}",
         "format-icons": {
-            "notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue42b</span>", "none": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue059</span>",
-            "dnd-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05a</span>", "dnd-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05a</span>",
-            "inhibited-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue42b</span>", "inhibited-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue059</span>",
-            "dnd-inhibited-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05a</span>", "dnd-inhibited-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue05a</span>"
+            "notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>", "none": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+            "dnd-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>", "dnd-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+            "inhibited-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>", "inhibited-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
+            "dnd-inhibited-notification": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>", "dnd-inhibited-none": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>"
         },
         "tooltip": false,
         "escape": false,
+        "cursor": "pointer",
         "on-click": "swaync-client -t -sw",
         "on-click-right": "swaync-client -d -sw"
     },
     "custom/power": {
-        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue140</span>",
+        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'></span>",
         "tooltip": false,
+        "cursor": "pointer",
         "on-click": "tripppin-power"
-    },
-    "battery": {
-        "format": "<span font_family='lucide' font_size='11pt' rise='-1pt'>{icon}</span> {capacity}%",
-        "format-charging": "<span font_family='lucide' font_size='11pt' rise='-1pt'>\ue054</span> {capacity}%",
-        "format-icons": ["\ue056", "\ue057", "\ue055"],
-        "tooltip": false
     }
 }
