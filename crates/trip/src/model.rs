@@ -433,7 +433,9 @@ pub struct Message(pub serde_json::Value);
 
 impl Message {
     pub fn system() -> Self {
-        Message(serde_json::json!({ "role": "system", "content": SYSTEM_PROMPT }))
+        Message(
+            serde_json::json!({ "role": "system", "content": format!("{SYSTEM_PROMPT}\n\n{}", crate::permissions::summary()) }),
+        )
     }
     pub fn user(text: &str) -> Self {
         Message(serde_json::json!({ "role": "user", "content": text }))

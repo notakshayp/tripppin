@@ -7,6 +7,8 @@ pub mod jobs;
 pub mod logo;
 pub mod markdown;
 pub mod model;
+pub mod models;
+pub mod permissions;
 pub mod providers;
 pub mod session;
 pub mod term;

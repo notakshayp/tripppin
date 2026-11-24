@@ -1630,4 +1630,26 @@ button.link.history-back {
 
 .orb-dim.out {
     opacity: 0;
+
+/* ---- Settings → AI (ai-settings): badges on model rows, the provider's model list. ---- */
+.ai-badge {
+    padding: 1px 7px;
+    border-radius: 6px;
+    background: #1d2825;
+    color: #c9d4ce;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.ai-badge.on {
+    background: #1f6b45;
+    color: #f2f5ef;
+}
+
+.ai-model {
+    padding: 8px 14px;
+}
+
+list.list-card > row:selected .ai-model .row-title {
+    color: #57d99a;
 }

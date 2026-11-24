@@ -64,14 +64,21 @@ pub fn start(command: &str, foreground: bool) -> Result<usize, String> {
     let id = list.last().map_or(1, |j| j.id + 1);
     let mut bash = Command::new("bash");
     // With no terminal to type into (the orb, or a background job), sudo asks for the password
-    // in a pop-up that says which command wants it. Settings → AI can allow some commands
-    // without a password instead.
+    // in a pop-up that says which command wants it, and never reuses a password typed earlier.
+    // Settings → AI → Permissions can allow some commands without a password instead. Every
+    // sudo is logged for the activity list there.
     let terminal = foreground && std::io::stdin().is_terminal();
+    if let Some(log) = crate::permissions::activity_log() {
+        if let Some(dir) = log.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        bash.env("TRIPPPIN_ADMIN_LOG", log);
+    }
     let script = if !terminal && std::path::Path::new(ASKPASS).exists() {
         bash.env("SUDO_ASKPASS", ASKPASS).env("TRIPPPIN_SUDO_FOR", command);
-        format!("sudo() {{ command sudo -A \"$@\"; }}\n{command}")
+        format!("{}{command}", crate::permissions::sudo_wrapper(true))
     } else {
-        command.to_string()
+        format!("{}{command}", crate::permissions::sudo_wrapper(false))
     };
     let mut child = bash
         .arg("-c")

@@ -1,7 +1,9 @@
 //! The password pop-up sudo uses when the AI runs an administrator command without a terminal
 //! (`SUDO_ASKPASS`, through /usr/libexec/tripppin-askpass). It says which command wants the
 //! password (`TRIPPPIN_SUDO_FOR`), prints the password for sudo on "allow", and exits with 1 on
-//! "cancel" or Escape, which sudo treats as no password.
+//! "cancel" or Escape, which sudo treats as no password. It records which it was in the file
+//! named by `TRIPPPIN_SUDO_MARK`, for the activity list in Settings → AI, and warns when the
+//! command is a risky one (see `trip::permissions::is_risky`).
 
 use crate::common::{self, icons, label};
 use gtk::prelude::*;
@@ -26,7 +28,15 @@ pub fn run() -> glib::ExitCode {
     }
     let args: Vec<String> = std::env::args().take(1).collect();
     app.run_with_args(&args);
+    mark(if allowed.get() { "asked" } else { "cancelled" });
     if allowed.get() { glib::ExitCode::SUCCESS } else { glib::ExitCode::FAILURE }
+}
+
+/// Tells the sudo wrapper what happened here (never the password).
+fn mark(what: &str) {
+    if let Some(path) = std::env::var_os("TRIPPPIN_SUDO_MARK").filter(|p| !p.is_empty() && p != "/dev/null") {
+        let _ = std::fs::write(path, what);
+    }
 }
 
 fn build(app: &gtk::Application, allowed: Rc<Cell<bool>>) {
@@ -54,7 +64,7 @@ fn build(app: &gtk::Application, allowed: Rc<Cell<bool>>) {
     card.set_size_request(420, -1);
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     head.append(&common::icon(icons::KEY, &["askpass-icon"]));
-    let title = label("the ai wants to run this as administrator", &["asked"]);
+    let title = label("The AI wants to run this as administrator", &["asked"]);
     title.set_wrap(true);
     title.set_xalign(0.0);
     head.append(&title);
@@ -69,19 +79,30 @@ fn build(app: &gtk::Application, allowed: Rc<Cell<bool>>) {
         cmd.set_xalign(0.0);
         card.append(&cmd);
     }
-    let why =
-        label("type your password to allow it. settings → ai can let some commands run without asking.", &["row-sub"]);
+    if trip::permissions::is_risky(&command) {
+        let warn = label(
+            "This can delete data, change accounts or turn off protection. Allow it only if you asked for this.",
+            &["error"],
+        );
+        warn.set_wrap(true);
+        warn.set_xalign(0.0);
+        card.append(&warn);
+    }
+    let why = label(
+        "Type your password to allow it. Settings → AI → Permissions can let some commands run without asking.",
+        &["row-sub"],
+    );
     why.set_wrap(true);
     why.set_xalign(0.0);
     card.append(&why);
-    let entry = gtk::PasswordEntry::builder().placeholder_text("your password").build();
+    let entry = gtk::PasswordEntry::builder().placeholder_text("Your password").build();
     entry.add_css_class("field");
     card.append(&entry);
     let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     buttons.set_halign(gtk::Align::End);
-    let cancel = gtk::Button::with_label("cancel");
+    let cancel = gtk::Button::with_label("Cancel");
     cancel.add_css_class("link");
-    let allow = gtk::Button::with_label("allow");
+    let allow = gtk::Button::with_label("Allow");
     allow.add_css_class("pill");
     buttons.append(&cancel);
     buttons.append(&allow);
