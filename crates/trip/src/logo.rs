@@ -10,7 +10,6 @@
 //! In the terminal each character cell holds two square pixels (upper and lower half
 //! blocks), and each pixel is shaded from 4×4 samples, so edges stay smooth.
 
-use std::f64::consts::PI;
 use std::io::{self, IsTerminal, Write};
 use std::thread::sleep;
 use std::time::Duration;
