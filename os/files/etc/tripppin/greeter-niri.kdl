@@ -13,3 +13,8 @@ spawn-at-startup "sh" "-c" "tripppin-ui displays; tripppin-ui greeter; niri msg 
 
 binds {
 }
+
+// Ink behind the login screen, so the moment before it draws matches the console and splash.
+layout {
+    background-color "#0b100f"
+}

@@ -1789,3 +1789,26 @@ window.fb .fb-card {
     background: transparent;
     padding-top: var(--s-2);
 }
+
+/* ---- Settings → AI (ai-settings): badges on model rows, the provider's model list. ---- */
+.ai-badge {
+    padding: 1px var(--s-2);
+    border-radius: var(--r-sm);
+    background: var(--surface-3);
+    color: var(--fg-2);
+    font-size: var(--t-caption);
+    font-weight: 600;
+}
+
+.ai-badge.on {
+    background: var(--accent-soft);
+    color: var(--fg);
+}
+
+.ai-model {
+    padding: var(--s-2) var(--s-4);
+}
+
+list.list-card > row:selected .ai-model .row-title {
+    color: var(--accent);
+}

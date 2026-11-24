@@ -46,6 +46,30 @@ pub fn vendor_from_pci_id(id: &str) -> Option<Vendor> {
     }
 }
 
+/// Which AMD cards are integrated (an APU's GPU), given each card's reported VRAM in the order
+/// found. An APU reports only its BIOS carve-out: usually under 2 GiB, but some laptops set
+/// aside 4 or 8. So a bigger card still counts as integrated when the CPU has Radeon graphics
+/// built in ("AMD Ryzen 7 7840U w/ Radeon 780M Graphics") and it's the smallest AMD card there.
+pub fn amd_integrated(cpu_model: &str, vram: &[u64]) -> Vec<bool> {
+    const SMALL: u64 = 2 * 1024 * 1024 * 1024;
+    let apu = cpu_model.to_lowercase().contains("radeon");
+    let smallest = vram.iter().copied().min().unwrap_or(0);
+    // Only one APU per machine: a small card already is it.
+    let mut taken = vram.iter().any(|&v| v < SMALL);
+    vram.iter()
+        .map(|&v| {
+            if v < SMALL {
+                return true;
+            }
+            if apu && !taken && v == smallest {
+                taken = true;
+                return true;
+            }
+            false
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -75,6 +99,21 @@ mod tests {
         assert_eq!(cpu.model, "unknown");
         assert_eq!(cpu.threads, 2);
         assert!(cpu.flags.is_empty());
+    }
+
+    #[test]
+    fn tells_apus_from_graphics_cards() {
+        const G: u64 = 1024 * 1024 * 1024;
+        let apu = "AMD Ryzen 7 7840U w/ Radeon 780M Graphics";
+        assert_eq!(amd_integrated(apu, &[512 << 20]), [true]);
+        // Some laptops' BIOS sets 8 GB aside for the APU.
+        assert_eq!(amd_integrated(apu, &[8 * G]), [true]);
+        // An APU and a Radeon card: the small one is the APU.
+        assert_eq!(amd_integrated(apu, &[8 * G, G / 2]), [false, true]);
+        assert_eq!(amd_integrated(apu, &[16 * G, 4 * G]), [false, true]);
+        // A desktop CPU without graphics and a Radeon card.
+        assert_eq!(amd_integrated("AMD Ryzen 7 7700X 8-Core Processor", &[16 * G]), [false]);
+        assert!(amd_integrated(apu, &[]).is_empty());
     }
 
     #[test]

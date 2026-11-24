@@ -7,7 +7,7 @@
 //! knows what it set out to do, what it tried and what happened. It's saved next to the session
 //! as Markdown (`<id>.md`), readable by people too.
 
-use crate::model::Message;
+use crate::model::{Message, PlanStep};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -64,7 +64,42 @@ pub struct Session {
     pub compactions: usize,
     /// The whole conversation, as sent to the model.
     pub history: Vec<Message>,
+    /// The task plan the model wrote with its `plan` tool. It outlives a request that ran out
+    /// of steps ("keep going" carries on from it) and is cleared once every step is done.
+    #[serde(default)]
+    pub plan: Vec<PlanStep>,
+    /// What each compaction dropped from the conversation.
+    #[serde(default)]
+    pub dropped: Vec<Dropped>,
+    /// Earlier requests whose messages are gone from the conversation (oldest first); the
+    /// notebook lists the newest of them.
+    #[serde(default)]
+    pub forgotten: usize,
+    /// Tokens read and written over the whole session, as the server counted them.
+    #[serde(default)]
+    pub prompt_tokens: u64,
+    #[serde(default)]
+    pub completion_tokens: u64,
 }
+
+/// One compaction: when, how much it saved and what went.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Dropped {
+    /// The request (index in `turns`) being worked on.
+    pub turn: usize,
+    /// Estimated prompt size before and after, in tokens.
+    pub tokens_before: usize,
+    pub tokens_after: usize,
+    /// Old command output replaced by a short note.
+    pub outputs_trimmed: usize,
+    /// Whole steps (a tool call and its result) removed, one line each.
+    pub steps: Vec<String>,
+    /// Earlier requests removed, with their answers.
+    pub requests: Vec<String>,
+}
+
+/// Steps in a plan, at most.
+pub const MAX_PLAN_STEPS: usize = 12;
 
 /// A line in the history list.
 #[derive(Clone, Debug, PartialEq)]
@@ -104,10 +139,57 @@ impl Session {
         }
     }
 
-    /// Starts a new request in this session.
+    /// Starts a new request in this session. A finished plan is cleared; an unfinished one
+    /// stays, so "keep going" carries on where the last request stopped.
     pub fn ask(&mut self, request: &str) {
+        if self.plan.iter().all(|s| s.done) {
+            self.plan.clear();
+        }
         self.history.push(Message::user(request));
         self.turns.push(Turn { request: request.into(), start: self.history.len() - 1, ..Default::default() });
+    }
+
+    /// The first step of the plan that isn't done, with its number (from 1).
+    pub fn current_step(&self) -> Option<(usize, &PlanStep)> {
+        self.plan.iter().enumerate().find(|(_, s)| !s.done).map(|(i, s)| (i + 1, s))
+    }
+
+    /// Writes (or rewrites) the plan. Steps kept word for word stay done. Returns whether
+    /// anything changed.
+    pub fn set_plan(&mut self, steps: &[String]) -> bool {
+        let new: Vec<PlanStep> = steps
+            .iter()
+            .take(MAX_PLAN_STEPS)
+            .map(|text| PlanStep {
+                text: text.clone(),
+                done: self.plan.iter().any(|old| old.done && old.text.eq_ignore_ascii_case(text)),
+            })
+            .collect();
+        let changed = new != self.plan;
+        self.plan = new;
+        changed
+    }
+
+    /// Marks step `n` (from 1) done, noting how it was checked. The message is for the model:
+    /// what's next, or what was wrong.
+    pub fn finish_step(&mut self, n: usize, check: &str) -> Result<String, String> {
+        if self.plan.is_empty() {
+            return Err("There's no plan yet. Write one with the plan tool first.".into());
+        }
+        let len = self.plan.len();
+        let Some(step) = n.checked_sub(1).and_then(|i| self.plan.get_mut(i)) else {
+            return Err(format!("There's no step {n}; the plan has steps 1 to {len}."));
+        };
+        if step.done {
+            return Err(format!("Step {n} is already done. Work on the next one."));
+        }
+        step.done = true;
+        let text = step.text.clone();
+        self.notes.push(format!("step {n} done ({text}): {check}"));
+        Ok(match self.current_step() {
+            Some((next, s)) => format!("Step {n} is done. Now step {next}: {}", s.text),
+            None => "Every step is done. Check the whole result once, then answer the person briefly.".into(),
+        })
     }
 
     pub fn title(&self) -> &str {
@@ -159,13 +241,50 @@ impl Session {
         self.history.push(Message::assistant(&format!("(I didn't finish that: {reason}.)")));
     }
 
-    /// The notebook as the model sees it: the request, its notes, the steps so far.
+    /// The notebook as the model sees it: the request, the plan, its notes, the steps so far.
     pub fn notebook(&self) -> String {
+        self.notebook_with(&[])
+    }
+
+    /// The notebook with the harness's own reminders at the end ("you've been on this step a
+    /// while…").
+    pub fn notebook_with(&self, hints: &[String]) -> String {
         let Some(turn) = self.turns.last() else { return String::new() };
-        let mut out = format!(
-            "TASK NOTEBOOK (kept for you; it stays even when old messages are dropped)\nRequest: {}\n",
-            turn.request
+        let mut out = String::from(
+            "TASK NOTEBOOK (kept for you by the system, not a new request; it stays when old messages are dropped)\n",
         );
+        let earlier = self.forgotten.min(self.turns.len().saturating_sub(1));
+        if earlier > 0 {
+            out.push_str("Earlier in this chat (no longer in the conversation):\n");
+            for t in &self.turns[earlier.saturating_sub(3)..earlier] {
+                let answer = if t.answer.is_empty() { &t.error } else { &t.answer };
+                let answer: String = answer.lines().next().unwrap_or("").chars().take(120).collect();
+                out.push_str(&format!("- {} → {answer}\n", one_line(&t.request, 120)));
+            }
+        }
+        out.push_str(&format!("Request: {}\n", turn.request));
+        if !self.plan.is_empty() {
+            out.push_str("Plan:\n");
+            let current = self.current_step().map(|(n, _)| n);
+            for (i, s) in self.plan.iter().enumerate() {
+                let n = i + 1;
+                let mark = if s.done {
+                    "[done]"
+                } else if Some(n) == current {
+                    "[now] "
+                } else {
+                    "[ ]   "
+                };
+                out.push_str(&format!("  {n}. {mark} {}\n", s.text));
+            }
+            match self.current_step() {
+                Some((n, s)) => out.push_str(&format!(
+                    "Work only on step {n} ({}). When it's done and you've checked it worked, call done.\n",
+                    s.text
+                )),
+                None => out.push_str("Every step is done: check the result, then answer.\n"),
+            }
+        }
         if !self.notes.is_empty() {
             out.push_str("Your notes:\n");
             let skip = self.notes.len().saturating_sub(NOTEBOOK_NOTES);
@@ -186,12 +305,22 @@ impl Session {
         out.push_str(
             "Don't repeat steps that already worked. If a step failed twice, change approach or stop and explain.",
         );
+        for h in hints {
+            out.push_str(&format!("\nNOTE FROM THE SYSTEM: {h}"));
+        }
         out
     }
 
     /// The whole session as Markdown, for people (and the notebook file).
     pub fn markdown(&self) -> String {
         let mut out = format!("# {}\n\n", self.title());
+        if !self.plan.is_empty() {
+            out.push_str("## plan\n\n");
+            for s in &self.plan {
+                out.push_str(&format!("- [{}] {}\n", if s.done { "x" } else { " " }, s.text));
+            }
+            out.push('\n');
+        }
         if !self.notes.is_empty() {
             out.push_str("## notes\n\n");
             for n in &self.notes {
@@ -216,6 +345,17 @@ impl Session {
             out.push_str(&format!(
                 "_older messages were dropped {} time(s) to fit the model's memory; the steps above are complete._\n",
                 self.compactions
+            ));
+        }
+        for d in &self.dropped {
+            out.push_str(&format!(
+                "_while on request {}: {} → {} tokens; {} outputs shortened, {} steps and {} earlier requests dropped._\n",
+                d.turn + 1,
+                d.tokens_before,
+                d.tokens_after,
+                d.outputs_trimmed,
+                d.steps.len(),
+                d.requests.len()
             ));
         }
         out
@@ -261,6 +401,11 @@ fn step_line(s: &Step) -> String {
         }
     }
     line
+}
+
+fn one_line(text: &str, max: usize) -> String {
+    let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if line.chars().count() > max { format!("{}…", line.chars().take(max).collect::<String>()) } else { line }
 }
 
 fn tail(text: &str, max: usize) -> String {
@@ -362,6 +507,50 @@ mod tests {
         assert!(nb.contains("1. [ok] exec flatpak search vlc"));
         assert!(nb.contains("2. [FAILED] exec flatpak install") && nb.contains("→ error: no space left on device"));
         assert_eq!(s.summary().steps, 2);
+    }
+
+    #[test]
+    fn keeps_a_plan_one_step_at_a_time() {
+        let mut s = Session::new("terminal");
+        s.ask("make my desktop dark");
+        let steps: Vec<String> =
+            ["find the theme setting", "switch it to dark", "check it changed"].map(String::from).into();
+        assert!(s.set_plan(&steps));
+        assert!(!s.set_plan(&steps), "the same plan again is no change");
+        assert_eq!(s.current_step().map(|(n, _)| n), Some(1));
+        let next = s.finish_step(1, "gsettings has color-scheme").unwrap();
+        assert!(next.contains("Now step 2: switch it to dark"));
+        assert!(s.finish_step(1, "x").unwrap_err().contains("already done"));
+        assert!(s.finish_step(9, "x").unwrap_err().contains("steps 1 to 3"));
+        let nb = s.notebook_with(&["you've been on step 2 a while".into()]);
+        assert!(nb.contains("1. [done] find the theme setting"));
+        assert!(nb.contains("2. [now]  switch it to dark"));
+        assert!(nb.contains("Work only on step 2"));
+        assert!(nb.contains("- step 1 done (find the theme setting): gsettings has color-scheme"));
+        assert!(nb.ends_with("NOTE FROM THE SYSTEM: you've been on step 2 a while"));
+        // Rewriting keeps what's done, word for word.
+        s.set_plan(&["Find the theme setting".into(), "use gsettings to set prefer-dark".into()]);
+        assert_eq!(s.plan.iter().map(|p| p.done).collect::<Vec<_>>(), [true, false]);
+        // An unfinished plan carries over to the next request ("keep going"); a finished one doesn't.
+        s.ask("keep going");
+        assert_eq!(s.plan.len(), 2);
+        s.finish_step(2, "ok").unwrap();
+        s.ask("thanks");
+        assert!(s.plan.is_empty());
+        assert!(s.finish_step(1, "x").unwrap_err().contains("no plan"));
+    }
+
+    #[test]
+    fn remembers_forgotten_requests_in_the_notebook() {
+        let mut s = Session::new("terminal");
+        for (q, a) in [("first", "one"), ("second", "two"), ("third", "three")] {
+            s.ask(q);
+            s.turns.last_mut().unwrap().answer = a.into();
+        }
+        s.forgotten = 2;
+        let nb = s.notebook();
+        assert!(nb.contains("- first → one\n- second → two\n"));
+        assert!(!nb.contains("third →"));
     }
 
     #[test]

@@ -2,6 +2,7 @@
 //!
 //! - `orb`: the AI, resting in the corner. Super+Space (`orb --toggle`) asks it something.
 //! - `greeter`: the login screen, run by greetd.
+//! - `splash`: the logo on ink between logging in and the desktop being ready.
 //! - `lock`: the lock screen.
 //! - `first-boot`: fetches the model the first time someone logs in.
 //! - `osd`: the volume, mic and brightness pop-ups.
@@ -36,6 +37,7 @@ mod privacy;
 mod region;
 mod settings;
 mod snd;
+mod splash;
 mod storage;
 mod switch;
 mod system;
@@ -93,11 +95,12 @@ fn main() -> ExitCode {
         Some("dim") => dim::run(),
         Some("askpass") => askpass::run(),
         Some("welcome") => welcome::run(),
+        Some("splash") => splash::run(),
         Some("switch") => switch::run(),
         Some("snap") => switch::snap(args.get(1).map(String::as_str).unwrap_or("")),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | askpass | displays | corners sharp|default|round"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | dim | welcome [--first-time] | splash | askpass | displays | corners sharp|default|round"
             );
             ExitCode::from(2)
         }

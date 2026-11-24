@@ -3,6 +3,7 @@
 use gtk::prelude::*;
 use gtk::{cairo, gdk, gio, glib};
 use std::path::PathBuf;
+use trip::logo;
 
 pub const INK: (f64, f64, f64) = (0.949, 0.961, 0.937);
 pub const GREEN: (f64, f64, f64) = (0.341, 0.851, 0.604);
@@ -51,56 +52,99 @@ pub fn label(text: &str, classes: &[&str]) -> gtk::Label {
     l
 }
 
-/// Draws the power-spark mark into a box whose width is `w` (the mark is 146 x 175 units).
-fn draw_mark(cr: &cairo::Context, x: f64, y: f64, w: f64, ring: (f64, f64, f64, f64), spark: (f64, f64, f64, f64)) {
-    let s = w / 146.0;
+type Rgba = (f64, f64, f64, f64);
+
+/// Draws the power-spark mark into a box whose width is `w`, as it stands at `pose`.
+/// Every drawing of the mark on the desktop goes through here; the geometry (and the intro's
+/// timing) is `trip::logo`'s, the same as the terminal's and the brand files'.
+pub fn draw_mark_posed(cr: &cairo::Context, x: f64, y: f64, w: f64, ring: Rgba, spark: Rgba, pose: logo::Pose) {
+    let (bx, by, bw, _) = logo::BOX;
+    let s = w / bw;
     cr.save().ok();
     cr.translate(x, y);
     cr.scale(s, s);
-    cr.translate(-27.0, -12.0);
-    // The ring: centre (100, 114), radius 60, open +-44 degrees around the top.
-    let start = (-90.0f64 + 44.0).to_radians();
-    let end = (-90.0f64 - 44.0 + 360.0).to_radians();
-    cr.set_source_rgba(ring.0, ring.1, ring.2, ring.3);
-    cr.set_line_width(22.0);
-    cr.set_line_cap(cairo::LineCap::Round);
-    cr.arc(100.0, 114.0, 60.0, start, end);
-    cr.stroke().ok();
-    // The spark: a four-point star at (100, 50).
-    let pts = [
-        (100.00, 14.00),
-        (106.11, 43.89),
-        (136.00, 50.00),
-        (106.11, 56.11),
-        (100.00, 86.00),
-        (93.89, 56.11),
-        (64.00, 50.00),
-        (93.89, 43.89),
-    ];
-    cr.move_to(pts[0].0, pts[0].1);
-    for p in &pts[1..] {
-        cr.line_to(p.0, p.1);
+    cr.translate(-bx, -by);
+    // The ring, drawn from its left end down and round (cairo's angles run clockwise from +x).
+    let (cx, cy, r, width) = logo::RING;
+    if pose.ring > 0.0 {
+        let left = (-90.0 - logo::GAP_DEG).to_radians();
+        cr.set_source_rgba(ring.0, ring.1, ring.2, ring.3);
+        cr.set_line_width(width);
+        cr.set_line_cap(cairo::LineCap::Round);
+        cr.arc_negative(cx, cy, r, left, left - (logo::SPAN * pose.ring.min(1.0)).to_radians());
+        cr.stroke().ok();
     }
-    cr.close_path();
-    cr.set_source_rgba(spark.0, spark.1, spark.2, spark.3);
-    cr.fill().ok();
+    // The spark: an × in the ring's opening.
+    if pose.spark_scale > 0.0 {
+        let pts = logo::spark_points(pose.spark_scale, pose.spark_turn);
+        cr.move_to(pts[0].0, pts[0].1);
+        for p in &pts[1..] {
+            cr.line_to(p.0, p.1);
+        }
+        cr.close_path();
+        cr.set_source_rgba(spark.0, spark.1, spark.2, spark.3);
+        cr.fill().ok();
+    }
     cr.restore().ok();
+}
+
+/// Draws the finished mark into a box whose width is `w` (the mark is 146 x 175 units).
+pub fn draw_mark(cr: &cairo::Context, x: f64, y: f64, w: f64, ring: Rgba, spark: Rgba) {
+    draw_mark_posed(cr, x, y, w, ring, spark, logo::Pose::FULL);
+}
+
+/// The mark's height for a given width.
+pub fn mark_height(width: f64) -> f64 {
+    width * logo::BOX.3 / logo::BOX.2
 }
 
 /// The full mark, paper ring and green spark, `width` px wide (and 175/146 as tall).
 pub fn logo(width: i32) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
     area.set_content_width(width);
-    area.set_content_height((f64::from(width) * 175.0 / 146.0).round() as i32);
+    area.set_content_height(mark_height(f64::from(width)).round() as i32);
     area.set_can_target(false);
     // Always the asked-for size, centred, however much room the parent gives it.
     area.set_halign(gtk::Align::Center);
     area.set_valign(gtk::Align::Center);
     let size = f64::from(width);
     area.set_draw_func(move |_, cr, w, h| {
-        let height = size * 175.0 / 146.0;
-        let (x, y) = ((f64::from(w) - size) / 2.0, (f64::from(h) - height) / 2.0);
+        let (x, y) = ((f64::from(w) - size) / 2.0, (f64::from(h) - mark_height(size)) / 2.0);
         draw_mark(cr, x, y, size, (INK.0, INK.1, INK.2, 1.0), (GREEN.0, GREEN.1, GREEN.2, 1.0));
+    });
+    area
+}
+
+/// The mark playing its intro (the ring draws itself, the × spins in and settles), then,
+/// if `waiting`, making a gentle quarter turn every couple of seconds. It starts when first
+/// shown. With reduce motion on, it's the finished mark, still.
+pub fn animated_logo(width: i32, waiting: bool) -> gtk::DrawingArea {
+    let area = logo(width);
+    if crate::display::reduce_motion() {
+        return area;
+    }
+    let size = f64::from(width);
+    let start: std::rc::Rc<std::cell::Cell<Option<i64>>> = Default::default();
+    {
+        let start = start.clone();
+        area.set_draw_func(move |a, cr, w, h| {
+            let now = a.frame_clock().map_or(0, |c| c.frame_time());
+            let t = (now - start.get().unwrap_or(now)) as f64 / 1_000_000.0;
+            let mut pose = logo::intro_pose(t);
+            if waiting {
+                pose.spark_turn += logo::waiting_turn(t - logo::INTRO_SECS);
+            }
+            let (x, y) = ((f64::from(w) - size) / 2.0, (f64::from(h) - mark_height(size)) / 2.0);
+            draw_mark_posed(cr, x, y, size, (INK.0, INK.1, INK.2, 1.0), (GREEN.0, GREEN.1, GREEN.2, 1.0), pose);
+        });
+    }
+    area.add_tick_callback(move |a, clock| {
+        let now = clock.frame_time();
+        let began = start.get().unwrap_or(now);
+        start.set(Some(began));
+        let t = (now - began) as f64 / 1_000_000.0;
+        a.queue_draw();
+        if waiting || t < logo::INTRO_SECS + 0.1 { glib::ControlFlow::Continue } else { glib::ControlFlow::Break }
     });
     area
 }
@@ -186,6 +230,7 @@ pub mod icons {
     pub const CAPS: char = '\u{e04a}';
     pub const HISTORY: char = '\u{e1f5}';
     pub const CHEVRON_DOWN: char = '\u{e06d}';
+    pub const CHEVRON_LEFT: char = '\u{e06e}';
     pub const CHEVRON_RIGHT: char = '\u{e06f}';
     pub const TERMINAL: char = '\u{e181}';
     pub const NEW: char = '\u{e172}';

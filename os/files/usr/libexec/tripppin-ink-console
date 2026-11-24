@@ -1,0 +1,19 @@
+#!/bin/sh
+# Makes the text console on our standard output plain ink: every colour in its palette set to
+# the login screen's ink, the screen cleared and the cursor hidden. tty1 belongs to the
+# login screen and the desktop, and the console only shows for a moment between them (when
+# one niri lets go of the screen and the next takes it); this way that moment is ink, not
+# text. `tripppin-ink-console reset` puts the normal colours back, for when something failed
+# and its message should be readable.
+# Only on a real VT (tty1, tty2…), judged by where our output goes.
+exec 3>&1
+case "$(tty <&3 2>/dev/null)" in /dev/tty[0-9]*) ;; *) exit 0 ;; esac
+exec 3>&-
+if [ "$1" = reset ]; then
+    printf '\033]R\033[?25h'
+    exit 0
+fi
+for n in 0 1 2 3 4 5 6 7 8 9 A B C D E F; do
+    printf '\033]P%s0b100f' "$n"
+done
+printf '\033[0m\033[H\033[2J\033[3J\033[?25l'
