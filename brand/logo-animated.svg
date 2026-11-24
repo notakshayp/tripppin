@@ -3,7 +3,7 @@
 <style>
   .ink{fill:#182423;stroke:#182423} .green{fill:#1f6b45}
   @media (prefers-color-scheme: dark){ .ink{fill:#f2f5ef;stroke:#f2f5ef} .green{fill:#57d99a} }
-  .arc{fill:none;stroke-width:22;stroke-linecap:round;stroke-dasharray:1;animation:draw 6s cubic-bezier(.3,0,.2,1) infinite}
+  .arc{fill:none;stroke-width:22;stroke-linecap:round;stroke-dasharray:1 2;animation:draw 6s cubic-bezier(.3,0,.2,1) infinite}
   .spark{animation:appear 6s ease infinite}
   @keyframes draw{0%,5%{stroke-dashoffset:1}16%,100%{stroke-dashoffset:0}}
   @keyframes appear{0%{opacity:0}6%,100%{opacity:1}}
