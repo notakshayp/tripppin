@@ -23,6 +23,9 @@ ureq = { version = "3", features = ["platform-verifier"] }
 sha2 = "0.10"
 reedline = "0.53"
 ctrlc = "3"
+crossterm = "=0.29.0"
+nu-ansi-term = "=0.50.3"
+unicode-width = "=0.2.3"
 hwdetect = { path = "crates/hwdetect" }
 
 [workspace.lints.rust]

@@ -18,6 +18,9 @@ ureq.workspace = true
 sha2.workspace = true
 reedline.workspace = true
 ctrlc.workspace = true
+crossterm.workspace = true
+nu-ansi-term.workspace = true
+unicode-width.workspace = true
 
 [lints]
 workspace = true

@@ -79,6 +79,7 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [ ] Harness daemon: router, per-category tool sets, the model's native tool-call grammar, validation, step limits
 - [ ] First tools: system info, files (read), web search (local SearXNG), web fetch
 - [x] The AI shell (`trip shell`), default for interactive terminals: plain text goes to the model as a single question, `/chat` keeps a conversation, `/terminal` opens a normal shell, `!cmd` runs one command, `/setup` downloads the model; streaming and Ctrl-C
+- [x] Shell conversation view (`trip::tui`): "You" / "Tripppin" gutter, answers rendered from Markdown (lists, aligned tables, framed code), steps as one row each (spinner → ✓/✗, time, newest output while running), a live status line that always says what it's waiting on, the plan as a checklist, a token line after each answer (in, cached, out, tok/s, context fill, session total); welcome header, mode prompt, footer with model and context, Tab completion for /commands; `trip shell --demo` replays a canned session for screenshots
 - [x] Agent loop in `trip`: the model calls tools until it answers in plain text (25-step cap, Ctrl-C stops it)
 - [x] Tools: `exec` (bash, live output, timeout, sudo prompts work), `read_file`, `write_file`
 - [x] Task notebook and compaction for small models: the model's plan and notes plus one line per step, shown at every step; old steps dropped when the context fills (the notebook keeps them); every session saved and listed (`/history`, the orb's history), continued in the terminal

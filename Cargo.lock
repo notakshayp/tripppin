@@ -1685,12 +1685,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "crossterm",
  "ctrlc",
  "hwdetect",
+ "nu-ansi-term",
  "reedline",
  "serde",
  "serde_json",
  "sha2",
+ "unicode-width",
  "ureq",
 ]
 
