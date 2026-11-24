@@ -71,6 +71,7 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [x] `trip model pull` / `list`: download with resume and SHA-256 check into `/var/lib/tripppin/models`; TLS trusts the OS certificate store
 - [x] `tripppin-llm.service`: `trip model serve` execs llama-server on 127.0.0.1:8086; DynamicUser, read-only models, localhost-only IP filter, idle unload after 15 min
 - [x] `trip ask "…"`: streams the answer and reports time to first word and tokens/s
+- [x] Memory-safe serving sized per machine ([HARNESS.md](HARNESS.md)): model shape read from the GGUF header; context and placement (CPU, integrated GPU within its GTT share, graphics card via `--fit`) chosen so model + cache fit next to the desktop; q8_0 KV cache with flash attention, context checkpoints, a bounded prompt cache, cache reuse
 - [ ] Measure speed (tokens per second, time to first word) per hardware tier; publish in the plan
 - [ ] Eval runner skeleton with a first handful of recorded requests
 
@@ -79,10 +80,15 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [ ] Harness daemon: router, per-category tool sets, the model's native tool-call grammar, validation, step limits
 - [ ] First tools: system info, files (read), web search (local SearXNG), web fetch
 - [x] The AI shell (`trip shell`), default for interactive terminals: plain text goes to the model as a single question, `/chat` keeps a conversation, `/terminal` opens a normal shell, `!cmd` runs one command, `/setup` downloads the model; streaming and Ctrl-C
+- [x] Shell conversation view (`trip::tui`): "You" / "Tripppin" gutter, answers rendered from Markdown (lists, aligned tables, framed code), steps as one row each (spinner → ✓/✗, time, newest output while running), a live status line that always says what it's waiting on, the plan as a checklist, a token line after each answer (in, cached, out, tok/s, context fill, session total); welcome header, mode prompt, footer with model and context, Tab completion for /commands; `trip shell --demo` replays a canned session for screenshots
 - [x] Agent loop in `trip`: the model calls tools until it answers in plain text (25-step cap, Ctrl-C stops it)
 - [x] Tools: `exec` (bash, live output, timeout, sudo prompts work), `read_file`, `write_file`
 - [x] Task notebook and compaction for small models: the model's plan and notes plus one line per step, shown at every step; old steps dropped when the context fills (the notebook keeps them); every session saved and listed (`/history`, the orb's history), continued in the terminal
+- [x] Task plan (`plan` / `done` tools): short steps, one at a time, each checked; kept in the session across compaction and `--continue`; stuck detection (repeats, no progress, failures in a row) nudges, then makes the model stop and explain
+- [x] Compaction on the server's real token counts with headroom (85 % → 55 %); the notebook sent as its own message so the prompt cache holds; what was dropped recorded in the session; UI events for waiting, token usage and the plan ([HARNESS.md](HARNESS.md))
 - [x] Administrator commands: sudo asks through a pop-up showing the command; Settings → AI can allow installs, services or updates without a password
+- [x] AI permissions ([AI-PERMISSIONS.md](AI-PERMISSIONS.md)): a level (ask every time, allow what I pick, full administrator with risky commands still asking) and nine areas, kept in a root-owned policy and a sudoers rule checked by visudo; the agent's sudo never reuses a cached password, and every administrator command is logged and listed under Settings → AI → Activity
+- [ ] Tell the agent its permissions: include `trip::permissions::summary()` in the harness system prompt
 - [x] Tool-call verifier: unknown tools, bad JSON, missing or mistyped fields and calls written as text go back to the model with the exact problem; 3 retries before giving up
 - [x] Flatpak with Flathub in the image, so the agent can install apps
 - [ ] Safety: permission modes, a second check on risky steps, undo (M4)
@@ -92,6 +98,8 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 ## M7: Agents + bring your own model (started early)
 
 - [x] Settings → AI: guided cloud providers (OpenAI, Anthropic, Google Gemini, DeepSeek, Sarvam AI, OpenRouter, Groq) or your own server, with the provider's model list
+- [x] Models appear only after the key checks out, from each provider's own list endpoint (Anthropic's headers, OpenRouter's key check and tool-capable models, Groq's active ones, Sarvam's fixed pair), with a default preselected, search, and plain errors for a refused key or no network
+- [x] Several local models: download any that fits (size, memory need, progress, cancel and resume), keep several, switch the one in use (restarts `tripppin-llm`), delete to free space (`trip::models`)
 - [x] Other local models with native tool calling: Gemma 4 (E4B, 12B, 26B-A4B), Granite 4.1 8B; each family gets its own sampling
 - [ ] Background jobs that outlive the request
 
@@ -108,6 +116,7 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 - [x] Apps: Thunar, Text Editor, Loupe, Papers, Calculator, Celluloid, File Roller, System Monitor, Disks; Firefox on first boot
 - [x] Behaviour: USB automount, low battery, updates staged with rollback (greenboot), crash notices, the model freed first when memory runs low, a welcome tour
 - [x] Polish pass: sharp text at a whole-number scale, a compact layout, icons throughout, a movable orb, spring motion everywhere (DESKTOP.md, "Polish pass")
+- [x] The mark's spark is an × and the sparkle burst is gone everywhere; logging in goes from the login screen to a logo splash with no text console in between (DESKTOP.md, "The mark and the way in")
 - [x] Laptop fixes from the first test: the red lock screen (root cause and a self-restarting lock), icons-only bar, a battery ring, the logo opening the apps, quick settings as one pill with working on/off tiles (DESKTOP.md, "Laptop fixes")
 - [ ] Checked on the laptop: Wi-Fi, Bluetooth, sound devices, brightness, battery, the boot splash, a real USB stick and printer
 - [ ] Later: light mode, sounds, voice input, on-screen keyboard (see DESKTOP.md)

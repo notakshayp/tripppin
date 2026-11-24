@@ -1,40 +1,133 @@
 #!/bin/sh
-# Settings → AI → administrator commands. Run through pkexec, so the person types their
-# password once. Lets the groups given run with sudo without a password, for the person who
-# asked (and so for the AI working for them):
-#   install    dnf, flatpak
-#   services   systemctl
-#   updates    bootc
-# "off" (or no groups) goes back to asking every time.
+# Settings → AI → Permissions. Run through pkexec, so an administrator's password is typed
+# once. Sets what the AI (and so the person who asked) may run with sudo without a password:
+#
+#   tripppin-ai-sudo --level ask                 every sudo asks (the default)
+#   tripppin-ai-sudo --level pick AREA...        the areas run without asking
+#   tripppin-ai-sudo --level full                everything, except risky commands
+#
+# Areas: apps services updates network hardware disks etc users printers.
+# The old form still works: "tripppin-ai-sudo install services updates" or "off".
+#
+# Writes the person's section of /etc/tripppin/ai-permissions (read by Settings and the AI)
+# and the sudoers rule /etc/sudoers.d/tripppin-ai-<user>, checked with visudo first.
+# See docs/AI-PERMISSIONS.md.
 set -eu
 [ -n "${PKEXEC_UID:-}" ] || { echo "run this through pkexec" >&2; exit 2; }
 user=$(id -nu "$PKEXEC_UID")
-rules=/etc/sudoers.d/tripppin-ai
-state=/etc/tripppin/ai-sudo
-cmds=""
-groups=""
-for g in "$@"; do
-    case $g in
-        install) cmds="$cmds /usr/bin/dnf, /usr/bin/flatpak," ;;
-        services) cmds="$cmds /usr/bin/systemctl," ;;
-        updates) cmds="$cmds /usr/bin/bootc," ;;
-        off) continue ;;
-        *) echo "unknown group: $g" >&2; exit 2 ;;
+case $user in
+    *[!a-z0-9_-]*|"") echo "unusual user name: $user" >&2; exit 2 ;;
+esac
+id -nG "$user" | tr ' ' '\n' | grep -qx wheel ||
+    { echo "only administrators can let the AI run administrator commands" >&2; exit 2; }
+
+policy=/etc/tripppin/ai-permissions
+legacy_state=/etc/tripppin/ai-sudo
+legacy_rules=/etc/sudoers.d/tripppin-ai
+rules=/etc/sudoers.d/tripppin-ai-$user
+
+# The commands each area allows. Fedora merged /usr/sbin into /usr/bin.
+B=/usr/bin
+area_cmds() {
+    case $1 in
+        apps) echo "$B/dnf, $B/dnf5, $B/flatpak, $B/rpm-ostree" ;;
+        services) echo "$B/systemctl, $B/journalctl" ;;
+        updates) echo "$B/bootc" ;;
+        network) echo "$B/nmcli, $B/firewall-cmd" ;;
+        hardware) echo "$B/modprobe, $B/fwupdmgr, $B/dmidecode" ;;
+        disks) echo "$B/mount, $B/umount, $B/udisksctl mount *, $B/udisksctl unmount *, $B/udisksctl info *, $B/udisksctl status, $B/lsblk, $B/blkid" ;;
+        etc) echo "/usr/libexec/tripppin-etc-write" ;;
+        users) echo "$B/useradd, $B/usermod, $B/userdel, $B/groupadd, $B/groupmod, $B/groupdel, $B/gpasswd, $B/passwd, $B/chpasswd" ;;
+        printers) echo "$B/lpadmin, $B/lpinfo, $B/cupsenable, $B/cupsdisable, $B/cupsaccept, $B/cupsreject" ;;
+        *) return 1 ;;
     esac
-    groups="$groups $g"
-done
-mkdir -p /etc/tripppin
-if [ -z "$cmds" ]; then
-    rm -f "$rules"
-    : > "$state"
-    chmod 644 "$state"
-    exit 0
+}
+# At "full", these still ask for the password (a later sudoers line wins over an earlier one).
+risky="$B/rm, $B/shred, $B/dd, $B/wipefs, $B/mkfs, $B/mkfs.*, $B/fdisk, $B/sfdisk, $B/gdisk, $B/sgdisk, \
+$B/parted, $B/blkdiscard, $B/cryptsetup, $B/udisksctl format *, $B/visudo, \
+$B/useradd, $B/usermod, $B/userdel, $B/groupadd, $B/groupmod, $B/groupdel, $B/gpasswd, $B/passwd, $B/chpasswd, \
+$B/systemctl stop firewalld*, $B/systemctl disable firewalld*, $B/systemctl mask firewalld*, \
+$B/systemctl * stop firewalld*, $B/systemctl * disable firewalld*, $B/systemctl * mask firewalld*, \
+$B/firewall-cmd --panic-on*, $B/firewall-cmd *--set-default-zone=trusted*"
+
+level=""
+areas=""
+if [ "${1:-}" = "--level" ]; then
+    level=${2:-}
+    shift 2 || { echo "--level needs a value" >&2; exit 2; }
+    for a in "$@"; do
+        area_cmds "$a" > /dev/null || { echo "unknown area: $a" >&2; exit 2; }
+        areas="$areas $a"
+    done
+else
+    # The old groups.
+    for g in "$@"; do
+        case $g in
+            install) areas="$areas apps" ;;
+            services|updates) areas="$areas $g" ;;
+            off) ;;
+            *) echo "unknown group: $g" >&2; exit 2 ;;
+        esac
+    done
+    if [ -n "$areas" ]; then level=pick; else level=ask; fi
 fi
+case $level in
+    ask) areas="" ;;
+    full) areas="" ;;
+    pick) [ -n "$areas" ] || level=ask ;;
+    *) echo "unknown level: $level" >&2; exit 2 ;;
+esac
+
+mkdir -p /etc/tripppin
 tmp=$(mktemp)
-trap 'rm -f "$tmp"' EXIT
-printf '# Written by Settings → AI → administrator commands. Change it there.\n%s ALL=(root) NOPASSWD:%s\n' \
-    "$user" "${cmds%,}" > "$tmp"
-visudo -cqf "$tmp"
-install -m 0440 -o root -g root "$tmp" "$rules"
-echo "${groups# }" > "$state"
-chmod 644 "$state"
+trap 'rm -f "$tmp" "$tmp.p"' EXIT
+
+# The sudoers rule.
+{
+    echo "# Written by Settings → AI → Permissions for $user. Change it there."
+    case $level in
+        pick)
+            cmds=""
+            for a in $areas; do cmds="$cmds$(area_cmds "$a"), "; done
+            echo "$user ALL=(root) NOPASSWD: ${cmds%, }"
+            ;;
+        full)
+            echo "$user ALL=(root) NOPASSWD: ALL"
+            echo "$user ALL=(root) PASSWD: $risky"
+            ;;
+    esac
+} > "$tmp"
+
+if [ "$level" = ask ]; then
+    rm -f "$rules"
+else
+    visudo -cqf "$tmp"
+    install -m 0440 -o root -g root "$tmp" "$rules"
+    # The whole configuration must still parse; take ours out again if it doesn't.
+    if ! visudo -cq > /dev/null; then
+        rm -f "$rules"
+        echo "the sudo configuration didn't check out; nothing was changed" >&2
+        exit 1
+    fi
+fi
+# The old single rule, when it was this person's.
+if [ -f "$legacy_rules" ] && grep -q "^$user " "$legacy_rules"; then
+    rm -f "$legacy_rules"
+    : > "$legacy_state"
+fi
+
+# The policy: everyone else's sections as they were, then this person's.
+if [ -f "$policy" ]; then
+    awk -v me="[user.\"$user\"]" '
+        /^\[/ { skip = ($0 == me) }
+        !skip' "$policy" > "$tmp.p"
+else
+    printf '# What the AI may run as administrator, per person. Written by Settings → AI →\n# Permissions through tripppin-ai-sudo; the sudoers rules are made from it.\n' > "$tmp.p"
+fi
+list=""
+for a in $areas; do list="$list\"$a\", "; done
+printf '\n[user."%s"]\nlevel = "%s"\nareas = [%s]\n' "$user" "$level" "${list%, }" >> "$tmp.p"
+# Keep blank lines from piling up.
+awk 'NF || !blank { print } { blank = !NF }' "$tmp.p" > "$tmp"
+install -m 0644 -o root -g root "$tmp" "$policy"
+logger -t tripppin-ai-sudo "AI permissions for $user: $level${areas:+ (${areas# })}" 2>/dev/null || true

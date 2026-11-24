@@ -1477,3 +1477,179 @@ button.menu-item:hover {
 .menu-note {
     padding: 8px 10px;
 }
+
+/* ---- orb feedback: status, plan, tokens -----------------------------------
+   Kept quiet on purpose: neutral hairlines and dim text, no glows. Green only as small
+   accents (the breathing dot, the current plan step, the context fill). */
+
+/* What it's doing or waiting on, with a running clock. */
+.caption.orb-status {
+    color: #9fb0a8;
+}
+
+.pulse-dot {
+    margin: 0 2px;
+}
+
+/* The hairline under the header: context fill, and a sweep while it works (drawn in code). */
+.context-meter {
+    min-height: 2px;
+    margin-top: -4px;
+}
+
+/* The plan, at the top of the request it belongs to. */
+.plan {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #222d2a;
+    background: rgba(242, 245, 239, 0.02);
+}
+
+.plan-caption {
+    font-family: "DM Mono", monospace;
+    font-size: 10px;
+    color: #6b7a74;
+    margin-bottom: 2px;
+}
+
+.plan-mark {
+    min-width: 14px;
+    min-height: 14px;
+    margin-top: 2px;
+}
+
+.plan-todo {
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 9999px;
+    border: 1px solid #3a4843;
+}
+
+.plan-now {
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 9999px;
+    background: #57d99a;
+}
+
+.icon.plan-done {
+    font-size: 11px;
+    padding: 0;
+    color: #6b7a74;
+}
+
+.plan-text {
+    font-size: 12px;
+    color: #8a9a93;
+    transition: color 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.plan-step.now .plan-text {
+    color: #f2f5ef;
+    font-weight: 500;
+}
+
+.plan-step.done .plan-text {
+    color: #5c6b65;
+}
+
+/* Tokens: one dim line under each request, the conversation's total in the footer. */
+.turn-usage,
+.session-usage {
+    font-family: "DM Mono", monospace;
+    font-size: 10px;
+    color: #5c6b65;
+}
+
+/* ---- orb: requests side by side, the way back from history, the dim ------
+   Same rules: neutral hairlines, dim text, green only as a small accent. */
+
+/* One chip per open request, under the header, once there's more than one. */
+.request-tabs {
+    padding-bottom: 2px;
+}
+
+button.request-tab {
+    min-height: 24px;
+    padding: 0 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid #222d2a;
+    box-shadow: none;
+    color: #8a9a93;
+    font-size: 11px;
+    font-weight: 400;
+    transition: background 160ms cubic-bezier(0.32, 0.72, 0, 1), color 160ms ease, border-color 160ms ease;
+}
+
+button.request-tab:hover {
+    background: rgba(242, 245, 239, 0.04);
+    color: #c9d4ce;
+}
+
+button.request-tab.selected {
+    background: rgba(242, 245, 239, 0.06);
+    border-color: #3a4843;
+    color: #f2f5ef;
+}
+
+/* A finished request's mark in its tab: grey, or green while it waits to be opened. */
+.request-tab-dot {
+    min-width: 6px;
+    min-height: 6px;
+    border-radius: 9999px;
+    background: #4d5c56;
+}
+
+.request-tab-dot.unseen {
+    background: #57d99a;
+}
+
+/* "Back to current request", at the top of the history. */
+button.link.history-back {
+    font-size: 12px;
+    margin-bottom: 2px;
+}
+
+/* The requests open here, at the top of the history. */
+.session-row.current {
+    border: 1px solid #222d2a;
+    margin-bottom: 4px;
+}
+
+.session-row.current.on-show {
+    background: rgba(242, 245, 239, 0.035);
+}
+
+/* The rest of the screen, softly dimmed while the card is open; clicking it puts the card
+   away. Fades in with `fade`, out with `out` (both off when animations are off). */
+.orb-dim {
+    background: rgba(13, 18, 17, 0.28);
+    transition: opacity 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.orb-dim.out {
+    opacity: 0;
+
+/* ---- Settings → AI (ai-settings): badges on model rows, the provider's model list. ---- */
+.ai-badge {
+    padding: 1px 7px;
+    border-radius: 6px;
+    background: #1d2825;
+    color: #c9d4ce;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.ai-badge.on {
+    background: #1f6b45;
+    color: #f2f5ef;
+}
+
+.ai-model {
+    padding: 8px 14px;
+}
+
+list.list-card > row:selected .ai-model .row-title {
+    color: #57d99a;
+}

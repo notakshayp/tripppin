@@ -3,10 +3,10 @@ use clap::{Parser, Subcommand};
 use hwdetect::{Catalog, Hardware, Tier};
 use serde::Serialize;
 
-mod logo;
+mod demo;
 mod shell;
 
-use trip::{agent, model};
+use trip::{agent, logo, model};
 
 #[derive(Parser)]
 #[command(name = "trip", version, about = "Tripppin: tell your computer what you want.")]
@@ -28,6 +28,9 @@ enum Command {
         /// Pick up a session from the history (the orb's "continue in terminal").
         #[arg(long = "continue", value_name = "SESSION")]
         resume: Option<String>,
+        /// Replay a canned session with made-up steps (no model needed), for screenshots.
+        #[arg(long, hide = true)]
+        demo: bool,
     },
     /// Ask one question and print the answer (for scripts and testing).
     #[command(hide = true)]
@@ -79,7 +82,8 @@ struct HwReport<'a> {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Hw { json } => hw(json),
-        Command::Shell { resume } => shell::run(resume.as_deref()),
+        Command::Shell { demo: true, .. } => demo::run(),
+        Command::Shell { resume, .. } => shell::run(resume.as_deref()),
         Command::Ask { words } => model::ask(&words.join(" ")),
         Command::Do { words } => agent::once(&words.join(" ")),
         Command::Model(ModelCommand::List) => model::list(),

@@ -8,6 +8,35 @@ use gtk::glib;
 use gtk::prelude::*;
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
+/// The desktop session greetd starts: it keeps the text console blank and ink, then runs
+/// niri-session (os/files/usr/libexec/tripppin-session).
+const SESSION: &str = "/usr/libexec/tripppin-session";
+
+/// Once logged in: everything on the login screen fades, leaving plain ink, and then the
+/// greeter quits. greetd starts the desktop only after that, and the desktop opens on the
+/// same ink with the splash (`tripppin-ui splash`), so ink is all there is in between.
+fn fade_to_ink(app: &gtk::Application) {
+    let Some(window) = app.active_window() else {
+        app.quit();
+        return;
+    };
+    let Some(content) = window.child() else {
+        app.quit();
+        return;
+    };
+    let start = std::time::Instant::now();
+    let app = app.clone();
+    content.add_tick_callback(move |c, _| {
+        let t = (start.elapsed().as_secs_f64() / 0.25).min(1.0);
+        c.set_opacity(1.0 - common::ease_out(t));
+        if t >= 1.0 {
+            app.quit();
+            return glib::ControlFlow::Break;
+        }
+        glib::ControlFlow::Continue
+    });
+}
+
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder().application_id("in.trippp.Greeter").build();
     app.connect_activate(build);
@@ -209,9 +238,9 @@ fn build(app: &gtk::Application) {
             if who.is_empty() || pw.is_empty() {
                 return;
             }
-            let result = Greetd::connect().and_then(|mut g| g.login(&who, &pw, &["niri-session"]));
+            let result = Greetd::connect().and_then(|mut g| g.login(&who, &pw, &[SESSION]));
             match result {
-                Ok(Outcome::Started) => app.quit(),
+                Ok(Outcome::Started) => fade_to_ink(&app),
                 Ok(Outcome::Refused(why)) => {
                     error.set_text(&why);
                     error.set_visible(true);

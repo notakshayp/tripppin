@@ -1,22 +1,38 @@
-//! The power spark drawn in the terminal, optionally animated.
+//! The power spark: its geometry, its intro animation, and its drawing in the terminal.
 //!
-//! Each character cell holds two square pixels (upper and lower half blocks), and
-//! each pixel is shaded from 4×4 samples, so edges stay smooth. Geometry matches
-//! `brand/logo.svg`: a ring of radius 60 centred at (100, 114), stroke 22 with
-//! round caps, open ±44° at the top, and a four-point star at (100, 50), radius 36.
+//! The geometry here is the one source for every drawing of the mark (`brand/logo.svg`,
+//! the desktop's screens in `tripppin-ui`, the boot splash frames from
+//! `scripts/brand-assets.sh`): a ring of radius 60 centred at (100, 114), stroke 22 with
+//! round caps, open ±52° at the top, and in the opening a four-point spark turned 45° into
+//! an ×, centred at (100, 46), its points 42 long and its waist 0.22 of that. The mark's
+//! box is 146 × 175 units from (27, 12).
+//!
+//! In the terminal each character cell holds two square pixels (upper and lower half
+//! blocks), and each pixel is shaded from 4×4 samples, so edges stay smooth.
 
 use std::f64::consts::PI;
 use std::io::{self, IsTerminal, Write};
 use std::thread::sleep;
 use std::time::Duration;
 
+/// The ring: centre x, centre y, radius, stroke width.
+pub const RING: (f64, f64, f64, f64) = (100.0, 114.0, 60.0, 22.0);
+/// Half the ring's opening at the top, in degrees either side of straight up.
+pub const GAP_DEG: f64 = 52.0;
+/// How far round the ring goes, in degrees.
+pub const SPAN: f64 = 360.0 - 2.0 * GAP_DEG;
+/// The spark: centre x, centre y, point length, waist ratio.
+pub const SPARK: (f64, f64, f64, f64) = (100.0, 46.0, 42.0, 0.22);
+/// The spark's resting turn: its long points on the diagonals, an ×.
+pub const SPARK_REST_DEG: f64 = 45.0;
+/// The mark's box in logo units: x, y, width, height.
+pub const BOX: (f64, f64, f64, f64) = (27.0, 12.0, 146.0, 175.0);
+/// How long the intro takes, in seconds.
+pub const INTRO_SECS: f64 = 1.3;
+
 const VIEW: (f64, f64, f64, f64) = (24.0, 6.0, 152.0, 184.0); // x, y, width, height in logo units
 const PX_H: usize = 52; // pixel rows (two per text row)
 const PX_W: usize = 43; // pixel columns, keeping pixels square
-const RING: (f64, f64, f64, f64) = (100.0, 114.0, 60.0, 11.0); // cx, cy, radius, half stroke
-const GAP_DEG: f64 = 44.0;
-const SPAN: f64 = 360.0 - 2.0 * GAP_DEG;
-const STAR: (f64, f64, f64, f64) = (100.0, 50.0, 36.0, 0.26); // cx, cy, radius, waist ratio
 const SS: usize = 4; // samples per pixel along each axis
 
 type Rgb = (f64, f64, f64);
@@ -25,23 +41,75 @@ const SPARK_RGB: Rgb = (87.0, 217.0, 154.0);
 const GLOW_RGB: Rgb = (190.0, 245.0, 214.0);
 
 /// One animation state.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Pose {
     /// How much of the ring is drawn, 0 to 1.
     pub ring: f64,
     /// How strongly the ring's newest stretch glows green, 0 to 1.
     pub head_glow: f64,
     pub spark_scale: f64,
+    /// Degrees the spark is turned away from rest, clockwise.
     pub spark_turn: f64,
     /// Extra brightness on the spark, 0 to 1.
     pub glint: f64,
-    /// Sparkle burst progress, 0 (none) to 1 (faded out).
-    pub burst: f64,
 }
 
 impl Pose {
-    pub const FULL: Pose =
-        Pose { ring: 1.0, head_glow: 0.0, spark_scale: 1.0, spark_turn: 0.0, glint: 0.0, burst: 0.0 };
+    pub const FULL: Pose = Pose { ring: 1.0, head_glow: 0.0, spark_scale: 1.0, spark_turn: 0.0, glint: 0.0 };
+}
+
+/// The spark's eight corners (long points at even indices), turned `turn_deg` past rest and scaled.
+pub fn spark_points(scale: f64, turn_deg: f64) -> [(f64, f64); 8] {
+    let (cx, cy, r, waist) = SPARK;
+    let mut pts = [(0.0, 0.0); 8];
+    for (i, p) in pts.iter_mut().enumerate() {
+        let rad = if i % 2 == 0 { r } else { r * waist } * scale;
+        let a = (SPARK_REST_DEG + turn_deg + 45.0 * i as f64).to_radians();
+        *p = (cx + rad * a.sin(), cy - rad * a.cos());
+    }
+    pts
+}
+
+/// The ring's two ends, left then right.
+pub fn ring_ends() -> [(f64, f64); 2] {
+    let (cx, cy, r, _) = RING;
+    let a = GAP_DEG.to_radians();
+    [(cx - r * a.sin(), cy - r * a.cos()), (cx + r * a.sin(), cy - r * a.cos())]
+}
+
+fn ease_out(t: f64) -> f64 {
+    1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(3)
+}
+
+/// The intro at `t` seconds: the ring draws itself from its left end, down and round, with a
+/// glowing head; then the × spins in half a turn, settling from just past full size; then it
+/// glints once. From [`INTRO_SECS`] on, the finished mark.
+pub fn intro_pose(t: f64) -> Pose {
+    const RING_END: f64 = 0.55;
+    const SPARK_START: f64 = 0.42;
+    const SPARK_END: f64 = 1.0;
+    let ring = ease_out(t / RING_END);
+    let u = ((t - SPARK_START) / (SPARK_END - SPARK_START)).clamp(0.0, 1.0);
+    let (spark_scale, spark_turn) =
+        if u <= 0.0 { (0.0, 0.0) } else { (ease_out(u) * (1.0 + 0.12 * (PI * u).sin()), -180.0 * (1.0 - ease_out(u))) };
+    let glint =
+        if t > SPARK_END { 0.6 * (1.0 - (t - SPARK_END) / (INTRO_SECS - SPARK_END)).clamp(0.0, 1.0) } else { 0.0 };
+    Pose { ring, head_glow: 1.0 - u, spark_scale, spark_turn, glint }
+}
+
+/// The waiting motion after the intro, `t` seconds after it ended: every 2.4 s the × makes
+/// a gentle quarter turn (an × turned a quarter is the same ×, so it always rests looking
+/// right). Returns the extra turn in degrees.
+pub fn waiting_turn(t: f64) -> f64 {
+    const EVERY: f64 = 2.4;
+    const TURN: f64 = 0.7;
+    if t <= 0.0 {
+        return 0.0;
+    }
+    let n = (t / EVERY).floor();
+    let s = ((t - n * EVERY - (EVERY - TURN)) / TURN).clamp(0.0, 1.0);
+    // Eases in and out, so it never jolts.
+    (90.0 * (n + s * s * (3.0 - 2.0 * s))) % 360.0
 }
 
 /// How the terminal can show colour.
@@ -70,7 +138,8 @@ fn ring_at(x: f64, y: f64, progress: f64) -> Option<f64> {
     if progress <= 0.0 {
         return None;
     }
-    let (cx, cy, r, half) = RING;
+    let (cx, cy, r, width) = RING;
+    let half = width / 2.0;
     let (dx, dy) = (x - cx, y - cy);
     let drawn = progress.min(1.0);
     let deg = bearing(dx, dy);
@@ -92,16 +161,6 @@ fn ring_at(x: f64, y: f64, progress: f64) -> Option<f64> {
     }
 }
 
-fn star_points(cx: f64, cy: f64, r: f64, waist: f64) -> [(f64, f64); 8] {
-    let mut pts = [(0.0, 0.0); 8];
-    for (i, p) in pts.iter_mut().enumerate() {
-        let rad = if i % 2 == 0 { r } else { r * waist };
-        let a = -PI / 2.0 + 2.0 * PI * i as f64 / 8.0;
-        *p = (cx + rad * a.cos(), cy + rad * a.sin());
-    }
-    pts
-}
-
 fn in_polygon(x: f64, y: f64, pts: &[(f64, f64)]) -> bool {
     let mut inside = false;
     let mut j = pts.len() - 1;
@@ -115,29 +174,8 @@ fn in_polygon(x: f64, y: f64, pts: &[(f64, f64)]) -> bool {
     inside
 }
 
-fn in_star(x: f64, y: f64, scale: f64, turn_deg: f64) -> bool {
-    if scale <= 0.0 {
-        return false;
-    }
-    let (cx, cy, r, waist) = STAR;
-    let t = -turn_deg.to_radians();
-    let (dx, dy) = (x - cx, y - cy);
-    let (px, py) = (cx + dx * t.cos() - dy * t.sin(), cy + dx * t.sin() + dy * t.cos());
-    in_polygon(px, py, &star_points(cx, cy, r * scale, waist))
-}
-
-/// Four small sparkles flying out diagonally from the spark, shrinking as they go.
-fn in_burst(x: f64, y: f64, t: f64) -> bool {
-    if t <= 0.0 || t >= 1.0 {
-        return false;
-    }
-    let (cx, cy, ..) = STAR;
-    let dist = 30.0 + 34.0 * t;
-    let size = 12.0 * (1.0 - t);
-    [45.0f64, 135.0, 225.0, 315.0].iter().any(|deg| {
-        let a = deg.to_radians();
-        in_polygon(x, y, &star_points(cx + dist * a.sin(), cy - dist * a.cos(), size, 0.3))
-    })
+fn in_spark(x: f64, y: f64, scale: f64, turn_deg: f64) -> bool {
+    scale > 0.0 && in_polygon(x, y, &spark_points(scale, turn_deg))
 }
 
 fn mix(a: Rgb, b: Rgb, t: f64) -> Rgb {
@@ -159,10 +197,8 @@ fn pixels(pose: Pose) -> Vec<Vec<(Rgb, f64)>> {
                         for sx in 0..SS {
                             let x = vx + (col as f64 + (sx as f64 + 0.5) / SS as f64) * pw;
                             let y = vy + (row as f64 + (sy as f64 + 0.5) / SS as f64) * ph;
-                            let c = if in_star(x, y, pose.spark_scale, pose.spark_turn) {
+                            let c = if in_spark(x, y, pose.spark_scale, pose.spark_turn) {
                                 Some(mix(SPARK_RGB, GLOW_RGB, pose.glint))
-                            } else if in_burst(x, y, pose.burst) {
-                                Some(GLOW_RGB)
                             } else {
                                 ring_at(x, y, pose.ring).map(|behind| {
                                     // The newest stretch of ring glows green, fading back to the ring colour.
@@ -249,30 +285,11 @@ pub fn render(pose: Pose, palette: Palette) -> Vec<String> {
         .collect()
 }
 
-fn ease_out(t: f64) -> f64 {
-    1.0 - (1.0 - t).powi(3)
-}
-
-/// The intro: the ring draws itself with a glowing head, the spark spins in,
-/// sparkles burst outward, and the spark glints once. Each frame has its delay in ms.
+/// The intro as terminal frames, each with its delay in ms (the last has none).
 pub fn intro() -> Vec<(Pose, u64)> {
-    let base = Pose { ring: 0.0, head_glow: 1.0, spark_scale: 0.0, spark_turn: 0.0, glint: 0.0, burst: 0.0 };
-    let mut frames = Vec::new();
-    for i in 1..=22 {
-        let t = f64::from(i) / 22.0;
-        frames.push((Pose { ring: ease_out(t), ..base }, 24));
-    }
-    for i in 1..=14 {
-        let t = f64::from(i) / 14.0;
-        // Overshoot past full size, then settle; the ring's glow fades as the spark arrives.
-        let scale = ease_out(t) * (1.0 + 0.22 * (PI * t).sin());
-        let turn = -135.0 * (1.0 - ease_out(t));
-        frames.push((Pose { ring: 1.0, head_glow: 1.0 - t, spark_scale: scale, spark_turn: turn, ..base }, 30));
-    }
-    for i in 1..=12 {
-        let t = f64::from(i) / 12.0;
-        frames.push((Pose { burst: t, glint: (1.0 - t) * 0.8, ..Pose::FULL }, 32));
-    }
+    const STEP_MS: u64 = 28;
+    let n = (INTRO_SECS * 1000.0 / STEP_MS as f64).ceil() as u64;
+    let mut frames: Vec<(Pose, u64)> = (1..n).map(|i| (intro_pose((i * STEP_MS) as f64 / 1000.0), STEP_MS)).collect();
     frames.push((Pose::FULL, 0));
     frames
 }
@@ -373,17 +390,61 @@ mod tests {
     }
 
     #[test]
-    fn spark_has_points_not_a_plus() {
-        // Partway out along an arm, the arm is much narrower than across the centre.
-        let width_at = |y: f64| (0..200).filter(|i| in_star(f64::from(*i) * 0.5 + 50.0, y, 1.0, 0.0)).count();
-        let (_, cy, r, _) = STAR;
-        assert!(width_at(cy) > 4 * width_at(cy - r * 0.6), "{} vs {}", width_at(cy), width_at(cy - r * 0.6));
+    fn spark_is_an_x_not_a_plus() {
+        let (cx, cy, r, _) = SPARK;
+        let d = r * 0.6;
+        let diag = d / 2f64.sqrt();
+        // Out along the diagonals there is spark; straight up, down and across there isn't.
+        for (sx, sy) in [(1.0, 1.0), (1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)] {
+            assert!(in_spark(cx + sx * diag, cy + sy * diag, 1.0, 0.0));
+        }
+        for (dx, dy) in [(0.0, d), (0.0, -d), (d, 0.0), (-d, 0.0)] {
+            assert!(!in_spark(cx + dx, cy + dy, 1.0, 0.0));
+        }
+        // A quarter turn is the same ×.
+        assert!(in_spark(cx + diag, cy - diag, 1.0, 90.0));
+    }
+
+    #[test]
+    fn spark_clears_the_ring() {
+        // The spark's lower points stop well short of the ring's round ends.
+        let (_, _, _, width) = RING;
+        for (ex, ey) in ring_ends() {
+            let nearest = spark_points(1.0, 0.0)
+                .iter()
+                .map(|(x, y)| ((x - ex).powi(2) + (y - ey).powi(2)).sqrt())
+                .fold(f64::MAX, f64::min);
+            assert!(nearest - width / 2.0 > 5.0, "{nearest}");
+        }
     }
 
     #[test]
     fn ring_draws_in_order() {
-        let sizes: Vec<usize> = intro().iter().take(22).map(|(p, _)| inked(&render(*p, Palette::Plain))).collect();
+        let sizes: Vec<usize> = intro()
+            .iter()
+            .take_while(|(p, _)| p.spark_scale == 0.0)
+            .map(|(p, _)| inked(&render(*p, Palette::Plain)))
+            .collect();
+        assert!(sizes.len() > 8);
         assert!(sizes.windows(2).all(|w| w[1] >= w[0]), "{sizes:?}");
+    }
+
+    #[test]
+    fn intro_settles() {
+        assert_eq!(intro_pose(0.0).spark_scale, 0.0);
+        assert_eq!(intro_pose(INTRO_SECS), Pose::FULL);
+        assert_eq!(intro().last().map(|f| f.0), Some(Pose::FULL));
+        // The spark turns in from half a turn away, so it lands as an ×.
+        assert!(intro_pose(0.45).spark_turn < -150.0);
+    }
+
+    #[test]
+    fn waiting_turns_in_quarters() {
+        assert_eq!(waiting_turn(0.0), 0.0);
+        assert_eq!(waiting_turn(1.0), 0.0);
+        assert_eq!(waiting_turn(2.4), 90.0);
+        let mid = waiting_turn(2.05);
+        assert!(mid > 0.0 && mid < 90.0, "{mid}");
     }
 
     #[test]
@@ -398,23 +459,53 @@ mod tests {
 
     #[test]
     fn geometry() {
-        assert!(in_star(100.0, 50.0, 1.0, 0.0));
-        assert!(!in_star(140.0, 50.0, 1.0, 0.0));
+        assert!(in_spark(100.0, 46.0, 1.0, 0.0));
+        assert!(!in_spark(140.0, 46.0, 1.0, 0.0));
         assert!(ring_at(40.0, 114.0, 1.0).is_some());
         assert!(ring_at(100.0, 54.0, 1.0).is_none()); // the gap
+        let [(lx, ly), (rx, ry)] = ring_ends();
+        assert!((lx - 52.72).abs() < 0.01 && (rx - 147.28).abs() < 0.01 && (ly - 77.06).abs() < 0.01 && ly == ry);
     }
 }
 
 #[cfg(test)]
 mod preview {
-    /// Writes a few frames as ANSI text for visual review: `cargo test -p trip dump_frames -- --ignored`.
+    use super::*;
+
+    /// Six frames of the terminal intro as an SVG of square pixels, for brand/terminal-logo.png:
+    /// `cargo test -p trip --lib terminal_logo_svg -- --ignored` (scripts/brand-assets.sh runs it).
     #[test]
     #[ignore]
-    fn dump_frames() {
-        let frames = super::intro();
-        for n in [8usize, 21, 28, 33, 40, frames.len() - 1] {
-            let text = super::render(frames[n].0, super::Palette::TrueColor).join("\n");
-            std::fs::write(std::env::temp_dir().join(format!("trip-logo-{n:02}.ans")), text).unwrap();
+    fn terminal_logo_svg() {
+        const PX: usize = 7;
+        const MARGIN: usize = 32;
+        const GAP: usize = 36;
+        let times = [0.25, 0.5, 0.7, 0.85, 1.05, INTRO_SECS];
+        let (fw, fh) = (PX_W * PX, PX_H * PX);
+        let (w, h) = (2 * MARGIN + 3 * fw + 2 * GAP, 2 * MARGIN + 2 * fh + GAP);
+        let mut svg = format!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" shape-rendering=\"crispEdges\"><rect width=\"{w}\" height=\"{h}\" fill=\"#0d1211\"/>"
+        );
+        for (n, t) in times.iter().enumerate() {
+            let (ox, oy) = (MARGIN + (n % 3) * (fw + GAP), MARGIN + (n / 3) * (fh + GAP));
+            for (row, line) in pixels(intro_pose(*t)).iter().enumerate() {
+                for (col, px) in line.iter().enumerate() {
+                    if let Some(c) = ink(*px, Palette::TrueColor) {
+                        svg += &format!(
+                            "<rect x=\"{}\" y=\"{}\" width=\"{PX}\" height=\"{PX}\" fill=\"rgb({},{},{})\"/>",
+                            ox + col * PX,
+                            oy + row * PX,
+                            c.0 as u8,
+                            c.1 as u8,
+                            c.2 as u8
+                        );
+                    }
+                }
+            }
         }
+        svg += "</svg>\n";
+        let out = std::env::var("TRIP_LOGO_SVG")
+            .unwrap_or_else(|_| std::env::temp_dir().join("terminal-logo.svg").display().to_string());
+        std::fs::write(out, svg).unwrap();
     }
 }
