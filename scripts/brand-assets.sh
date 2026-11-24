@@ -12,7 +12,7 @@ set -eu
 # The mark, in logo units (the box is 146 x 175 from 27, 12). Keep in step with logo.rs.
 ARC='M52.72 77.06 A60 60 0 1 0 147.28 77.06'
 ARC_LEN=268.08 # 60 * (360 - 2 * 52) degrees, in radians
-SPARK='M129.70 16.30 109.24 46.00 129.70 75.70 100.00 55.24 70.30 75.70 90.76 46.00 70.30 16.30 100.00 36.76Z'
+SPARK='M129.70 24.30 109.24 54.00 129.70 83.70 100.00 63.24 70.30 83.70 90.76 54.00 70.30 24.30 100.00 44.76Z'
 FEDORA=quay.io/fedora/fedora:45
 DM_MONO_REV=85f32a0254c400b643d7ce589b91a2ad29bea73b
 

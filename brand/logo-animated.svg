@@ -12,5 +12,5 @@
   @media (prefers-reduced-motion: reduce){ .arc,.spark{animation:none} .arc{stroke-dashoffset:0} }
 </style>
 <path class="arc ink" pathLength="1" d="M52.72 77.06 A60 60 0 1 0 147.28 77.06"/>
-<path class="spark green" d="M129.70 16.30 109.24 46.00 129.70 75.70 100.00 55.24 70.30 75.70 90.76 46.00 70.30 16.30 100.00 36.76Z"/>
+<path class="spark green" d="M129.70 24.30 109.24 54.00 129.70 83.70 100.00 63.24 70.30 83.70 90.76 54.00 70.30 24.30 100.00 44.76Z"/>
 </svg>
