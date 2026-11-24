@@ -1917,3 +1917,18 @@ window.fb .fb-card {
 list.list-card > row:selected .ai-model .row-title {
     color: var(--accent);
 }
+
+.desktop-icon {
+    padding: 6px 4px;
+    border-radius: var(--r-md);
+}
+
+.desktop-icon.selected {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.desktop-label {
+    font-size: var(--t-body);
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}

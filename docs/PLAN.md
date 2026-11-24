@@ -143,3 +143,4 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 2. **ISO hosting:** Cloudflare R2 bucket (free egress) or another store?
 3. **Branch protection:** turn it on now, or once a second contributor joins?
 4. **Repo visibility:** private repos get 2,000 free Actions minutes a month. Nightly image builds use roughly 15–25 minutes each. Going public later makes standard runners free.
+- [~] Right-click desktop menu and ~/Desktop icons (`tripppin-ui desktop`, see docs/DESKTOP.md); not yet checked in a session
