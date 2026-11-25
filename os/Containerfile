@@ -129,7 +129,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       mesa-libEGL mesa-libGL libglvnd-egl libglvnd-gles libglvnd-opengl libglvnd-glx \
       xdg-desktop-portal xdg-desktop-portal-gtk xdg-user-dirs \
       dconf polkit libnotify wl-clipboard brightnessctl playerctl \
-      adw-gtk3-theme papirus-icon-theme papirus-icon-theme-dark qt6-qtwayland \
+      adw-gtk3-theme qt6-qtwayland \
       bluez pulseaudio-utils upower power-profiles-daemon \
       glibc-langpack-en glibc-langpack-hi glibc-langpack-bn glibc-langpack-ta glibc-langpack-te \
       glibc-langpack-mr glibc-langpack-kn glibc-langpack-ml glibc-langpack-gu glibc-langpack-pa \
@@ -180,20 +180,10 @@ RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsco
     && dconf update \
     && fc-cache -f
 
-# Icons: Papirus-Dark with the folders recoloured from Papirus blue to Tripppin greens, as
-# a small theme of its own that inherits everything else.
-RUN set -e; src=/usr/share/icons/Papirus; dst=/usr/share/icons/Tripppin; \
-    for dir in "$src"/*/places; do \
-      size=$(basename "$(dirname "$dir")"); mkdir -p "$dst/$size/places"; \
-      for f in "$dir"/*.svg; do \
-        real=$(readlink -f "$f"); grep -q '#5294e2' "$real" || continue; \
-        sed -e 's/#5294e2/#3aa873/g; s/#4877b1/#1f6b45/g; s/#1d344f/#0d2a1c/g' "$real" > "$dst/$size/places/$(basename "$f")"; \
-      done; \
-    done; \
-    sed -e 's/^Name=.*/Name=Tripppin/; s/^Comment=.*/Comment=Papirus-Dark with Tripppin folders/; s/^Inherits=.*/Inherits=Papirus-Dark,breeze-dark,hicolor/' \
-      /usr/share/icons/Papirus-Dark/index.theme > "$dst/index.theme"; \
-    gtk-update-icon-cache -q -f "$dst"; \
-    test -f "$dst/48x48/places/folder.svg"
+# Icons: our own "Tripppin" theme (os/files/usr/share/icons/Tripppin: crisp SVG tiles for the
+# system apps) over Breeze Dark's monochrome line icons. No Papirus. Fails if it is missing.
+RUN test -f /usr/share/icons/Tripppin/scalable/apps/org.kde.konsole.svg \
+    && test -f /usr/share/icons/breeze-dark/index.theme
 
 # The boot splash: our Plymouth theme, built into the initramfs so it shows from the start.
 # A clean app list: hide helpers, duplicates and tool windows from Plasma's launcher (they
@@ -211,6 +201,7 @@ RUN cd /usr/share/applications \
     && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \
     && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Konsole$/Name=Terminal/' org.kde.konsole.desktop \
     && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Dolphin$/Name=Files/' org.kde.dolphin.desktop \
+    && grep -q '^Name=Terminal$' org.kde.konsole.desktop && grep -q '^Name=Files$' org.kde.dolphin.desktop \
     && ! grep -q NoDisplay in.trippp.Settings.desktop
 
 RUN plymouth-set-default-theme tripppin \

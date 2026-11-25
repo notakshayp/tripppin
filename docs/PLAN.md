@@ -159,6 +159,7 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 - [x] Look-and-feel package `in.trippp.desktop`, colour scheme, Plasma style, Konsole profile, /etc/xdg defaults, shortcut map (docs/DESKTOP.md)
 - [x] Login: our greeter on KWin; session starts `startplasma-wayland`
 - [~] Checked in the VM by screenshot (docs/DESKTOP.md, Plasma section)
+- [~] Own icon theme (SVG tiles over Breeze Dark, Papirus gone), calm Files and Terminal defaults, Flatpak icon dirs in the session (docs/DESKTOP.md, Icons and calm apps); builds, not yet seen on screen
 - [ ] To remove from crates/ui once Plasma is accepted: `displays`, `splash`, `desktop`, `dim`, `lock`, `keeper`, `snap`, `switch`, `osd`, `quick`, `battery-ring`, the niri-based Settings pages (Wi-Fi, Bluetooth, Sound, Display, Appearance, Power, Notifications, Keyboard, Mouse, Printers, Accessibility, now `#[allow(dead_code)]`), `keys` (cheat sheet lists niri keys), and the `foot` shim in os/files/usr/bin once orb.rs launches Konsole
 
 ## Tiles shell (2026-11-25, branch `tiles-shell`)

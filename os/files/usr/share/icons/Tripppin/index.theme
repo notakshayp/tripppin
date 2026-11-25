@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Tripppin
+Comment=Tripppin app icons (flat tiles, thin white glyphs) over Breeze Dark's line icons
+Inherits=breeze-dark,breeze,hicolor
+Directories=scalable/apps
+
+[scalable/apps]
+Size=128
+MinSize=8
+MaxSize=1024
+Type=Scalable
+Context=Applications

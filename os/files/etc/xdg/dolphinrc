@@ -1,19 +1,40 @@
+# Calm Files: one sidebar (Places), no panels, a short toolbar, large icons, double-click.
+# Per-user changes live in ~/.config/dolphinrc and win over this; reset with
+# `rm ~/.config/dolphinrc ~/.local/share/kxmlgui5/dolphin/dolphinui.rc` (and quit Files).
 [General]
 BrowseThroughArchives=true
 RememberOpenedTabs=false
 ShowFullPath=false
 ConfirmClosingMultipleTabs=false
 GlobalViewProps=true
-ShowStatusBar=FullWidth
+ShowStatusBar=false
+ShowStatusBarFreeSpace=true
+ShowToolTips=false
+SplitView=false
+EditableUrl=false
+ShowZoomSlider=false
+OpenExternallyCalledFolderInNewTab=false
 Version=202
 
 [MainWindow]
 MenuBar=Disabled
 ToolBarsMovable=Disabled
 
+[DetailsMode]
+PreviewSize=32
+IconSize=32
+
+[IconsMode]
+IconSize=96
+PreviewSize=128
+TextWidthIndex=3
+MaximumTextLines=2
+
+[CompactMode]
+IconSize=32
+
 [PreviewSettings]
 Plugins=audiothumbnail,directorythumbnail,imagethumbnail,jpegthumbnail,ffmpegthumbs,svgthumbnail,comicbookthumbnail,opendocumentthumbnail,windowsimagethumbnail
 
-[IconsMode]
-IconSize=64
-PreviewSize=96
+[PlacesPanel]
+IconSize=22

@@ -21,3 +21,10 @@ CloseTabButton=None
 
 [ThumbnailsConfig]
 EnableThumbnails=false
+
+# Calm Terminal: no menubar (above), no toolbars; only the tab bar when there is more than one tab.
+[Toolbar mainToolBar]
+Hidden=true
+
+[Toolbar sessionToolbar]
+Hidden=true
