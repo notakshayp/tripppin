@@ -553,6 +553,8 @@ impl StepRow {
     /// The row's colour and word: amber "now", green "done", rust "failed".
     fn settle_look(&self, ok: bool) {
         self.root.remove_css_class("now");
+        // The marching dots are only for "now"; the colour and word say the rest.
+        self.mark.set_visible(false);
         self.root.add_css_class(if ok { "done" } else { "failed" });
         self.state.set_text(if ok { "done" } else { "failed" });
     }
@@ -1419,6 +1421,20 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     orb.card.add_controller(card_keys);
 
     corner.present();
+    // Development aid (see `demo`): TRIPPPIN_ORB_DEMO=ask or card opens that view by itself.
+    if let Ok(which) = std::env::var("TRIPPPIN_ORB_DEMO") {
+        let o = orb.clone();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(800), move || {
+            o.open_ask();
+            if which == "ask" {
+                common::snapshot_hook(&o.column);
+            } else {
+                o.entry.set_text("clean up my downloads");
+                o.submit();
+                common::snapshot_hook(&o.body);
+            }
+        });
+    }
     orb
 }
 
@@ -1978,6 +1994,12 @@ impl Orb {
             }
         });
 
+        // Development aid: with TRIPPPIN_ORB_DEMO set, a scripted run stands in for the agent, so
+        // the card can be looked at (and shot) without a model.
+        if std::env::var_os("TRIPPPIN_ORB_DEMO").is_some() {
+            self.demo(req);
+            return;
+        }
         // Its own thread and channel; other requests may be running tools at the same time.
         let (tx, rx) = async_channel::unbounded::<(String, Event)>();
         let id = req.id.clone();
@@ -2011,6 +2033,23 @@ impl Orb {
                 }
             }
         });
+    }
+
+    /// The scripted run behind TRIPPPIN_ORB_DEMO: two finished steps, one running.
+    fn demo(self: &Rc<Self>, req: &Rc<Request>) {
+        let script = [
+            Event::Step("Looking in Downloads".into(), "ls ~/Downloads".into()),
+            Event::StepDone(true),
+            Event::Step("Sorting 214 files by type".into(), "sort-downloads".into()),
+            Event::StepDone(true),
+            Event::Step("Moving the old installers to Trash".into(), "trash ~/Downloads/*.iso".into()),
+        ];
+        for (i, event) in script.into_iter().enumerate() {
+            let (orb, req) = (self.clone(), req.clone());
+            glib::timeout_add_local_once(std::time::Duration::from_millis(300 + 250 * i as u64), move || {
+                orb.apply(&req, event);
+            });
+        }
     }
 
     /// The status line: what the request on show is doing or waiting on, and a clock that

@@ -129,7 +129,7 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 - [x] Design system: sentence case, readable type, tokens with a quiet green accent, a Sharp / Default / Round corners setting, a real Settings title bar, the computer called "tripppin" (UX-REVIEW.md)
 - [x] The sparkle burst is gone everywhere (the mark keeps its upright spark); logging in goes from the login screen to a logo splash with no text console in between (DESKTOP.md, "The mark and the way in")
 - [x] Laptop fixes from the first test: the red lock screen (root cause and a self-restarting lock), icons-only bar, a battery ring, the logo opening the apps, quick settings as one pill with working on/off tiles (DESKTOP.md, "Laptop fixes")
-- [x] Start screen (`tripppin-ui start`, Tiles design 02 and 03): full-screen layer-shell overlay toggled by a second run; named tile groups (small/medium/wide/large, 5 px gaps, real app icons on stable palette colours), live Calendar (next event from `~/.local/share/tripppin/calendar/*.ics`), Now playing (playerctl/MPRIS, artwork) and Ask tiles; right-click or long-press to resize, recolour, move or unpin, drag to reorder, rename groups, pin from the app list; layout in `~/.config/tripppin/start.json`; all-apps list with letter tiles and the jump grid, live search. Unread-mail badge not done (no per-app count from notifications). `--window` runs it in a normal window for Broadway screenshots
+- [x] Bridge, the start screen (`tripppin-ui bridge`; `start` still works, Tiles design 02 and 03): full-screen layer-shell overlay toggled by a second run; named tile groups (small/medium/wide/large, 5 px gaps, real app icons on stable palette colours), live Calendar (next event from `~/.local/share/tripppin/calendar/*.ics`), Now playing (playerctl/MPRIS, artwork) and Ask tiles; right-click or long-press to resize, recolour, move or unpin, drag to reorder, rename groups, pin from the app list; layout in `~/.config/tripppin/start.json`; all-apps list with letter tiles and the jump grid, live search. Unread-mail badge not done (no per-app count from notifications). `--window` runs it in a normal window for Broadway screenshots
 - [ ] Checked on the laptop: Wi-Fi, Bluetooth, sound devices, brightness, battery, the boot splash, a real USB stick and printer
 - [ ] Later: light mode, sounds, voice input, on-screen keyboard (see DESKTOP.md)
 
@@ -164,9 +164,10 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 
 ## Tiles shell (2026-11-25, branch `tiles-shell`)
 
-- [~] Taskbar: 40 px bottom panel, start button plasmoid, icons-only tasks with accent underline, status-line plasmoid, tray reduced to notifications; Meta tap opens `tripppin-ui start`
+- [~] Taskbar: 40 px bottom panel, start button plasmoid, icons-only tasks with accent underline, status-line plasmoid, tray reduced to notifications; Meta tap opens `tripppin-ui bridge`
 - [~] Plasma style `tripppin-tiles`, colour scheme to the tokens, QML window decoration (36 px strip), Kvantum "Tripppin" theme for Qt apps
 - [~] Lock screen (QML) and login screen in the Tiles look; splash with Shapes
 - [~] Lock and login are two-stage curtains; the lock's event line and unread badges read small files (next-event.json from the calendar app, unread.json from the status plasmoid) and are hidden without data
-- [ ] Calendar app writes `~/.local/share/tripppin/next-event.json`; `tripppin-ui start` bound once it lands
+- [ ] Calendar app writes `~/.local/share/tripppin/next-event.json`; `tripppin-ui bridge` bound once it lands
 - [ ] Checked at scale 1, 1.5 and 2 on the laptop (checked in the VM at 1)
+- [~] Shell polish: orb redesigned after the website's ask demo and resting bottom-centre; the start screen is now the bridge (`tripppin-ui bridge`, click-out closes, name/avatar opens Settings account); one Tiles quick panel (`tripppin-ui quick`) from the taskbar status; KDE jargon and stock context-menu entries removed; fade/squash window animations. See docs/DESKTOP.md "Shell polish".

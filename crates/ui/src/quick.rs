@@ -194,9 +194,10 @@ button.qtile:active { opacity: 0.85; }
 .qrow { background: #1a2025; padding: 14px 16px; }
 .qrow .qlabel { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #9aa4ab; }
 .qrow .qvalue { font-size: 11px; color: #9aa4ab; }
-.quick-panel scale trough { background: #2a343b; min-height: 4px; }
-.quick-panel scale highlight { background: #3fae7a; min-height: 4px; }
-.quick-panel scale slider { background: #fff; min-width: 14px; min-height: 22px; border: none; box-shadow: none; }
+.quick-panel scale trough { background: #2a343b; background-image: none; border: none; box-shadow: none; outline: none; min-height: 4px; }
+.quick-panel scale highlight { background: #3fae7a; background-image: none; border: none; min-height: 4px; }
+.quick-panel scale slider { background: #fff; background-image: none; min-width: 10px; min-height: 22px; border: none; box-shadow: none; outline: none; }
+.quick-panel scale { padding: 0; min-height: 22px; }
 .qbattery { background: #1a2025; padding: 12px 16px; font-size: 13px; color: #9aa4ab; }
 button.qact { background: #3a4a5a; color: #fff; min-height: 48px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
 button.qact:hover { background: #46586a; }
@@ -420,6 +421,7 @@ impl Panel {
         p.wire(&settings, &lock, &power, &revealer, &options);
         common::play(&panel, "rise");
         window.present();
+        common::snapshot_hook(&panel);
         p.refresh();
         p
     }
