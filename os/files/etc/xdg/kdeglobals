@@ -1,0 +1,31 @@
+# System defaults for KDE Plasma, Tripppin style. A person's own ~/.config/kdeglobals wins
+# over these. The look itself is the "Tripppin" look-and-feel package
+# (/usr/share/plasma/look-and-feel/in.trippp.desktop); this file points at it and fixes the
+# parts the package's defaults can't (fonts, terminal, click behaviour).
+[General]
+ColorScheme=Tripppin
+TerminalApplication=konsole
+TerminalService=org.kde.konsole.desktop
+# Inter for the interface, DM Mono for code; greyscale antialiasing, slight hinting (the
+# same as /etc/fonts/local.conf, so every toolkit draws text alike).
+font=
+menuFont=
+toolBarFont=
+smallestReadableFont=Inter,9,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+fixed=DM Mono,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+XftAntialias=true
+XftHintStyle=hintslight
+XftSubPixel=none
+
+[KDE]
+LookAndFeelPackage=in.trippp.desktop
+widgetStyle=Breeze
+# Double-click opens, like on the desktops people come from; one click selects.
+SingleClick=false
+AnimationDurationFactor=0.7
+
+[Icons]
+Theme=Tripppin
+
+[WM]
+activeFont=

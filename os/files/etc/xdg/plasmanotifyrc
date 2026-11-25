@@ -1,0 +1,24 @@
+[Notifications]
+PopupPosition=TopRight
+PopupTimeout=6
+
+# Screenshot notifications are explicit user interactions, always show them
+[Applications][org.kde.spectacle]
+ShowPopupsInDndMode=true
+
+# Power notifications are urgent enough to avoid e.g. the device turning off mid-presentation.
+[Applications][org.kde.powerdevil]
+ShowPopupsInDndMode=true
+
+[Applications][org.kde.klipper]
+ShowInHistory=false
+
+[Applications][org.kde.drkonqi]
+ShowInHistory=false
+
+[Applications][@other]
+ShowInHistory=false
+ShowBadges=false
+
+[Services][libnotificationmanager]
+ShowInHistory=false

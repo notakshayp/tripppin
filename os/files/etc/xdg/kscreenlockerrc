@@ -1,0 +1,14 @@
+# Lock after five minutes alone, and always when waking from sleep. The lock screen is
+# Plasma's, in the Tripppin look-and-feel's colours, over our ink wallpaper.
+[Daemon]
+Autolock=true
+LockOnResume=true
+Timeout=5
+LockGrace=0
+
+[Greeter]
+WallpaperPlugin=org.kde.image
+
+[Greeter][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/tripppin/wallpapers/ink.png
+PreviewImage=file:///usr/share/tripppin/wallpapers/ink.png
