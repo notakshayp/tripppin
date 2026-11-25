@@ -91,6 +91,7 @@ pub fn parse_appstream(source: impl Read) -> Vec<App> {
     let mut colour_dark = false;
     let mut brand: Option<String> = None;
     let mut icon_best = 0u32;
+    let mut bundle_id: Option<String> = None;
 
     loop {
         buf.clear();
@@ -115,6 +116,7 @@ pub fn parse_appstream(source: impl Read) -> Vec<App> {
                         desc.clear();
                         icon_best = 0;
                         brand = None;
+                        bundle_id = None;
                     }
                     "icon" => {
                         icon_kind = attrs.get("type").cloned().unwrap_or_default();
@@ -128,6 +130,7 @@ pub fn parse_appstream(source: impl Read) -> Vec<App> {
                         image_kind = attrs.get("type").cloned().unwrap_or_default();
                         image_width = attrs.get("width").and_then(|w| w.parse().ok()).unwrap_or(0);
                     }
+                    "bundle" => image_kind = attrs.get("type").cloned().unwrap_or_default(),
                     "value" => value_key = attrs.get("key").cloned().unwrap_or_default(),
                     "color" => {
                         colour_dark = attrs.get("type").map(String::as_str) == Some("primary")
@@ -161,7 +164,11 @@ pub fn parse_appstream(source: impl Read) -> Vec<App> {
                 {
                     let t = text.trim().to_string();
                     match (name.as_str(), parent.as_str()) {
-                        ("id", "component") => app.id = t.trim_end_matches(".desktop").to_string(),
+                        ("id", "component") => app.id = t.clone(),
+                        // "app/org.x.App/x86_64/stable": the id Flatpak itself uses.
+                        ("bundle", "component") if image_kind == "flatpak" => {
+                            bundle_id = t.strip_prefix("app/").and_then(|r| r.split('/').next()).map(str::to_string);
+                        }
                         ("name", "component") => app.name = t,
                         ("summary", "component") => app.summary = t,
                         ("project_license", _) => app.licence = t,
@@ -204,6 +211,7 @@ pub fn parse_appstream(source: impl Read) -> Vec<App> {
                     && let Some(mut app) = cur.take()
                 {
                     app.brand = brand.take();
+                    app.id = bundle_id.take().unwrap_or_else(|| app.id.trim_end_matches(".desktop").to_string());
                     app.description = tidy_description(&desc);
                     if !app.id.is_empty() && !app.name.is_empty() {
                         apps.push(app);
@@ -837,6 +845,7 @@ mod tests {
     <custom><value key="flathub::verification::verified">true</value></custom>
     <branding><color type="primary" scheme_preference="dark">#8a3b00</color></branding>
   </component>
+  <component type="desktop-application"><id>com.bitwarden.desktop</id><name>Bitwarden</name><bundle type="flatpak">app/com.bitwarden.desktop/x86_64/stable</bundle></component>
   <component type="runtime"><id>org.x.Platform</id><name>Platform</name></component>
   <component type="desktop-application">
     <id>org.gnome.Calculator.desktop</id>
@@ -853,7 +862,8 @@ mod tests {
     #[test]
     fn parses_apps_and_skips_translations_and_runtimes() {
         let apps = parse_appstream(FIXTURE.as_bytes());
-        assert_eq!(apps.len(), 2);
+        assert_eq!(apps.len(), 3);
+        assert_eq!(apps[1].id, "com.bitwarden.desktop");
         let v = &apps[0];
         assert_eq!((v.id.as_str(), v.name.as_str()), ("org.videolan.VLC", "VLC"));
         assert_eq!(v.summary, "Play videos & music");
@@ -866,9 +876,9 @@ mod tests {
         assert_eq!(v.screenshots, ["https://x/752.png", "https://x/only.png"]);
         assert!(v.verified);
         assert_eq!(v.tile_colour(), "#8a3b00");
-        assert_eq!(apps[1].id, "org.gnome.Calculator");
-        assert!(!apps[1].verified);
-        assert!(PALETTE.contains(&apps[1].tile_colour().as_str()));
+        assert_eq!(apps[2].id, "org.gnome.Calculator");
+        assert!(!apps[2].verified);
+        assert!(PALETTE.contains(&apps[2].tile_colour().as_str()));
     }
 
     #[test]

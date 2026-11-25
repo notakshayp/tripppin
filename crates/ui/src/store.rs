@@ -73,6 +73,7 @@ struct Ui {
     shots: RefCell<HashMap<String, Vec<gtk::Picture>>>,
     current: RefCell<&'static str>,
     demo: Option<f64>,
+    pending: RefCell<Option<String>>,
 }
 
 pub fn run() -> glib::ExitCode {
@@ -96,6 +97,17 @@ fn label(text: &str, classes: &[&str]) -> gtk::Label {
         l.add_css_class(c);
     }
     l
+}
+
+/// An icon file at exactly `px` logical pixels, drawn at twice that so it stays sharp on
+/// high-density screens (and an SVG is rendered at that size, not scaled up).
+fn icon_widget(path: &std::path::Path, px: i32) -> gtk::Image {
+    let paintable = gtk::IconPaintable::for_file(&gio::File::for_path(path), px, 2);
+    let img = gtk::Image::from_paintable(Some(&paintable));
+    img.set_pixel_size(px);
+    img.set_halign(gtk::Align::Center);
+    img.set_valign(gtk::Align::Center);
+    img
 }
 
 fn flat(child: &impl IsA<gtk::Widget>, classes: &[&str]) -> gtk::Button {
@@ -183,6 +195,7 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
         shots: RefCell::new(HashMap::new()),
         current: RefCell::new("featured"),
         demo,
+        pending: RefCell::new(std::env::var("TRIPPPIN_STORE_OPEN").ok()),
     });
 
     // The home page: STORE, search, pivots, then the pivot's page.
@@ -260,21 +273,6 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
     placeholder(&ui, "loading the catalogue…");
     select_pivot(&ui, "featured");
     start_loading(&ui);
-    if let Ok(id) = std::env::var("TRIPPPIN_STORE_OPEN") {
-        let ui = ui.clone();
-        // For screenshots: `pivot:categories`, `search:video`, or an app id to open.
-        glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
-            if let Some(p) = id.strip_prefix("pivot:") {
-                if let Some((_, pid, _)) = ui.pivots.iter().find(|(_, pid, _)| *pid == p) {
-                    select_pivot(&ui, pid);
-                }
-            } else if let Some(q) = id.strip_prefix("search:") {
-                ui.search.set_text(q);
-            } else {
-                open_app(&ui, &id);
-            }
-        });
-    }
     window
 }
 
@@ -321,6 +319,18 @@ fn handle(ui: &Rc<Ui>, m: Msg) {
             *ui.catalog.borrow_mut() = Rc::new(c);
             ui.loaded.set(true);
             rebuild_home(ui);
+            // For screenshots: `pivot:categories`, `search:video`, or an app id to open.
+            if let Some(id) = ui.pending.borrow_mut().take() {
+                if let Some(p) = id.strip_prefix("pivot:") {
+                    if let Some((_, pid, _)) = ui.pivots.iter().find(|(_, pid, _)| *pid == p) {
+                        select_pivot(ui, pid);
+                    }
+                } else if let Some(q) = id.strip_prefix("search:") {
+                    ui.search.set_text(q);
+                } else {
+                    open_app(ui, &id);
+                }
+            }
         }
         Msg::Installed(v) => {
             *ui.installed.borrow_mut() = v;
@@ -650,14 +660,7 @@ fn tile(ui: &Rc<Ui>, s: &TileSpec, size: i32, index: usize) -> gtk::Widget {
         b.set_valign(gtk::Align::Start);
         overlay.set_child(Some(&b));
     } else if let Some(icon) = &s.icon {
-        let pic = gtk::Picture::for_filename(icon);
-        pic.set_can_shrink(true);
-        pic.set_content_fit(gtk::ContentFit::Contain);
-        let px = (f64::from(size) * 0.5).round() as i32;
-        pic.set_size_request(px, px);
-        pic.set_halign(gtk::Align::Center);
-        pic.set_valign(gtk::Align::Center);
-        overlay.set_child(Some(&pic));
+        overlay.set_child(Some(&icon_widget(icon, (f64::from(size) * 0.5).round() as i32)));
     }
     let name = label(&s.name, &["st-tile-name"]);
     name.set_halign(gtk::Align::Start);
@@ -789,13 +792,7 @@ fn open_app(ui: &Rc<Ui>, id: &str) {
     tile.add_css_class("st-hero");
     tile.add_css_class(&colour_class(ui, &app.tile_colour()));
     if let Some(icon) = &icon {
-        let pic = gtk::Picture::for_filename(icon);
-        pic.set_can_shrink(true);
-        pic.set_content_fit(gtk::ContentFit::Contain);
-        pic.set_size_request(120, 120);
-        pic.set_halign(gtk::Align::Center);
-        pic.set_valign(gtk::Align::Center);
-        tile.set_child(Some(&pic));
+        tile.set_child(Some(&icon_widget(icon, 120)));
     }
     hero.append(&tile);
     let info = gtk::Box::new(gtk::Orientation::Vertical, 10);
