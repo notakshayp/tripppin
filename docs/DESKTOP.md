@@ -201,7 +201,7 @@ real hardware.
 - [ ] Sounds: a small Tripppin sound set (login, notification, error, screenshot)
 - [ ] Light mode: every component switching together (dark only for now; Appearance says so)
 - [ ] On-screen keyboard for touchscreens
-- [ ] Voice input: hold Super + Space and talk (with a local speech model)
+- [~] Voice dictation: `tripppin-ui dictate` (Super + M): pill with a level meter, whisper.cpp base model on the device, text typed through the RemoteDesktop portal (wtype fallback); stops after 2 s of quiet. Unit-tested; the image build, the portal prompt and real typing are not yet checked in the VM
 - [ ] Ask about the screen or a selected file ("summarise this pdf")
 - [ ] History of past requests in the orb; continue a conversation
 - [ ] Permission prompts before risky steps (M4, with the safety work)

@@ -19,6 +19,7 @@ gtk = { package = "gtk4", version = "0.11", features = ["v4_16"] }
 gtk4-layer-shell = "0.9"
 gtk4-session-lock = "0.5"
 async-channel = "2.5"
+ashpd = { version = "0.14", default-features = false, features = ["async-io", "remote_desktop", "screencast"] }
 
 [lints]
 workspace = true

@@ -24,7 +24,7 @@ use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title, icon, page).
 type Section = (&'static str, &'static str, char, fn() -> gtk::ScrolledWindow);
-const SECTIONS: [Section; 21] = [
+const SECTIONS: [Section; 22] = [
     ("wifi", "Wi-Fi", icons::WIFI, wifi_page),
     ("network", "Network & VPN", icons::NETWORK, network_page),
     ("bluetooth", "Bluetooth", icons::BLUETOOTH, bluetooth_page),
@@ -33,6 +33,7 @@ const SECTIONS: [Section; 21] = [
     ("appearance", "Appearance", icons::PALETTE, appearance_page),
     ("power", "Power & battery", icons::BATTERY, power_page),
     ("ai", "AI", icons::SPARKLES, ai_page),
+    ("dictation", "Dictation", icons::MIC, dictation_page),
     ("notifications", "Notifications", icons::BELL, notifications_page),
     ("apps", "Apps", icons::APPS, apps_page),
     ("keyboard", "Keyboard", icons::KEYBOARD, keyboard_page),
@@ -4204,6 +4205,26 @@ fn privacy_page() -> gtk::ScrolledWindow {
             f();
         }
     });
+    scroll
+}
+
+fn dictation_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("Dictation");
+    status.set_text("Speak and it's typed, on this computer");
+    let card = card();
+    let on = gtk::Switch::new();
+    on.set_active(crate::dictate::enabled());
+    on.connect_state_set(|_, on| {
+        crate::dictate::set_enabled(on);
+        glib::Propagation::Proceed
+    });
+    card.append(&setting_row("Dictation", &on));
+    card.append(&setting_row("Shortcut", &label("Super + M", &["row-sub"])));
+    body.append(&card);
+    body.append(&label(
+        "Press the shortcut, speak, and press it again; the words are typed where you were. It also stops after a couple of seconds of quiet. The recording never leaves this computer and is deleted as soon as it's read.",
+        &["row-sub"],
+    ));
     scroll
 }
 
