@@ -1,7 +1,13 @@
 #!/bin/sh
-# The desktop session greetd starts after the login screen (tripppin-ui greeter asks for it).
-# The login screen has already faded to ink; keep the console ink too and send niri-session's
-# messages to the journal, so the next thing on screen is the desktop's splash
-# (tripppin-ui splash, first in /etc/niri/desktop.kdl), not text.
+# The desktop session greetd starts after the login screen (tripppin-ui greeter asks for it):
+# KDE Plasma on Wayland. The login screen has already faded to ink; keep the console ink too
+# and send Plasma's startup messages to the journal, so the next thing on screen is Plasma's
+# splash (the Tripppin look-and-feel's), not text.
 /usr/libexec/tripppin-ink-console
-exec systemd-cat -t niri-session niri-session
+# Qt apps are drawn by Kvantum with our flat square "Tripppin" theme (usr/share/Kvantum).
+# Kvantum reads only the person's own config, so write it once if it is missing.
+kv="${XDG_CONFIG_HOME:-$HOME/.config}/Kvantum/kvantum.kvconfig"
+if [ ! -f "$kv" ]; then
+    mkdir -p "$(dirname "$kv")" && printf '[General]\ntheme=Tripppin\n' > "$kv"
+fi
+exec systemd-cat -t plasma-session /usr/libexec/plasma-dbus-run-session-if-needed /usr/bin/startplasma-wayland

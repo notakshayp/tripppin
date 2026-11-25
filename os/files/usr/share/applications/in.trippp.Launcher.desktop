@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Open the start screen
+Exec=tripppin-ui start
+NoDisplay=true
+X-KDE-GlobalAccel-CommandShortcut=true

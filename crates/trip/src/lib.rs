@@ -3,6 +3,7 @@
 //! `tripppin-ui` (the orb) uses the same agent as the terminal.
 
 pub mod agent;
+pub mod follow;
 pub mod jobs;
 pub mod logo;
 pub mod markdown;
@@ -11,5 +12,7 @@ pub mod models;
 pub mod permissions;
 pub mod providers;
 pub mod session;
+pub mod steps;
+pub mod store;
 pub mod term;
 pub mod tui;

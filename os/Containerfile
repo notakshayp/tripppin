@@ -7,7 +7,7 @@
 # a new one, and that PR runs the full image pipeline before it can merge.
 
 # ---- Rust tools -------------------------------------------------------------
-FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS build
+FROM quay.io/fedora/fedora:45@sha256:92837d4834c1cff45cc2d534b655489b8e536271de1897932117e396cc9980c5 AS build
 RUN dnf -y install --setopt=install_weak_deps=False cargo rust gcc gtk4-devel gtk4-layer-shell-devel && dnf clean all
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rustfmt.toml ./
@@ -17,7 +17,7 @@ RUN cargo build --release --locked -p trip -p tripppin-ui
 
 # ---- llama.cpp ------------------------------------------------------------
 # Pinned release, Vulkan backend (falls back to the CPU when there's no GPU).
-FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS llama
+FROM quay.io/fedora/fedora:45@sha256:92837d4834c1cff45cc2d534b655489b8e536271de1897932117e396cc9980c5 AS llama
 ARG LLAMA_CPP_TAG=v1.0.0
 RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ vulkan-headers vulkan-loader-devel glslc spirv-headers-devel && dnf clean all
 RUN git clone --depth 1 --branch "$LLAMA_CPP_TAG" https://github.com/ggml-org/llama.cpp /src/llama.cpp
@@ -27,8 +27,21 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NAT
       -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_HTML=OFF \
     && cmake --build build --target llama-server -j"$(nproc)"
 
+# ---- whisper.cpp ----------------------------------------------------------
+# Dictation's speech to text. Fedora's whisper-cpp package ships only the libraries, no
+# whisper-cli, so build the pinned release (CPU only; the base model is fast enough there).
+FROM quay.io/fedora/fedora:45@sha256:92837d4834c1cff45cc2d534b655489b8e536271de1897932117e396cc9980c5 AS whisper
+ARG WHISPER_CPP_TAG=v1.8.7
+RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ && dnf clean all
+RUN git clone --depth 1 --branch "$WHISPER_CPP_TAG" https://github.com/ggml-org/whisper.cpp /src/whisper.cpp
+WORKDIR /src/whisper.cpp
+RUN if [ "$(uname -m)" = x86_64 ]; then X86="-DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON"; fi; \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF $X86 \
+      -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DWHISPER_BUILD_EXAMPLES=ON \
+    && cmake --build build --target whisper-cli -j"$(nproc)"
+
 # ---- The OS -----------------------------------------------------------------
-FROM quay.io/fedora/fedora-bootc:45@sha256:d440aea898005f376bbf0bbe06c216abdba68dcdb6dfa5cb0fa246cd03fa8d8a
+FROM quay.io/fedora/fedora-bootc:45@sha256:2342f957281b061919c48a12227f9cd04f2d9825d17629fd914083aaa672002c
 
 LABEL org.opencontainers.image.title="tripppin" \
       org.opencontainers.image.description="A Linux with an AI built in." \
@@ -52,6 +65,16 @@ COPY --from=build /src/target/release/trip /usr/bin/trip
 COPY --from=build /src/target/release/tripppin-ui /usr/bin/tripppin-ui
 COPY --from=llama /src/llama.cpp/build/bin/llama-server /usr/bin/llama-server
 COPY --from=llama /src/llama.cpp/LICENSE /usr/share/licenses/llama.cpp/LICENSE
+COPY --from=whisper /src/whisper.cpp/build/bin/whisper-cli /usr/bin/whisper-cli
+COPY --from=whisper /src/whisper.cpp/LICENSE /usr/share/licenses/whisper.cpp/LICENSE
+# Dictation's speech model: multilingual base, 5-bit (MIT, ggerganov/whisper.cpp), pinned to a revision and checked.
+ARG WHISPER_MODEL_REV=5359861c739e955e79d9a303bcbc70fb988958b1
+ARG WHISPER_MODEL_SHA256=422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898
+# Downloaded and checked by hash in a RUN step: CI's buildah has no ADD --checksum.
+RUN mkdir -p /usr/share/tripppin/whisper \
+    && curl -fsSL -o /usr/share/tripppin/whisper/ggml-base-q5_1.bin \
+         "https://huggingface.co/ggerganov/whisper.cpp/resolve/${WHISPER_MODEL_REV}/ggml-base-q5_1.bin" \
+    && echo "${WHISPER_MODEL_SHA256}  /usr/share/tripppin/whisper/ggml-base-q5_1.bin" | sha256sum -c -
 
 # What llama.cpp needs at runtime: the Vulkan loader and Mesa's GPU drivers.
 RUN dnf -y install --setopt=install_weak_deps=False vulkan-loader mesa-vulkan-drivers libgomp && dnf clean all
@@ -62,10 +85,15 @@ RUN dnf -y install --setopt=install_weak_deps=False NetworkManager-wifi wpa_supp
       iwlwifi-mvm-firmware iwlwifi-dvm-firmware realtek-firmware mt7xxx-firmware atheros-firmware brcmfmac-firmware \
     && dnf clean all
 
-# Apps install as Flatpaks from Flathub, since the system image itself is read-only.
+# Apps install as Flatpaks from Flathub, since the system image itself is read-only. The
+# Store (tripppin-ui store, trip store) is our front end to that catalogue. The remote is
+# configured system-wide, so everyone on the computer sees the same apps.
+ARG FLATHUBREPO_SHA256=3371dd250e61d9e1633630073fefda153cd4426f72f4afa0c3373ae2e8fea03a
 RUN dnf -y install --setopt=install_weak_deps=False flatpak && dnf clean all \
     && mkdir -p /usr/share/flatpak/remotes.d \
-    && curl -fsSL -o /usr/share/flatpak/remotes.d/flathub.flatpakrepo https://dl.flathub.org/repo/flathub.flatpakrepo
+    && curl -fsSL -o /usr/share/flatpak/remotes.d/flathub.flatpakrepo https://dl.flathub.org/repo/flathub.flatpakrepo \
+    && echo "${FLATHUBREPO_SHA256}  /usr/share/flatpak/remotes.d/flathub.flatpakrepo" | sha256sum -c - \
+    && flatpak remote-add --system --if-not-exists flathub /usr/share/flatpak/remotes.d/flathub.flatpakrepo
 
 # The console: kmscon (scrollback, mouse, real fonts) in DM Mono, with DejaVu Sans
 # Mono for the block and line characters DM Mono doesn't have.
@@ -90,18 +118,23 @@ RUN mkdir -p /usr/share/fonts/lucide /usr/share/licenses/lucide \
     && curl -fsSL -o /usr/share/licenses/lucide/LICENSE "https://unpkg.com/lucide-static@${LUCIDE_VERSION}/LICENSE" \
     && fc-cache -f
 
-# The desktop: niri (a Wayland compositor) with every window floating, styled end
-# to end. waybar, fuzzel, mako, foot and swaybg are configured in os/files; the
-# orb, login and lock screens are ours (tripppin-ui). Inter is the interface font.
+# The desktop: KDE Plasma 6 on KWin (Wayland), a lean explicit set rather than the whole
+# @kde-desktop group, restyled end to end by os/files (the "Tripppin" look-and-feel package,
+# Plasma style, colour scheme, Konsole profile). The orb, login screen and Settings' AI pages
+# are ours (tripppin-ui). Inter is the interface font. Apps come as Flatpaks (Discover).
 RUN dnf -y install --setopt=install_weak_deps=False \
-      niri xwayland-satellite waybar fuzzel SwayNotificationCenter wlogout wlsunset swaybg swayidle foot \
-      greetd gtk4 gtk4-layer-shell libadwaita adwaita-icon-theme adwaita-cursor-theme \
-      rsms-inter-fonts mesa-dri-drivers pipewire wireplumber pipewire-pulseaudio pipewire-alsa \
+      plasma-workspace plasma-desktop kwin plasma-nm plasma-pa bluedevil powerdevil kscreen kscreenlocker \
+      kde-gtk-config xdg-desktop-portal-kde plasma-systemsettings kinfocenter plasma-print-manager polkit-kde \
+      dolphin konsole ark gwenview okular spectacle kio-extras kde-cli-tools plasma-integration \
+      kdegraphics-thumbnailers ffmpegthumbs breeze-icon-theme breeze-gtk plasma-breeze breeze-cursor-theme \
+      plasma-discover plasma-discover-flatpak kvantum \
+      greetd gtk4 gtk4-layer-shell libadwaita adwaita-icon-theme \
+      rsms-inter-fonts mesa-dri-drivers pipewire pipewire-utils wireplumber pipewire-pulseaudio pipewire-alsa \
       mesa-libEGL mesa-libGL libglvnd-egl libglvnd-gles libglvnd-opengl libglvnd-glx \
-      xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome xdg-user-dirs \
+      xdg-desktop-portal xdg-desktop-portal-gtk xdg-user-dirs \
       dconf polkit libnotify wl-clipboard brightnessctl playerctl \
-      adw-gtk3-theme papirus-icon-theme papirus-icon-theme-dark qt6ct qt5ct qt6-qtwayland \
-      grim slurp swappy wf-recorder cliphist nm-connection-editor blueman bluez pavucontrol pulseaudio-utils wdisplays upower power-profiles-daemon \
+      adw-gtk3-theme qt6-qtwayland \
+      bluez pulseaudio-utils upower power-profiles-daemon \
       glibc-langpack-en glibc-langpack-hi glibc-langpack-bn glibc-langpack-ta glibc-langpack-te \
       glibc-langpack-mr glibc-langpack-kn glibc-langpack-ml glibc-langpack-gu glibc-langpack-pa \
       glibc-langpack-es glibc-langpack-fr glibc-langpack-de glibc-langpack-pt \
@@ -109,13 +142,14 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       google-noto-sans-telugu-vf-fonts google-noto-sans-kannada-vf-fonts google-noto-sans-malayalam-vf-fonts \
       google-noto-sans-gujarati-vf-fonts google-noto-sans-gurmukhi-vf-fonts \
       firewalld orca espeak-ng speech-dispatcher speech-dispatcher-espeak-ng NetworkManager-openvpn NetworkManager-openvpn-gnome \
-      cups cups-filters ipp-usb nss-mdns system-config-printer sane-backends sane-airscan simple-scan unicode-emoji wtype mate-polkit google-noto-color-emoji-fonts plymouth plymouth-plugin-script \
-      thunar thunar-volman thunar-archive-plugin tumbler gvfs gvfs-mtp file-roller \
-      gnome-text-editor loupe papers gnome-calculator celluloid gnome-system-monitor gnome-disk-utility \
-      udiskie greenboot greenboot-default-health-checks \
+      cups cups-filters ipp-usb nss-mdns sane-backends sane-airscan simple-scan unicode-emoji wtype google-noto-color-emoji-fonts plymouth plymouth-plugin-script \
+      gvfs gvfs-mtp \
+      gnome-text-editor gnome-calculator gnome-system-monitor gnome-disk-utility \
+      greenboot greenboot-default-health-checks \
     && dnf clean all
 
 COPY os/files/ /
+RUN test -x /usr/bin/startplasma-wayland && test -x /usr/bin/kwin_wayland && test -f /usr/share/icons/breeze_cursors/index.theme
 # The desktop widgets reference, for people and for the AI (`tripppin-ui widgets guide`).
 COPY docs/WIDGETS.md /usr/share/doc/tripppin/WIDGETS.md
 
@@ -145,38 +179,34 @@ RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } >
 # The desktop starts on tty1 through greetd; other consoles (Ctrl+Alt+F2…) are kmscon.
 RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service firewalld.service cups.socket \
       tripppin-firefox.service tripppin-hostname.service greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
+    && systemctl --global enable tripppin-calendar-remind.timer \
     && systemctl set-default graphical.target \
     && dconf update \
     && fc-cache -f
 
-# Icons: Papirus-Dark with the folders recoloured from Papirus blue to Tripppin greens, as
-# a small theme of its own that inherits everything else.
-RUN set -e; src=/usr/share/icons/Papirus; dst=/usr/share/icons/Tripppin; \
-    for dir in "$src"/*/places; do \
-      size=$(basename "$(dirname "$dir")"); mkdir -p "$dst/$size/places"; \
-      for f in "$dir"/*.svg; do \
-        real=$(readlink -f "$f"); grep -q '#5294e2' "$real" || continue; \
-        sed -e 's/#5294e2/#3aa873/g; s/#4877b1/#1f6b45/g; s/#1d344f/#0d2a1c/g' "$real" > "$dst/$size/places/$(basename "$f")"; \
-      done; \
-    done; \
-    sed -e 's/^Name=.*/Name=Tripppin/; s/^Comment=.*/Comment=Papirus-Dark with Tripppin folders/; s/^Inherits=.*/Inherits=Papirus-Dark,breeze-dark,hicolor/' \
-      /usr/share/icons/Papirus-Dark/index.theme > "$dst/index.theme"; \
-    gtk-update-icon-cache -q -f "$dst"; \
-    test -f "$dst/48x48/places/folder.svg"
+# Icons: our own "Tripppin" theme (os/files/usr/share/icons/Tripppin: crisp SVG tiles for the
+# system apps) over Breeze Dark's monochrome line icons. No Papirus. Fails if it is missing.
+RUN test -f /usr/share/icons/Tripppin/scalable/apps/org.kde.konsole.svg \
+    && test -f /usr/share/icons/breeze-dark/index.theme
 
 # The boot splash: our Plymouth theme, built into the initramfs so it shows from the start.
-# A clean app list: hide helpers, duplicates of our Settings pages and Fedora's tool windows
-# (they still open from files and links), and give the two everyday apps plain names.
-# Settings' own pages are found by searching "Settings" words instead of listing 20 entries.
+# A clean app list: hide helpers, duplicates and tool windows from Plasma's launcher (they
+# still open from files and links), and give the two everyday apps plain names. Our
+# Discover stays installed as a fallback, but our Store (in.trippp.Store) is the one in the launcher.
+# Settings' own pages are found by searching "Settings" words instead of listing entries.
 RUN cd /usr/share/applications \
-    && for f in blueman-manager blueman-adapters foot-server footclient qt5ct qt6ct system-config-printer \
-         thunar-bulk-rename thunar-settings network.cycles.wdisplays org.pulseaudio.pavucontrol \
-         org.gnome.FileRoller org.gnome.SimpleScan panel-preferences thunar-volman-settings; do \
+    && for f in kdesystemsettings systemsettings org.kde.systemsettings org.kde.kmenuedit org.kde.plasma.emojier org.kde.ark org.kde.kinfocenter \
+         org.gnome.SimpleScan org.kde.plasma-systemmonitor org.kde.kuserfeedback-console \
+         org.freedesktop.IBus.Panel.Emojier org.freedesktop.IBus.Panel.Extension.Gtk3 \
+         org.freedesktop.IBus.Setup nm-connection-editor \
+         org.kde.discover org.kde.discover.notifier org.kde.discover.urlhandler; do \
          [ ! -f "$f.desktop" ] || sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$f.desktop"; \
        done \
     && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \
-    && sed -i -e '/^Name\[/d' -e 's/^Name=Foot$/Name=Terminal/' foot.desktop \
-    && sed -i -e '/^Name\[/d' -e 's/^Name=Thunar File Manager$/Name=Files/' thunar.desktop \
+    && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Konsole$/Name=Terminal/' org.kde.konsole.desktop \
+    && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Dolphin$/Name=Files/' org.kde.dolphin.desktop \
+    && { [ ! -f org.gnome.SystemMonitor.desktop ] || sed -i -e '/^Name\[/d' -e 's/^Name=.*/Name=System monitor/' org.gnome.SystemMonitor.desktop; } \
+    && grep -q '^Name=Terminal$' org.kde.konsole.desktop && grep -q '^Name=Files$' org.kde.dolphin.desktop \
     && ! grep -q NoDisplay in.trippp.Settings.desktop
 
 RUN plymouth-set-default-theme tripppin \

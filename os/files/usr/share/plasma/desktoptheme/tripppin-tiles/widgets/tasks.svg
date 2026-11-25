@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="6" height="6" viewBox="0 0 6 6">
+  <g id="normal-topleft"><rect x="0" y="0" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="normal-top"><rect x="2" y="0" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="normal-topright"><rect x="4" y="0" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="normal-left"><rect x="0" y="2" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="normal-center"><rect x="2" y="2" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="normal-right"><rect x="4" y="2" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="normal-bottomleft"><rect x="0" y="4" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="normal-bottom"><rect x="2" y="4" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="normal-bottomright"><rect x="4" y="4" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <rect id="normal-hint-top-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="normal-hint-bottom-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="normal-hint-left-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="normal-hint-right-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="normal-hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>
+  <g id="focus-topleft"><rect x="0" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-top"><rect x="2" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-topright"><rect x="4" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-left"><rect x="0" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-center"><rect x="2" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-right"><rect x="4" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-bottomleft"><rect x="0" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/><rect x="0" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <g id="focus-bottom"><rect x="2" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/><rect x="2" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <g id="focus-bottomright"><rect x="4" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/><rect x="4" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <rect id="focus-hint-top-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="focus-hint-bottom-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="focus-hint-left-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="focus-hint-right-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="focus-hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>
+  <g id="hover-topleft"><rect x="0" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <g id="hover-top"><rect x="2" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <g id="hover-topright"><rect x="4" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <g id="hover-left"><rect x="0" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <g id="hover-center"><rect x="2" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <g id="hover-right"><rect x="4" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <g id="hover-bottomleft"><rect x="0" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <g id="hover-bottom"><rect x="2" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <g id="hover-bottomright"><rect x="4" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.08"/></g>
+  <rect id="hover-hint-top-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="hover-hint-bottom-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="hover-hint-left-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="hover-hint-right-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="hover-hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>
+  <g id="attention-topleft"><rect x="0" y="0" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/></g>
+  <g id="attention-top"><rect x="2" y="0" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/></g>
+  <g id="attention-topright"><rect x="4" y="0" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/></g>
+  <g id="attention-left"><rect x="0" y="2" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/></g>
+  <g id="attention-center"><rect x="2" y="2" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/></g>
+  <g id="attention-right"><rect x="4" y="2" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/></g>
+  <g id="attention-bottomleft"><rect x="0" y="4" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/><rect x="0" y="4" width="2" height="2" fill="#c2502e"/></g>
+  <g id="attention-bottom"><rect x="2" y="4" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/><rect x="2" y="4" width="2" height="2" fill="#c2502e"/></g>
+  <g id="attention-bottomright"><rect x="4" y="4" width="2" height="2" fill="#c2502e" fill-opacity="0.25"/><rect x="4" y="4" width="2" height="2" fill="#c2502e"/></g>
+  <rect id="attention-hint-top-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="attention-hint-bottom-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="attention-hint-left-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="attention-hint-right-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="attention-hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>
+  <g id="minimized-topleft"><rect x="0" y="0" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="minimized-top"><rect x="2" y="0" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="minimized-topright"><rect x="4" y="0" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="minimized-left"><rect x="0" y="2" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="minimized-center"><rect x="2" y="2" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="minimized-right"><rect x="4" y="2" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/></g>
+  <g id="minimized-bottomleft"><rect x="0" y="4" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/><rect x="0" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <g id="minimized-bottom"><rect x="2" y="4" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/><rect x="2" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <g id="minimized-bottomright"><rect x="4" y="4" width="2" height="2" fill="#3fae7a" fill-opacity="0.0"/><rect x="4" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <rect id="minimized-hint-top-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="minimized-hint-bottom-margin" x="0" y="0" width="1" height="9" fill="none"/>
+  <rect id="minimized-hint-left-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="minimized-hint-right-margin" x="0" y="0" width="9" height="1" fill="none"/>
+  <rect id="minimized-hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>
+</svg>

@@ -42,6 +42,24 @@ pub fn load_css() {
     });
 }
 
+/// Development aid: with `TRIPPPIN_SHOT=/path/name` set, saves a PNG of `w` a moment after
+/// it is shown (name.png), so screens can be checked on a headless display.
+pub fn snapshot_hook(w: &impl IsA<gtk::Widget>) {
+    let Ok(path) = std::env::var("TRIPPPIN_SHOT") else { return };
+    let w = w.clone().upcast::<gtk::Widget>();
+    glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
+        let (width, height) = (w.width(), w.height());
+        let Some(renderer) = w.native().and_then(|n| n.renderer()) else { return };
+        let paintable = gtk::WidgetPaintable::new(Some(&w));
+        let snapshot = gtk::Snapshot::new();
+        paintable.snapshot(&snapshot, f64::from(width), f64::from(height));
+        if let Some(node) = snapshot.to_node() {
+            let texture = renderer.render_texture(&node, None);
+            let _ = texture.save_to_png(format!("{path}.png"));
+        }
+    });
+}
+
 /// A label with the given CSS classes.
 pub fn label(text: &str, classes: &[&str]) -> gtk::Label {
     let l = gtk::Label::new(Some(text));
@@ -130,10 +148,9 @@ pub fn animated_logo(width: i32, waiting: bool) -> gtk::DrawingArea {
         area.set_draw_func(move |a, cr, w, h| {
             let now = a.frame_clock().map_or(0, |c| c.frame_time());
             let t = (now - start.get().unwrap_or(now)) as f64 / 1_000_000.0;
-            let mut pose = logo::intro_pose(t);
-            if waiting {
-                pose.spark_turn += logo::waiting_turn(t - logo::INTRO_SECS);
-            }
+            // The spark never turns; once in place the mark simply rests.
+            let pose = logo::intro_pose(t);
+            let _ = waiting;
             let (x, y) = ((f64::from(w) - size) / 2.0, (f64::from(h) - mark_height(size)) / 2.0);
             draw_mark_posed(cr, x, y, size, (INK.0, INK.1, INK.2, 1.0), (GREEN.0, GREEN.1, GREEN.2, 1.0), pose);
         });
@@ -150,6 +167,7 @@ pub fn animated_logo(width: i32, waiting: bool) -> gtk::DrawingArea {
 }
 
 /// The desktop's backdrop: the huge, faint mark off the top right, as on the wallpaper.
+#[allow(dead_code)] // the previous login look; the Tiles greeter is flat
 pub fn backdrop() -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
     area.set_hexpand(true);
@@ -414,6 +432,7 @@ pub const SHORTCUTS: [(&str, &[(&str, &str)]); 3] = [
             ("apps", "Super + A, or type its name after Super + Space"),
             ("Quick settings", "Super + N"),
             ("Clipboard history", "Super + V"),
+            ("Dictate: speak, press again to type", "Super + M"),
             ("emoji", "Super + ."),
             ("These shortcuts", "Super + /"),
         ],

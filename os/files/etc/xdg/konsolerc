@@ -1,0 +1,30 @@
+[Desktop Entry]
+DefaultProfile=Tripppin.profile
+
+[FileLocation]
+scrollbackUseCacheLocation=true
+scrollbackUseSystemLocation=false
+
+[KonsoleWindow]
+ShowMenuBarByDefault=false
+RememberWindowSize=false
+
+[MainWindow]
+MenuBar=Disabled
+StatusBar=Disabled
+ToolBarsMovable=Disabled
+
+[TabBar]
+TabBarVisibility=ShowTabBarWhenNeeded
+NewTabButton=false
+CloseTabButton=None
+
+[ThumbnailsConfig]
+EnableThumbnails=false
+
+# Calm Terminal: no menubar (above), no toolbars; only the tab bar when there is more than one tab.
+[Toolbar mainToolBar]
+Hidden=true
+
+[Toolbar sessionToolbar]
+Hidden=true

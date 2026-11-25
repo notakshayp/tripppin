@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Network & VPN settings
-Comment=Settings → network & VPN
-Exec=tripppin-ui settings network
-Icon=network-wired
-Keywords=ethernet;ip;dns;proxy;vpn;wireguard;openvpn;
-Categories=Settings;

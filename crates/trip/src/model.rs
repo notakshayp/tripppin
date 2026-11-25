@@ -479,7 +479,7 @@ pub struct ToolCall {
 }
 
 /// Token counts for one model reply, and how full the context is.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Usage {
     /// Tokens the model read for this reply (the whole conversation sent).
     pub prompt: usize,

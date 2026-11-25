@@ -1,6 +1,7 @@
-# The login screen. tripppin-ui greeter (in a small niri session) talks to greetd, and the
-# desktop it starts is /usr/libexec/tripppin-session (niri-session). Both keep the text
-# console plain ink, so logging in goes from the login screen to the splash with no text.
+# The login screen. tripppin-ui greeter (on KWin, in its own tiny session) talks to greetd,
+# and the desktop it starts is /usr/libexec/tripppin-session (KDE Plasma on Wayland). Both
+# keep the text console plain ink, so logging in goes from the login screen to the Plasma
+# splash with no text.
 [terminal]
 vt = 1
 

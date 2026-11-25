@@ -1,0 +1,22 @@
+#!/bin/sh
+# First login: give Files a short, calm Places list (the usual folders and Trash; drives
+# appear on their own). Does nothing if the person already has a places list.
+f="${XDG_DATA_HOME:-$HOME/.local/share}/user-places.xbel"
+[ -e "$f" ] && exit 0
+mkdir -p "$(dirname "$f")"
+item() { # title icon url
+  printf ' <bookmark href="%s">\n  <title>%s</title>\n  <info><metadata owner="http://freedesktop.org"><bookmark:icon name="%s"/></metadata></info>\n </bookmark>\n' "$3" "$1" "$2"
+}
+{
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xbel>\n<xbel xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks">\n'
+  item Home user-home "file://$HOME"
+  for e in "Desktop user-desktop DESKTOP" "Documents folder-documents DOCUMENTS" "Downloads folder-download DOWNLOAD" \
+           "Pictures folder-pictures PICTURES" "Music folder-music MUSIC" "Videos folder-videos VIDEOS"; do
+    set -- $e
+    d=$(xdg-user-dir "$3" 2>/dev/null)
+    [ -n "$d" ] || d="$HOME/$1"
+    item "$1" "$2" "file://$d"
+  done
+  item Trash user-trash "trash:/"
+  printf '</xbel>\n'
+} > "$f"

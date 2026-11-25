@@ -8,7 +8,7 @@ default-members = ["crates/hwdetect", "crates/trip"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 license = "Apache-2.0"
 repository = "https://github.com/notakshayp/tripppin"
 publish = false
@@ -26,6 +26,8 @@ ctrlc = "3"
 crossterm = "=0.29.0"
 nu-ansi-term = "=0.50.3"
 unicode-width = "=0.2.3"
+quick-xml = "0.42"
+flate2 = "1"
 hwdetect = { path = "crates/hwdetect" }
 
 [workspace.lints.rust]

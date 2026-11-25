@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Service
+MimeType=inode/directory;
+Actions=newfolder
+X-KDE-Priority=TopLevel
+X-KDE-StartupNotify=false
+
+[Desktop Action newfolder]
+Name=New Folder
+Icon=folder-new
+Exec=sh -c 'd="$1/New Folder"; n=1; while [ -e "$d" ]; do n=$((n+1)); d="$1/New Folder $n"; done; mkdir -p "$d"' sh %f

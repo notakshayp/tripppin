@@ -24,25 +24,26 @@ use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title, icon, page).
 type Section = (&'static str, &'static str, char, fn() -> gtk::ScrolledWindow);
-const SECTIONS: [Section; 21] = [
-    ("wifi", "Wi-Fi", icons::WIFI, wifi_page),
-    ("network", "Network & VPN", icons::NETWORK, network_page),
-    ("bluetooth", "Bluetooth", icons::BLUETOOTH, bluetooth_page),
-    ("sound", "Sound", icons::SOUND, sound_page),
-    ("display", "Display", icons::DISPLAY, display_page),
-    ("appearance", "Appearance", icons::PALETTE, appearance_page),
-    ("power", "Power & battery", icons::BATTERY, power_page),
+pub(crate) const SECTIONS: [Section; 22] = [
+    ("wifi", "Wi-Fi", icons::WIFI, kde_wifi),
+    ("network", "Network & VPN", icons::NETWORK, kde_network),
+    ("bluetooth", "Bluetooth", icons::BLUETOOTH, kde_bluetooth),
+    ("sound", "Sound", icons::SOUND, kde_sound),
+    ("display", "Display", icons::DISPLAY, kde_display),
+    ("appearance", "Appearance", icons::PALETTE, kde_appearance),
+    ("power", "Power & battery", icons::BATTERY, kde_power),
     ("ai", "AI", icons::SPARKLES, ai_page),
-    ("notifications", "Notifications", icons::BELL, notifications_page),
+    ("dictation", "Dictation", icons::MIC, dictation_page),
+    ("notifications", "Notifications", icons::BELL, kde_notifications),
     ("apps", "Apps", icons::APPS, apps_page),
-    ("keyboard", "Keyboard", icons::KEYBOARD, keyboard_page),
-    ("pointer", "Mouse & touchpad", icons::POINTER, pointer_page),
-    ("printers", "Printers & scanners", icons::PRINTER, printers_page),
+    ("keyboard", "Keyboard", icons::KEYBOARD, kde_keyboard),
+    ("pointer", "Mouse & touchpad", icons::POINTER, kde_pointer),
+    ("printers", "Printers & scanners", icons::PRINTER, kde_printers),
     ("time", "Date & time", icons::CLOCK, time_page),
     ("language", "Language & region", icons::LANGUAGE, language_page),
     ("accounts", "Accounts", icons::USERS, accounts_page),
     ("privacy", "Privacy", icons::SHIELD, privacy_page),
-    ("accessibility", "Accessibility", icons::ACCESSIBILITY, accessibility_page),
+    ("accessibility", "Accessibility", icons::ACCESSIBILITY, kde_accessibility),
     ("storage", "Storage", icons::DISK, storage_page),
     ("updates", "Updates", icons::UPDATE, updates_page),
     ("about", "About", icons::INFO, about_page),
@@ -71,21 +72,14 @@ pub fn run() -> glib::ExitCode {
         .application_id("in.trippp.Settings")
         .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
-    let window: Rc<RefCell<Option<(gtk::ApplicationWindow, gtk::Stack, gtk::ListBox)>>> = Rc::new(RefCell::new(None));
+    let window: Rc<RefCell<Option<(gtk::ApplicationWindow, Open)>>> = Rc::new(RefCell::new(None));
     app.connect_command_line(move |app, cmd| {
         let wanted = cmd.arguments().iter().filter_map(|a| a.to_str().map(str::to_string)).nth(1);
         let mut slot = window.borrow_mut();
-        let (win, stack, nav) = slot.get_or_insert_with(|| build(app)).clone();
+        let (win, open) = slot.get_or_insert_with(|| build(app)).clone();
         drop(slot);
-        if let Some(i) = wanted.and_then(|w| SECTIONS.iter().position(|(id, ..)| *id == w)) {
-            show_section(&stack, i);
-            if let Some(row) = nav.row_at_index(i as i32) {
-                nav.select_row(Some(&row));
-                // Once the window is laid out, scroll the sidebar so the open section shows.
-                glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
-                    row.grab_focus();
-                });
-            }
+        if let Some(id) = wanted {
+            open(&id);
         }
         win.present();
         glib::ExitCode::SUCCESS
@@ -94,17 +88,21 @@ pub fn run() -> glib::ExitCode {
     app.run_with_args(&args)
 }
 
-fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::ListBox) {
+/// The window: the hub (pivots and rows) and, sliding in over it, the page a row opens.
+type Open = Rc<dyn Fn(&str)>;
+
+fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
     crate::common::load_css();
+    crate::hub::load_css();
     let window = gtk::ApplicationWindow::builder()
         .application(app)
         .title("Settings")
-        .default_width(920)
-        .default_height(600)
+        .default_width(1000)
+        .default_height(625)
         .build();
     window.add_css_class("tripppin");
     window.add_css_class("settings");
-    // Narrow enough for half of a small screen, wide enough for the sidebar and a page.
+    window.add_css_class("hub-window");
     window.set_size_request(640, 420);
 
     // Pages are built as they're first opened (show_section).
@@ -112,100 +110,159 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.set_transition_type(gtk::StackTransitionType::Crossfade);
     stack.set_transition_duration(160);
     stack.set_hexpand(true);
+    stack.set_vexpand(true);
 
-    let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
-    side.add_css_class("sidebar");
-    side.set_size_request(232, -1);
-    let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some("Search settings"));
-    search.add_css_class("search");
-    let nav = gtk::ListBox::new();
-    nav.add_css_class("nav");
-    for (_, title, glyph, _) in SECTIONS {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        let tile = crate::common::icon(glyph, &["nav-icon"]);
-        tile.set_valign(gtk::Align::Center);
-        row.append(&tile);
-        row.append(&label(title, &["nav-title"]));
-        nav.append(&row);
-    }
-    {
-        let stack = stack.clone();
-        nav.connect_row_selected(move |_, row| {
-            if let Some(row) = row {
-                show_section(&stack, row.index() as usize);
-            }
-        });
-    }
-    {
-        let nav = nav.clone();
-        search.connect_search_changed(move |s| {
-            let q = s.text().to_lowercase();
-            let mut i = 0;
-            while let Some(row) = nav.row_at_index(i) {
-                row.set_visible(q.is_empty() || SECTIONS[i as usize].1.to_lowercase().contains(q.as_str()));
-                i += 1;
-            }
-        });
-    }
-    nav.select_row(nav.row_at_index(0).as_ref());
-    side.append(&search);
-    // The list scrolls once there are more sections than fit.
-    let nav_scroll = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Never)
-        .vexpand(true)
-        .propagate_natural_height(false)
-        .child(&nav)
-        .build();
-    nav.set_adjustment(Some(&nav_scroll.vadjustment()));
-    side.append(&nav_scroll);
+    let view = gtk::Stack::new();
+    view.set_transition_type(gtk::StackTransitionType::SlideLeftRight);
+    view.set_transition_duration(220);
+    view.set_vexpand(true);
 
-    let root = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    root.append(&side);
-    root.append(&stack);
-    window.set_titlebar(Some(&title_bar(&stack, &side)));
-    window.set_child(Some(&root));
-    (window, stack, nav)
-}
-
-/// The title bar: "Settings" over the sidebar, the open page's name over the page and the
-/// window controls at the end of the same row, so page content never sits under them.
-/// Drag the window by it; double-click maximises.
-fn title_bar(stack: &gtk::Stack, sidebar: &gtk::Box) -> gtk::WindowHandle {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    row.add_css_class("titlebar-row");
-    let side = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    side.add_css_class("titlebar-side");
-    // Always exactly as wide as the sidebar under it.
-    let widths = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
-    widths.add_widget(&side);
-    widths.add_widget(sidebar);
-    let app = label("Settings", &["titlebar-app"]);
-    app.set_valign(gtk::Align::Center);
-    side.append(&app);
-    let title = label("", &["titlebar-title"]);
-    title.set_hexpand(true);
-    title.set_valign(gtk::Align::Center);
+    let title = label("", &["hub-detail-title"]);
     title.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    let controls = gtk::WindowControls::new(gtk::PackType::End);
-    controls.set_valign(gtk::Align::Center);
-    row.append(&side);
-    row.append(&title);
-    row.append(&controls);
-    let show = move |s: &gtk::Stack| {
-        let name = s.visible_child_name().unwrap_or_default();
-        let shown = SECTIONS.iter().find(|(id, ..)| *id == name.as_str()).map_or("", |(_, t, ..)| *t);
-        title.set_text(shown);
+    let back = gtk::Button::with_label("\u{2039}");
+    back.add_css_class("hub-back");
+    back.set_tooltip_text(Some("Back to settings"));
+    let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    head.add_css_class("hub-detail-head");
+    head.append(&back);
+    head.append(&title);
+    let detail = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    detail.append(&label("SETTINGS", &["hub-app"]));
+    detail.append(&head);
+    detail.append(&stack);
+
+    let open: Rc<dyn Fn(&str)> = {
+        let (stack, view, title) = (stack.clone(), view.clone(), title.clone());
+        Rc::new(move |id: &str| {
+            if let Some(i) = SECTIONS.iter().position(|(sid, ..)| *sid == id) {
+                show_section(&stack, i);
+                title.set_text(&SECTIONS[i].1.to_lowercase());
+                view.set_visible_child_name("detail");
+            }
+        })
     };
-    show(stack);
-    stack.connect_visible_child_name_notify(show);
+    let hub = crate::hub::build(open.clone());
+    view.add_named(&hub.root, Some("hub"));
+    view.add_named(&detail, Some("detail"));
+    {
+        let view = view.clone();
+        back.connect_clicked(move |_| view.set_visible_child_name("hub"));
+    }
+
+    let keys = gtk::EventControllerKey::new();
+    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    {
+        let (view, search, step) = (view.clone(), hub.search.clone(), hub.step.clone());
+        let window = window.clone();
+        keys.connect_key_pressed(move |_, key, _, _| {
+            use gtk::gdk::Key;
+            let in_hub = view.visible_child_name().as_deref() == Some("hub");
+            let typing = gtk::prelude::GtkWindowExt::focus(&window).is_some_and(|w| w.is::<gtk::Text>());
+            match key {
+                Key::Escape if !in_hub => view.set_visible_child_name("hub"),
+                Key::Escape if !search.text().is_empty() => search.set_text(""),
+                Key::Left if in_hub && !typing => step(-1),
+                Key::Right if in_hub && !typing => step(1),
+                _ => return glib::Propagation::Proceed,
+            }
+            glib::Propagation::Stop
+        });
+    }
+    window.add_controller(keys);
+
+    let controls = gtk::WindowControls::new(gtk::PackType::End);
+    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    bar.add_css_class("titlebar-row");
+    let space = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    space.set_hexpand(true);
+    bar.append(&space);
+    bar.append(&controls);
     let handle = gtk::WindowHandle::new();
-    handle.set_child(Some(&row));
-    handle
+    handle.set_child(Some(&bar));
+    window.set_titlebar(Some(&handle));
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    body.add_css_class("hub-body");
+    body.set_margin_start(44);
+    body.set_margin_end(44);
+    body.set_margin_bottom(16);
+    body.append(&view);
+    window.set_child(Some(&body));
+    gtk::prelude::GtkWindowExt::set_focus(&window, Some(&hub.first));
+    if let Some(n) = std::env::var("TRIPPPIN_STEP").ok().and_then(|v| v.parse::<i32>().ok()) {
+        let step = hub.step.clone();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(900), move || step(n));
+    }
+    crate::common::snapshot_hook(&window);
+    (window, open)
 }
 
 /// A page: its name is in the title bar; the page starts with a status line, with an
 /// optional control (an on/off switch, "Advanced") on the right.
+/// A section that System Settings (KDE) covers: a short line and one button that opens it
+/// on the matching page. Plasma replaced the niri-era pages for these.
+fn kde_page(title: &str, what: &str, kcm: &'static str) -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page(title);
+    status.set_text(what);
+    let open = gtk::Button::with_label("Open in System Settings");
+    open.add_css_class("link");
+    open.add_css_class("accent");
+    open.connect_clicked(move |_| {
+        let _ = std::process::Command::new("systemsettings").arg(kcm).spawn();
+    });
+    let list = card();
+    list.append(&setting_row(title, &open));
+    body.append(&list);
+    scroll
+}
+
+fn kde_wifi() -> gtk::ScrolledWindow {
+    kde_page("Wi-Fi", "Wi-Fi and wired networks, VPN and hotspots", "kcm_networkmanagement")
+}
+
+fn kde_network() -> gtk::ScrolledWindow {
+    kde_page("Network & VPN", "Network details, proxy and VPN", "kcm_networkmanagement")
+}
+
+fn kde_bluetooth() -> gtk::ScrolledWindow {
+    kde_page("Bluetooth", "Pair and manage Bluetooth devices", "kcm_bluetooth")
+}
+
+fn kde_sound() -> gtk::ScrolledWindow {
+    kde_page("Sound", "Output and input devices, volume and per-app sound", "kcm_pulseaudio")
+}
+
+fn kde_display() -> gtk::ScrolledWindow {
+    kde_page("Display", "Resolution, scale, refresh rate, rotation and night light", "kcm_kscreen")
+}
+
+fn kde_appearance() -> gtk::ScrolledWindow {
+    kde_page("Appearance", "Wallpaper, colours, fonts, icons and the Plasma style", "kcm_lookandfeel")
+}
+
+fn kde_power() -> gtk::ScrolledWindow {
+    kde_page("Power & battery", "Battery, power mode, screen off, sleep and lid action", "kcm_powerdevilprofilesconfig")
+}
+
+fn kde_notifications() -> gtk::ScrolledWindow {
+    kde_page("Notifications", "Do not disturb and per-app notifications", "kcm_notifications")
+}
+
+fn kde_keyboard() -> gtk::ScrolledWindow {
+    kde_page("Keyboard", "Layouts, repeat rate and shortcuts", "kcm_keyboard")
+}
+
+fn kde_pointer() -> gtk::ScrolledWindow {
+    kde_page("Mouse & touchpad", "Mouse and touchpad speed, tap to click and gestures", "kcm_mouse")
+}
+
+fn kde_printers() -> gtk::ScrolledWindow {
+    kde_page("Printers & scanners", "Add printers, the default and the queue", "kcm_printer_manager")
+}
+
+fn kde_accessibility() -> gtk::ScrolledWindow {
+    kde_page("Accessibility", "Screen reader, larger text, high contrast and sticky keys", "kcm_access")
+}
+
 fn page(_title: &str) -> (gtk::ScrolledWindow, gtk::Box, gtk::Label, gtk::Box) {
     let body = gtk::Box::new(gtk::Orientation::Vertical, 24);
     body.add_css_class("page");
@@ -226,7 +283,7 @@ fn page(_title: &str) -> (gtk::ScrolledWindow, gtk::Box, gtk::Label, gtk::Box) {
 }
 
 /// Runs `work` on a thread and hands its result to `done` on the GTK thread.
-fn background<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static, done: impl FnOnce(T) + 'static) {
+pub(crate) fn background<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static, done: impl FnOnce(T) + 'static) {
     let (tx, rx) = async_channel::bounded(1);
     std::thread::spawn(move || {
         let _ = tx.send_blocking(work());
@@ -267,6 +324,7 @@ fn signal_icon(signal: u8, connected: bool) -> gtk::DrawingArea {
     area
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn wifi_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Wi-Fi");
     // The radio's real state straight away (a quick query), so the switch never shows "off"
@@ -651,6 +709,7 @@ fn clear(list: &gtk::ListBox) {
     }
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn bluetooth_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Bluetooth");
     let switch = gtk::Switch::new();
@@ -1002,6 +1061,7 @@ fn fill_devices(list: &gtk::ListBox, devices: &[snd::Device], default: &str, out
     }
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn sound_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Sound");
     let outs = gtk::ListBox::new();
@@ -1119,6 +1179,7 @@ fn dropdown(items: &[String], selected: usize) -> gtk::DropDown {
     d
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn display_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Display");
     let screens = gtk::Box::new(gtk::Orientation::Vertical, 22);
@@ -1271,6 +1332,7 @@ fn gsettings_set(key: &str, value: &str) {
     let _ = std::process::Command::new("gsettings").args(["set", "org.gnome.desktop.interface", key, value]).status();
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn appearance_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Appearance");
     let current = std::fs::read_to_string(tripppin_config().join("wallpaper-name")).unwrap_or_else(|_| "ink".into());
@@ -1404,6 +1466,7 @@ fn minutes(m: u32) -> String {
     }
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn power_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Power & battery");
     let battery_caption = caption("Battery");
@@ -2642,6 +2705,7 @@ fn activity_section() -> (gtk::Box, Rc<dyn Fn()>) {
     (root, load)
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn notifications_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Notifications");
     let dnd = gtk::Switch::new();
@@ -3036,6 +3100,7 @@ fn apps_page() -> gtk::ScrolledWindow {
     scroll
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn keyboard_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Keyboard");
     let error = label("", &["error"]);
@@ -3179,6 +3244,7 @@ fn keyboard_page() -> gtk::ScrolledWindow {
     scroll
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn pointer_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Mouse & touchpad");
     let error = label("", &["error"]);
@@ -4207,6 +4273,27 @@ fn privacy_page() -> gtk::ScrolledWindow {
     scroll
 }
 
+fn dictation_page() -> gtk::ScrolledWindow {
+    let (scroll, body, status, _right) = page("Dictation");
+    status.set_text("Speak and it's typed, on this computer");
+    let card = card();
+    let on = gtk::Switch::new();
+    on.set_active(crate::dictate::enabled());
+    on.connect_state_set(|_, on| {
+        crate::dictate::set_enabled(on);
+        glib::Propagation::Proceed
+    });
+    card.append(&setting_row("Dictation", &on));
+    card.append(&setting_row("Shortcut", &label("Super + M", &["row-sub"])));
+    body.append(&card);
+    body.append(&label(
+        "Press the shortcut, speak, and press it again; the words are typed where you were. It also stops after a couple of seconds of quiet. The recording never leaves this computer and is deleted as soon as it's read.",
+        &["row-sub"],
+    ));
+    scroll
+}
+
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn accessibility_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Accessibility");
     status.set_text("Seeing, moving and typing");
@@ -4277,6 +4364,7 @@ fn accessibility_page() -> gtk::ScrolledWindow {
 const PROXY_MODES: [(&str, &str); 3] =
     [("none", "No proxy"), ("auto", "Automatic (a PAC address)"), ("manual", "One proxy for everything")];
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn network_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Network & VPN");
     let advanced = gtk::Button::with_label("Advanced");
@@ -4511,6 +4599,7 @@ fn network_page() -> gtk::ScrolledWindow {
     scroll
 }
 
+#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn printers_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Printers & scanners");
     let add = gtk::Button::with_label("Add a printer");

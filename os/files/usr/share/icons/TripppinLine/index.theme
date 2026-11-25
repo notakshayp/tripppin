@@ -1,0 +1,13 @@
+[Icon Theme]
+Name=Tripppin Line
+Comment=Thin white line glyphs for the system and toolbars; app icons come from Tripppin (Papirus)
+Inherits=Tripppin,Papirus-Dark,breeze-dark,hicolor
+Example=folder
+Directories=scalable/status
+
+[scalable/status]
+Size=24
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Status

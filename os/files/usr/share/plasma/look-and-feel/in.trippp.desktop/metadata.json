@@ -1,0 +1,13 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [{ "Name": "Tripppin" }],
+        "Category": "",
+        "Description": "Tiles: flat, square, solid colour, Inter and DM Mono",
+        "Id": "in.trippp.desktop",
+        "License": "Apache-2.0",
+        "Name": "Tripppin",
+        "Version": "1.0",
+        "Website": "https://trippp.in"
+    }
+}

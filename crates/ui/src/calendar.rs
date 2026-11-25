@@ -1,5 +1,5 @@
 //! The calendar that drops from the clock: today's date and the month. Clicking the clock
-//! again (a second `tripppin-ui calendar`) or pressing Esc closes it.
+//! again (a second `tripppin-ui calendar --popover`) or pressing Esc closes it.
 
 use crate::common::label;
 use gtk::prelude::*;
@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder()
-        .application_id("in.trippp.Calendar")
+        .application_id("in.trippp.CalendarPopover")
         .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
     let window: Rc<RefCell<Option<gtk::Window>>> = Rc::new(RefCell::new(None));

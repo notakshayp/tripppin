@@ -163,6 +163,33 @@ pub fn tools() -> Value {
         {
             "type": "function",
             "function": {
+                "name": "store_search",
+                "description": "Search the app store (Flathub) for apps to install. Returns up to 8 matches with \
+    their app ids and whether each is installed. Use this to find an app before store_install.",
+                "parameters": {
+                    "type": "object",
+                    "properties": { "query": { "type": "string", "description": "What the app does or is called." } },
+                    "required": ["query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "store_install",
+                "description": "Install an app from the app store (Flathub), for everyone on the computer. Takes the \
+    app id from store_search. It runs as an administrator command, so it follows the person's permission settings and \
+    may ask for their password.",
+                "parameters": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "description": "The app id, like org.videolan.VLC." } },
+                    "required": ["id"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "read_file",
                 "description": "Read a text file.",
                 "parameters": {
@@ -190,7 +217,8 @@ pub fn tools() -> Value {
     ])
 }
 
-const TOOL_NAMES: &str = "exec, job_wait, job_output, job_stop, plan, done, note, read_file and write_file";
+const TOOL_NAMES: &str =
+    "exec, job_wait, job_output, job_stop, plan, done, note, store_search, store_install, read_file and write_file";
 
 /// A tool call that passed the checks.
 #[derive(Debug, PartialEq)]
@@ -202,6 +230,8 @@ pub enum Action {
     Plan { steps: Vec<String> },
     Done { step: usize, check: String },
     Note { text: String },
+    StoreSearch { query: String },
+    StoreInstall { id: String },
     ReadFile { path: String },
     WriteFile { path: String, content: String },
 }
@@ -337,6 +367,12 @@ pub fn verify(call: &ToolCall) -> Result<Action, String> {
             Ok(Action::Done { step, check: text("check", false)? })
         }
         "note" => Ok(Action::Note { text: text("text", false)? }),
+        "store_search" => Ok(Action::StoreSearch { query: text("query", false)? }),
+        "store_install" => {
+            let id = text("id", false)?;
+            crate::store::check_id(id.trim()).map_err(|e| format!("{e}. Use store_search to find the id."))?;
+            Ok(Action::StoreInstall { id: id.trim().to_string() })
+        }
         "read_file" => Ok(Action::ReadFile { path: text("path", false)? }),
         "write_file" => Ok(Action::WriteFile { path: text("path", false)?, content: text("content", true)? }),
         "" => Err(format!("The tool call has no tool name. The tools are {TOOL_NAMES}.")),
@@ -346,6 +382,8 @@ pub fn verify(call: &ToolCall) -> Result<Action, String> {
 
 fn example(tool: &str) -> &'static str {
     match tool {
+        "store_search" => r#"{"query": "video player"}"#,
+        "store_install" => r#"{"id": "org.videolan.VLC"}"#,
         "read_file" => r#"{"path": "~/notes.txt"}"#,
         "write_file" => r#"{"path": "~/notes.txt", "content": "hello"}"#,
         "job_wait" | "job_output" | "job_stop" => r#"{"job": 1}"#,
@@ -844,7 +882,7 @@ fn thousands(n: usize) -> String {
     let digits = n.to_string();
     let mut out = String::new();
     for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
@@ -1017,6 +1055,8 @@ fn describe_action(action: &Action) -> (String, String) {
         Action::Note { text } => ("note".into(), text.clone()),
         Action::Plan { steps } => ("plan".into(), steps.join("; ")),
         Action::Done { step, check } => ("done".into(), format!("step {step}: {check}")),
+        Action::StoreSearch { query } => ("store search".into(), query.clone()),
+        Action::StoreInstall { id } => ("store install".into(), id.clone()),
         Action::ReadFile { path } => ("read".into(), path.clone()),
         Action::WriteFile { path, .. } => ("write".into(), path.clone()),
     }
@@ -1053,6 +1093,16 @@ fn perform(action: &Action, cancel: &AtomicBool, ui: &mut dyn Ui) -> String {
             show_step(ui, &format!("stopping job {job}"), &jobs::command(*job).unwrap_or_default());
             jobs::stop(*job)
         }
+        Action::StoreSearch { query } => {
+            show_step(ui, "store search", query);
+            store_search(query)
+        }
+        // An administrator command like any other: it goes through sudo, so the person's
+        // permission level (Settings, AI, Permissions) and the password pop-up apply.
+        Action::StoreInstall { id } => {
+            let command = format!("sudo flatpak install -y --noninteractive --system flathub {id}");
+            perform(&Action::Exec { command, wait_secs: 300, background: false }, cancel, ui)
+        }
         Action::ReadFile { path } => {
             show_step(ui, "read", path);
             read_file(path)
@@ -1062,6 +1112,25 @@ fn perform(action: &Action, cancel: &AtomicBool, ui: &mut dyn Ui) -> String {
             write_file(path, content)
         }
     }
+}
+
+fn store_search(query: &str) -> String {
+    let catalog = crate::store::Catalog::load();
+    if catalog.apps.is_empty() {
+        return "Error: the app catalogue isn't downloaded yet. Run `flatpak update --appstream` and try again.".into();
+    }
+    let have: Vec<String> = crate::store::installed().into_iter().map(|i| i.id).collect();
+    let hits = catalog.search(query, 8);
+    if hits.is_empty() {
+        return format!("No apps found for \"{query}\". Try other words.");
+    }
+    hits.iter()
+        .map(|a| {
+            let mark = if have.contains(&a.id) { " [installed]" } else { "" };
+            format!("{} ({}){mark}: {}", a.name, a.id, a.summary)
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn expand(path: &str) -> PathBuf {
@@ -1154,6 +1223,15 @@ mod tests {
         assert_eq!(verify(&call("job_output", r##"{"job":"#3"}"##)), Ok(Action::JobOutput { job: 3 }));
         assert_eq!(verify(&call("job_stop", r#"{"job":"job 4"}"#)), Ok(Action::JobStop { job: 4 }));
         assert_eq!(verify(&call("read_file", r#"{"path":"~/a"}"#)), Ok(Action::ReadFile { path: "~/a".into() }));
+        assert_eq!(
+            verify(&call("store_install", r#"{"id":" org.videolan.VLC "}"#)),
+            Ok(Action::StoreInstall { id: "org.videolan.VLC".into() })
+        );
+        assert!(verify(&call("store_install", r#"{"id":"--user rm"}"#)).is_err());
+        assert_eq!(
+            verify(&call("store_search", r#"{"query":"vlc"}"#)),
+            Ok(Action::StoreSearch { query: "vlc".into() })
+        );
         assert_eq!(verify(&call("note", r#"{"text":"plan"}"#)), Ok(Action::Note { text: "plan".into() }));
         assert_eq!(
             verify(&call("write_file", r#"{"path":"a","content":""}"#)),

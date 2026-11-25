@@ -9,7 +9,7 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 | Base | Fedora bootc 45, image-based. The whole OS is one signed OCI image; machines update atomically and roll back on failed boots. |
 | Language | Rust for everything we write (edition 2024, MSRV 1.85). |
 | Model engine | llama.cpp server as a supervised child process; Vulkan by default, NVIDIA image variant later. |
-| Desktop | niri (packaged by Fedora) with lightweight parts restyled to our design (waybar, SwayNotificationCenter, fuzzel, foot), and our own screens in Rust (orb, login, lock, Settings). Hyprland was the first plan; COSMIC was tried and dropped as too generic. |
+| Desktop | KDE Plasma 6 on KWin (Wayland), restyled end to end ("Tripppin" look-and-feel, colour scheme, Plasma style, Konsole profile), with our own screens in Rust (orb, login, Settings hub). Replaced niri on 2026-11-25: niri lacked desktop icons, right-click menus and a complete file manager. Hyprland was the first plan; COSMIC was dropped as too generic. |
 | Shell | Plain text goes to the model. `!cmd` runs a raw command; `/term` opens a classic shell. |
 | Safety | Code is the boundary (taint labels, policy engine, sandbox); an AI verifier checks intent on top. YOLO keeps two exceptions. |
 | Minimum | 16 GB memory for local AI; below that, a cloud key or the user's own server. |
@@ -84,6 +84,7 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [x] Agent loop in `trip`: the model calls tools until it answers in plain text (25-step cap, Ctrl-C stops it)
 - [x] Tools: `exec` (bash, live output, timeout, sudo prompts work), `read_file`, `write_file`
 - [x] Task notebook and compaction for small models: the model's plan and notes plus one line per step, shown at every step; old steps dropped when the context fills (the notebook keeps them); every session saved and listed (`/history`, the orb's history), continued in the terminal
+- [x] Follow mode: while the orb runs a request it appends each agent event as a JSON line to `<session>.live`; "Continue in terminal" renders the history, then follows the run live with the shell's own rendering (Ctrl+C writes `<session>.stop`, which the orb honours), then carries on as a chat
 - [x] Task plan (`plan` / `done` tools): short steps, one at a time, each checked; kept in the session across compaction and `--continue`; stuck detection (repeats, no progress, failures in a row) nudges, then makes the model stop and explain
 - [x] Compaction on the server's real token counts with headroom (85 % → 55 %); the notebook sent as its own message so the prompt cache holds; what was dropped recorded in the session; UI events for waiting, token usage and the plan ([HARNESS.md](HARNESS.md))
 - [x] Administrator commands: sudo asks through a pop-up showing the command; Settings → AI can allow installs, services or updates without a password
@@ -112,16 +113,23 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 - [x] The orb overlay: ask, live steps, the result; the logo in the corner
 - [x] Shell: bar, quick settings and notifications, launcher (with every Settings page), Alt + Tab, snapping, lock screen, pop-ups, calendar, shortcuts sheet, clipboard history, emoji, screenshots and recording, password prompts
 - [x] Settings, ours: Wi-Fi, network and VPN, Bluetooth, sound, display, appearance, power, AI, notifications, apps (with Flathub search), keyboard, mouse and touchpad, printers, date and time, language, accounts, privacy, accessibility, storage, updates (download only, never a surprise restart), about
+- [~] Dictation: Super + M, speak, press again; whisper.cpp (pinned tag, built in the image) with a pinned multilingual base model, all on the device; Settings → Dictation (on/off). Not yet checked on a booted image
 - [x] Every app in our style: GTK 3 and 4 colours, a Tripppin icon theme (green folders), Qt through qt6ct, Flatpak overrides, a text colour scheme
 - [x] Apps: Thunar, Text Editor, Loupe, Papers, Calculator, Celluloid, File Roller, System Monitor, Disks; Firefox on first boot
 - [x] Behaviour: USB automount, low battery, updates staged with rollback (greenboot), crash notices, the model freed first when memory runs low, a welcome tour
 - [x] Polish pass: sharp text at a whole-number scale, a compact layout, icons throughout, a movable orb, spring motion everywhere (DESKTOP.md, "Polish pass")
 - [x] Rectangle-style snapping (drag to edges and corners with a preview, Ctrl + Alt shortcuts, cycling thirds, restore) and desktop widgets the AI can write ([WIDGETS.md](WIDGETS.md))
 - [x] Laptop round 3: Wi-Fi switch shows the real radio state at once; no focus ring trailing clicks; Corners reshapes every GTK window (Sharp is square), niri's focus ring neutral
+- [~] Store, in the Tiles design (`tripppin-ui store`, `trip store search|info|install|remove|updates`, AI tools `store_search` and `store_install`): reads Flathub's AppStream data Flatpak keeps locally (`trip::store`, cached parse, fuzzy search), hub of featured, categories, installed and updates, app page with real icons, plain-words permissions from the app's finish-args, lazy screenshots, marching-dot install progress. System-wide installs, no password for the wheel group (polkit rule); the flathub remote is added in the image from a pinned `.flatpakrepo`. Discover stays installed as a fallback with its launcher entry hidden. Checked in Broadway with a fixture catalogue, not yet on a booted image or against the live catalogue
+- [x] Tiles direction (apps): Settings is a hub (SETTINGS label, big light pivots network / display / sound / power / ai / dictation / privacy / apps / about that slide and scroll sideways, a two-column grid of coloured rows with the state under each and flat switches for Wi-Fi and Bluetooth; a row slides in the existing page; search filters across pivots); glyphs are vectors drawn at device scale (`glyph.rs`)
+- [x] Calendar app (`tripppin-ui calendar`, entry Calendar): day, week and month in the same style; "+ add call mum friday 6pm" is read by a local parser (no AI needed); events are one .ics file each in ~/.local/share/tripppin/calendar/ for the start screen's tile to read; reminders by notification at event time from a user systemd timer (tripppin-calendar-remind.timer, every minute, works with the app closed) and, while the app is open, its own 30 s check (de-duplicated). `calendar --popover` is the old small drop-down (not bound to Plasma's clock)
+- [x] Terminal: on a terminal 100 columns or wider the AI's steps are a right-hand column of flat blocks (done green, running amber with marching dots, next dim, token line at the foot); narrower keeps the inline checklist. the Konsole profile and colour scheme match (DM Mono, #0b0e11, white block cursor, accent #3fae7a)
+- [ ] Not yet: Tiles checked on the VM and on a real pointer; the AI as a fallback for calendar text the parser can't read; a Calendar tile on the start screen (reads the .ics folder)
 - [x] A clean app launcher: helpers and duplicates of Settings pages hidden, "Terminal" and "Files", a quieter card
 - [x] Design system: sentence case, readable type, tokens with a quiet green accent, a Sharp / Default / Round corners setting, a real Settings title bar, the computer called "tripppin" (UX-REVIEW.md)
 - [x] The sparkle burst is gone everywhere (the mark keeps its upright spark); logging in goes from the login screen to a logo splash with no text console in between (DESKTOP.md, "The mark and the way in")
 - [x] Laptop fixes from the first test: the red lock screen (root cause and a self-restarting lock), icons-only bar, a battery ring, the logo opening the apps, quick settings as one pill with working on/off tiles (DESKTOP.md, "Laptop fixes")
+- [x] Start screen (`tripppin-ui start`, Tiles design 02 and 03): full-screen layer-shell overlay toggled by a second run; named tile groups (small/medium/wide/large, 5 px gaps, real app icons on stable palette colours), live Calendar (next event from `~/.local/share/tripppin/calendar/*.ics`), Now playing (playerctl/MPRIS, artwork) and Ask tiles; right-click or long-press to resize, recolour, move or unpin, drag to reorder, rename groups, pin from the app list; layout in `~/.config/tripppin/start.json`; all-apps list with letter tiles and the jump grid, live search. Unread-mail badge not done (no per-app count from notifications). `--window` runs it in a normal window for Broadway screenshots
 - [ ] Checked on the laptop: Wi-Fi, Bluetooth, sound devices, brightness, battery, the boot splash, a real USB stick and printer
 - [ ] Later: light mode, sounds, voice input, on-screen keyboard (see DESKTOP.md)
 
@@ -144,3 +152,21 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 3. **Branch protection:** turn it on now, or once a second contributor joins?
 4. **Repo visibility:** private repos get 2,000 free Actions minutes a month. Nightly image builds use roughly 15–25 minutes each. Going public later makes standard runners free.
 - [~] Right-click desktop menu and ~/Desktop icons (`tripppin-ui desktop`, see docs/DESKTOP.md); not yet checked in a session
+
+## Plasma switch (2026-11-25, branch `plasma`)
+
+- [x] Plasma 6 package set in os/Containerfile (explicit, not @kde-desktop); niri, waybar, swaync, fuzzel, wlogout, swaybg, swayidle, Thunar, blueman, wdisplays, pavucontrol, foot, mate-polkit, cliphist, qt5ct/qt6ct, grim/slurp/swappy/wf-recorder, udiskie removed with their config
+- [x] Look-and-feel package `in.trippp.desktop`, colour scheme, Plasma style, Konsole profile, /etc/xdg defaults, shortcut map (docs/DESKTOP.md)
+- [x] Login: our greeter on KWin; session starts `startplasma-wayland`
+- [~] Checked in the VM by screenshot (docs/DESKTOP.md, Plasma section)
+- [~] Own icon theme (SVG tiles over Breeze Dark, Papirus gone), calm Files and Terminal defaults, Flatpak icon dirs in the session (docs/DESKTOP.md, Icons and calm apps); builds, not yet seen on screen
+- [ ] To remove from crates/ui once Plasma is accepted: `displays`, `splash`, `desktop`, `dim`, `lock`, `keeper`, `snap`, `switch`, `osd`, `quick`, `battery-ring`, the niri-based Settings pages (Wi-Fi, Bluetooth, Sound, Display, Appearance, Power, Notifications, Keyboard, Mouse, Printers, Accessibility, now `#[allow(dead_code)]`), `keys` (cheat sheet lists niri keys), and the `foot` shim in os/files/usr/bin once orb.rs launches Konsole
+
+## Tiles shell (2026-11-25, branch `tiles-shell`)
+
+- [~] Taskbar: 40 px bottom panel, start button plasmoid, icons-only tasks with accent underline, status-line plasmoid, tray reduced to notifications; Meta tap opens `tripppin-ui start`
+- [~] Plasma style `tripppin-tiles`, colour scheme to the tokens, QML window decoration (36 px strip), Kvantum "Tripppin" theme for Qt apps
+- [~] Lock screen (QML) and login screen in the Tiles look; splash with Shapes
+- [~] Lock and login are two-stage curtains; the lock's event line and unread badges read small files (next-event.json from the calendar app, unread.json from the status plasmoid) and are hidden without data
+- [ ] Calendar app writes `~/.local/share/tripppin/next-event.json`; `tripppin-ui start` bound once it lands
+- [ ] Checked at scale 1, 1.5 and 2 on the laptop (checked in the VM at 1)

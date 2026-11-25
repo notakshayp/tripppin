@@ -1,0 +1,233 @@
+/* The Tiles design for Settings (and the Calendar): flat colour, square edges, Inter in light
+   weights, big lowercase pivots. Loaded after style.css, so it wins.
+   bg #101418, raised #1a2025, muted #9aa4ab, accent #3fae7a. */
+
+window.settings.hub-window,
+window.calendar-app {
+    background: #101418;
+    color: #fff;
+    font-family: Inter, sans-serif;
+}
+window.settings.hub-window *,
+window.calendar-app * {
+    border-radius: 0;
+    box-shadow: none;
+}
+window.hub-window .titlebar-row,
+window.calendar-app .titlebar-row { background: #101418; border: none; min-height: 34px; }
+
+.hub-app {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #fff;
+}
+.hub-pivots { padding: 0; }
+button.hub-pivot,
+button.hub-pivot:hover,
+button.hub-pivot:focus {
+    background: none;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    padding: 0;
+    min-height: 0;
+    min-width: 0;
+    font-size: 46px;
+    font-weight: 200;
+    letter-spacing: -0.02em;
+    color: #4b555c;
+    transition: color 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+button.hub-pivot:hover { color: #9aa4ab; }
+button.hub-pivot.on { color: #fff; }
+.hub-pivot-scroll { margin-top: 4px; }
+
+.hub-search,
+.hub-search:focus-within {
+    background: #1a2025;
+    color: #fff;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    min-height: 34px;
+    font-size: 14px;
+}
+.hub-grid { margin-top: 34px; padding-bottom: 20px; }
+.hub-empty { font-size: 22px; font-weight: 300; color: #9aa4ab; }
+
+button.hub-row,
+button.hub-row:hover,
+button.hub-row:focus,
+button.hub-row:active {
+    background: none;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    padding: 0;
+    min-height: 0;
+    transition: opacity 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+button.hub-row:hover { opacity: 0.85; }
+button.hub-row:active { opacity: 0.7; }
+button.hub-row:focus-visible .hub-tile { outline: 2px solid #3fae7a; outline-offset: 2px; }
+.hub-tile { min-width: 56px; min-height: 56px; background: #3a4a5a; color: #fff; }
+.hub-glyph { color: #fff; }
+.hub-title { font-size: 22px; font-weight: 300; color: #fff; }
+.hub-state { font-size: 14px; color: #9aa4ab; }
+
+/* The flat switch, as drawn: a 44 x 20 frame with a square knob. */
+switch.hub-switch {
+    min-width: 44px;
+    min-height: 20px;
+    padding: 0;
+    background: transparent;
+    border: 2px solid #fff;
+    outline: none;
+    transition: background 160ms cubic-bezier(0.32, 0.72, 0, 1), border-color 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+switch.hub-switch:checked { background: #3fae7a; border-color: #3fae7a; }
+switch.hub-switch slider {
+    min-width: 10px;
+    min-height: 12px;
+    margin: 2px;
+    background: #fff;
+    border: none;
+    transition: margin 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+switch.hub-switch:checked slider { background: #101418; }
+switch.hub-switch image { opacity: 0; }
+
+/* Detail pages: the hub's back arrow and big title over the existing page. */
+.hub-detail-head { padding-bottom: 6px; }
+button.hub-back,
+button.hub-back:hover {
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0 18px 0 0;
+    min-height: 0;
+    min-width: 0;
+    color: #9aa4ab;
+    font-size: 46px;
+    font-weight: 200;
+}
+button.hub-back:hover { color: #fff; }
+.hub-detail-title { font-size: 46px; font-weight: 200; letter-spacing: -0.02em; color: #fff; }
+
+window.hub-window .page { padding: 12px 0 24px 0; }
+window.hub-window .list-card { background: #1a2025; border: none; }
+window.hub-window .list-card row,
+window.hub-window .list-card row:hover { background: transparent; border-color: #2a3238; }
+window.hub-window .page-sub { color: #9aa4ab; }
+window.hub-window entry,
+window.hub-window dropdown button,
+window.hub-window button.suggested-action { border-radius: 0; }
+window.hub-window button.suggested-action { background: #3fae7a; color: #101418; font-weight: 600; }
+window.hub-window scale highlight { background: #3fae7a; }
+window.hub-window switch:checked { background: #3fae7a; }
+
+/* ---- Calendar (mock 07) ---- */
+.cal-daynum { font-size: 120px; font-weight: 200; letter-spacing: -0.02em; color: #fff; }
+.cal-weekday { font-size: 26px; font-weight: 300; color: #fff; }
+.cal-month { font-size: 16px; color: #9aa4ab; margin-top: 4px; }
+.cal-time { font-size: 14px; color: #9aa4ab; padding-top: 10px; }
+.cal-rule { border-top: 1px solid #2a3238; min-height: 1px; }
+.cal-empty { font-size: 22px; font-weight: 300; color: #4b555c; padding: 10px 0; }
+.cal-note { font-size: 14px; color: #9aa4ab; margin-top: 4px; }
+button.cal-block,
+button.cal-block:hover,
+button.cal-block:focus,
+button.cal-block:active {
+    border: none;
+    box-shadow: none;
+    outline: none;
+    padding: 10px 14px;
+    min-height: 0;
+    color: #fff;
+    transition: opacity 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+button.cal-block:hover { opacity: 0.88; }
+.cal-title { font-size: 19px; font-weight: 300; color: #fff; }
+.cal-sub { font-size: 13px; color: #fff; opacity: 0.8; }
+.cal-title-s { font-size: 15px; font-weight: 300; color: #fff; }
+.cal-sub-s { font-size: 12px; color: #fff; opacity: 0.8; }
+entry.cal-add,
+entry.cal-add:focus-within {
+    background: transparent;
+    border: 2px solid #3a444b;
+    outline: none;
+    box-shadow: none;
+    padding: 9px 14px;
+    min-height: 0;
+    font-size: 15px;
+    color: #fff;
+}
+entry.cal-add:focus-within { border-color: #3fae7a; }
+entry.cal-add text placeholder { color: #9aa4ab; }
+popover.cal-pop contents { background: #1a2025; border: none; padding: 4px; }
+button.cal-delete { background: #c2502e; color: #fff; border: none; padding: 6px 16px; }
+button.cal-nav,
+button.cal-nav:hover,
+button.cal-nav:focus {
+    background: none;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    color: #9aa4ab;
+    font-size: 16px;
+    font-weight: 300;
+    padding: 4px 10px;
+    min-height: 0;
+}
+button.cal-nav:hover { color: #fff; }
+button.cal-head,
+button.cal-head:hover,
+button.cal-head:focus {
+    background: #1a2025;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    padding: 8px 12px;
+    min-height: 0;
+}
+button.cal-head.today { background: #1f6b45; }
+.cal-head-day { font-size: 13px; color: #9aa4ab; }
+button.cal-head.today .cal-head-day { color: #fff; opacity: 0.85; }
+.cal-head-num { font-size: 30px; font-weight: 200; color: #fff; }
+.cal-month-title { font-size: 22px; font-weight: 300; color: #fff; }
+.cal-dow { font-size: 13px; color: #9aa4ab; padding-left: 4px; }
+button.cal-cell,
+button.cal-cell:hover,
+button.cal-cell:focus {
+    background: #1a2025;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    padding: 6px 8px;
+    min-height: 0;
+    transition: background 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+button.cal-cell:hover { background: #222a30; }
+button.cal-cell.other { background: #14191d; }
+button.cal-cell.other .cal-cell-num { color: #4b555c; }
+button.cal-cell.today { background: #1f6b45; }
+button.cal-cell.picked { box-shadow: inset 0 0 0 2px #3fae7a; }
+.cal-cell-num { font-size: 16px; font-weight: 300; color: #fff; }
+.cal-bar { min-height: 5px; }
+.cal-more { font-size: 11px; color: #9aa4ab; }
+
+/* Things arriving: slide in from the side and fade, one after another. */
+@keyframes ev-in {
+    from { opacity: 0; transform: translateX(14px); }
+    to { opacity: 1; transform: none; }
+}
+.ev-in { animation: ev-in 220ms cubic-bezier(0.32, 0.72, 0, 1) backwards; }
+.ev-in.d1 { animation-delay: 30ms; }
+.ev-in.d2 { animation-delay: 60ms; }
+.ev-in.d3 { animation-delay: 90ms; }
+.ev-in.d4 { animation-delay: 120ms; }
+.ev-in.d5 { animation-delay: 150ms; }
+.ev-in.d6 { animation-delay: 180ms; }
+.ev-in.d7 { animation-delay: 210ms; }
+.ev-in.d8 { animation-delay: 240ms; }
