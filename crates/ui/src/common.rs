@@ -42,6 +42,24 @@ pub fn load_css() {
     });
 }
 
+/// Development aid: with `TRIPPPIN_SHOT=/path/name` set, saves a PNG of `w` a moment after
+/// it is shown (name.png), so screens can be checked on a headless display.
+pub fn snapshot_hook(w: &impl IsA<gtk::Widget>) {
+    let Ok(path) = std::env::var("TRIPPPIN_SHOT") else { return };
+    let w = w.clone().upcast::<gtk::Widget>();
+    glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
+        let (width, height) = (w.width(), w.height());
+        let Some(renderer) = w.native().and_then(|n| n.renderer()) else { return };
+        let paintable = gtk::WidgetPaintable::new(Some(&w));
+        let snapshot = gtk::Snapshot::new();
+        paintable.snapshot(&snapshot, f64::from(width), f64::from(height));
+        if let Some(node) = snapshot.to_node() {
+            let texture = renderer.render_texture(&node, None);
+            let _ = texture.save_to_png(format!("{path}.png"));
+        }
+    });
+}
+
 /// A label with the given CSS classes.
 pub fn label(text: &str, classes: &[&str]) -> gtk::Label {
     let l = gtk::Label::new(Some(text));

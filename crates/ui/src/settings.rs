@@ -24,7 +24,7 @@ use std::rc::Rc;
 
 /// The sections, in sidebar order: (id, title, icon, page).
 type Section = (&'static str, &'static str, char, fn() -> gtk::ScrolledWindow);
-const SECTIONS: [Section; 21] = [
+pub(crate) const SECTIONS: [Section; 21] = [
     ("wifi", "Wi-Fi", icons::WIFI, wifi_page),
     ("network", "Network & VPN", icons::NETWORK, network_page),
     ("bluetooth", "Bluetooth", icons::BLUETOOTH, bluetooth_page),
@@ -71,21 +71,14 @@ pub fn run() -> glib::ExitCode {
         .application_id("in.trippp.Settings")
         .flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
-    let window: Rc<RefCell<Option<(gtk::ApplicationWindow, gtk::Stack, gtk::ListBox)>>> = Rc::new(RefCell::new(None));
+    let window: Rc<RefCell<Option<(gtk::ApplicationWindow, Open)>>> = Rc::new(RefCell::new(None));
     app.connect_command_line(move |app, cmd| {
         let wanted = cmd.arguments().iter().filter_map(|a| a.to_str().map(str::to_string)).nth(1);
         let mut slot = window.borrow_mut();
-        let (win, stack, nav) = slot.get_or_insert_with(|| build(app)).clone();
+        let (win, open) = slot.get_or_insert_with(|| build(app)).clone();
         drop(slot);
-        if let Some(i) = wanted.and_then(|w| SECTIONS.iter().position(|(id, ..)| *id == w)) {
-            show_section(&stack, i);
-            if let Some(row) = nav.row_at_index(i as i32) {
-                nav.select_row(Some(&row));
-                // Once the window is laid out, scroll the sidebar so the open section shows.
-                glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
-                    row.grab_focus();
-                });
-            }
+        if let Some(id) = wanted {
+            open(&id);
         }
         win.present();
         glib::ExitCode::SUCCESS
@@ -94,17 +87,21 @@ pub fn run() -> glib::ExitCode {
     app.run_with_args(&args)
 }
 
-fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::ListBox) {
+/// The window: the hub (pivots and rows) and, sliding in over it, the page a row opens.
+type Open = Rc<dyn Fn(&str)>;
+
+fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
     crate::common::load_css();
+    crate::hub::load_css();
     let window = gtk::ApplicationWindow::builder()
         .application(app)
         .title("Settings")
-        .default_width(920)
-        .default_height(600)
+        .default_width(1000)
+        .default_height(625)
         .build();
     window.add_css_class("tripppin");
     window.add_css_class("settings");
-    // Narrow enough for half of a small screen, wide enough for the sidebar and a page.
+    window.add_css_class("hub-window");
     window.set_size_request(640, 420);
 
     // Pages are built as they're first opened (show_section).
@@ -112,96 +109,90 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, gtk::Stack, gtk::Li
     stack.set_transition_type(gtk::StackTransitionType::Crossfade);
     stack.set_transition_duration(160);
     stack.set_hexpand(true);
+    stack.set_vexpand(true);
 
-    let side = gtk::Box::new(gtk::Orientation::Vertical, 10);
-    side.add_css_class("sidebar");
-    side.set_size_request(232, -1);
-    let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some("Search settings"));
-    search.add_css_class("search");
-    let nav = gtk::ListBox::new();
-    nav.add_css_class("nav");
-    for (_, title, glyph, _) in SECTIONS {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-        let tile = crate::common::icon(glyph, &["nav-icon"]);
-        tile.set_valign(gtk::Align::Center);
-        row.append(&tile);
-        row.append(&label(title, &["nav-title"]));
-        nav.append(&row);
-    }
-    {
-        let stack = stack.clone();
-        nav.connect_row_selected(move |_, row| {
-            if let Some(row) = row {
-                show_section(&stack, row.index() as usize);
-            }
-        });
-    }
-    {
-        let nav = nav.clone();
-        search.connect_search_changed(move |s| {
-            let q = s.text().to_lowercase();
-            let mut i = 0;
-            while let Some(row) = nav.row_at_index(i) {
-                row.set_visible(q.is_empty() || SECTIONS[i as usize].1.to_lowercase().contains(q.as_str()));
-                i += 1;
-            }
-        });
-    }
-    nav.select_row(nav.row_at_index(0).as_ref());
-    side.append(&search);
-    // The list scrolls once there are more sections than fit.
-    let nav_scroll = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Never)
-        .vexpand(true)
-        .propagate_natural_height(false)
-        .child(&nav)
-        .build();
-    nav.set_adjustment(Some(&nav_scroll.vadjustment()));
-    side.append(&nav_scroll);
+    let view = gtk::Stack::new();
+    view.set_transition_type(gtk::StackTransitionType::SlideLeftRight);
+    view.set_transition_duration(220);
+    view.set_vexpand(true);
 
-    let root = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    root.append(&side);
-    root.append(&stack);
-    window.set_titlebar(Some(&title_bar(&stack, &side)));
-    window.set_child(Some(&root));
-    (window, stack, nav)
-}
-
-/// The title bar: "Settings" over the sidebar, the open page's name over the page and the
-/// window controls at the end of the same row, so page content never sits under them.
-/// Drag the window by it; double-click maximises.
-fn title_bar(stack: &gtk::Stack, sidebar: &gtk::Box) -> gtk::WindowHandle {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    row.add_css_class("titlebar-row");
-    let side = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    side.add_css_class("titlebar-side");
-    // Always exactly as wide as the sidebar under it.
-    let widths = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
-    widths.add_widget(&side);
-    widths.add_widget(sidebar);
-    let app = label("Settings", &["titlebar-app"]);
-    app.set_valign(gtk::Align::Center);
-    side.append(&app);
-    let title = label("", &["titlebar-title"]);
-    title.set_hexpand(true);
-    title.set_valign(gtk::Align::Center);
+    let title = label("", &["hub-detail-title"]);
     title.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    let controls = gtk::WindowControls::new(gtk::PackType::End);
-    controls.set_valign(gtk::Align::Center);
-    row.append(&side);
-    row.append(&title);
-    row.append(&controls);
-    let show = move |s: &gtk::Stack| {
-        let name = s.visible_child_name().unwrap_or_default();
-        let shown = SECTIONS.iter().find(|(id, ..)| *id == name.as_str()).map_or("", |(_, t, ..)| *t);
-        title.set_text(shown);
+    let back = gtk::Button::with_label("\u{2039}");
+    back.add_css_class("hub-back");
+    back.set_tooltip_text(Some("Back to settings"));
+    let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    head.add_css_class("hub-detail-head");
+    head.append(&back);
+    head.append(&title);
+    let detail = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    detail.append(&label("SETTINGS", &["hub-app"]));
+    detail.append(&head);
+    detail.append(&stack);
+
+    let open: Rc<dyn Fn(&str)> = {
+        let (stack, view, title) = (stack.clone(), view.clone(), title.clone());
+        Rc::new(move |id: &str| {
+            if let Some(i) = SECTIONS.iter().position(|(sid, ..)| *sid == id) {
+                show_section(&stack, i);
+                title.set_text(&SECTIONS[i].1.to_lowercase());
+                view.set_visible_child_name("detail");
+            }
+        })
     };
-    show(stack);
-    stack.connect_visible_child_name_notify(show);
+    let hub = crate::hub::build(open.clone());
+    view.add_named(&hub.root, Some("hub"));
+    view.add_named(&detail, Some("detail"));
+    {
+        let view = view.clone();
+        back.connect_clicked(move |_| view.set_visible_child_name("hub"));
+    }
+
+    let keys = gtk::EventControllerKey::new();
+    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    {
+        let (view, search, step) = (view.clone(), hub.search.clone(), hub.step.clone());
+        let window = window.clone();
+        keys.connect_key_pressed(move |_, key, _, _| {
+            use gtk::gdk::Key;
+            let in_hub = view.visible_child_name().as_deref() == Some("hub");
+            let typing = gtk::prelude::GtkWindowExt::focus(&window).is_some_and(|w| w.is::<gtk::Text>());
+            match key {
+                Key::Escape if !in_hub => view.set_visible_child_name("hub"),
+                Key::Escape if !search.text().is_empty() => search.set_text(""),
+                Key::Left if in_hub && !typing => step(-1),
+                Key::Right if in_hub && !typing => step(1),
+                _ => return glib::Propagation::Proceed,
+            }
+            glib::Propagation::Stop
+        });
+    }
+    window.add_controller(keys);
+
+    let controls = gtk::WindowControls::new(gtk::PackType::End);
+    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    bar.add_css_class("titlebar-row");
+    let space = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    space.set_hexpand(true);
+    bar.append(&space);
+    bar.append(&controls);
     let handle = gtk::WindowHandle::new();
-    handle.set_child(Some(&row));
-    handle
+    handle.set_child(Some(&bar));
+    window.set_titlebar(Some(&handle));
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    body.add_css_class("hub-body");
+    body.set_margin_start(44);
+    body.set_margin_end(44);
+    body.set_margin_bottom(16);
+    body.append(&view);
+    window.set_child(Some(&body));
+    gtk::prelude::GtkWindowExt::set_focus(&window, Some(&hub.first));
+    if let Some(n) = std::env::var("TRIPPPIN_STEP").ok().and_then(|v| v.parse::<i32>().ok()) {
+        let step = hub.step.clone();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(900), move || step(n));
+    }
+    crate::common::snapshot_hook(&window);
+    (window, open)
 }
 
 /// A page: its name is in the title bar; the page starts with a status line, with an
@@ -226,7 +217,7 @@ fn page(_title: &str) -> (gtk::ScrolledWindow, gtk::Box, gtk::Label, gtk::Box) {
 }
 
 /// Runs `work` on a thread and hands its result to `done` on the GTK thread.
-fn background<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static, done: impl FnOnce(T) + 'static) {
+pub(crate) fn background<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static, done: impl FnOnce(T) + 'static) {
     let (tx, rx) = async_channel::bounded(1);
     std::thread::spawn(move || {
         let _ = tx.send_blocking(work());
