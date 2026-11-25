@@ -231,3 +231,21 @@ button.cal-cell.picked { box-shadow: inset 0 0 0 2px #3fae7a; }
 .ev-in.d6 { animation-delay: 180ms; }
 .ev-in.d7 { animation-delay: 210ms; }
 .ev-in.d8 { animation-delay: 240ms; }
+
+/* Accent choices in Appearance: flat squares in the tile colours; the chosen one has a white edge. */
+button.swatch {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    border-radius: 0;
+    border: 2px solid transparent;
+    box-shadow: none;
+}
+
+button.swatch.selected {
+    border-color: #fff;
+}
+
+button.swatch:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+}

@@ -113,6 +113,7 @@ The full checklist, with what's verified where, is [DESKTOP.md](DESKTOP.md).
 - [x] The orb overlay: ask, live steps, the result; the logo in the corner
 - [x] Shell: bar, quick settings and notifications, launcher (with every Settings page), Alt + Tab, snapping, lock screen, pop-ups, calendar, shortcuts sheet, clipboard history, emoji, screenshots and recording, password prompts
 - [x] Settings, ours: Wi-Fi, network and VPN, Bluetooth, sound, display, appearance, power, AI, notifications, apps (with Flathub search), keyboard, mouse and touchpad, printers, date and time, language, accounts, privacy, accessibility, storage, updates (download only, never a surprise restart), about
+- [x] Settings is one app, ours, on Plasma: every page is a native GTK page in the hub (no KDE System Settings anywhere; its entry and every `kcm_*` entry are NoDisplay, the panel launches `in.trippp.Settings`, the entry is just "Settings"). Display via `kscreen-doctor -j`, Keyboard via kxkbrc and kcminputrc, Mouse and touchpad via KWin's InputDevice D-Bus plus kcminputrc, Power via powerdevilrc and kscreenlockerrc, Notifications via plasmanotifyrc, Appearance via `plasma-apply-wallpaperimage`, `plasma-apply-colorscheme --accent-color`, kcmfonts and kdeglobals. A new Account pivot (`tripppin-ui settings account`). Needs a check on the VM.
 - [~] Dictation: Super + M, speak, press again; whisper.cpp (pinned tag, built in the image) with a pinned multilingual base model, all on the device; Settings → Dictation (on/off). Not yet checked on a booted image
 - [x] Every app in our style: GTK 3 and 4 colours, a Tripppin icon theme (green folders), Qt through qt6ct, Flatpak overrides, a text colour scheme
 - [x] Apps: Thunar, Text Editor, Loupe, Papers, Calculator, Celluloid, File Roller, System Monitor, Disks; Firefox on first boot
@@ -160,7 +161,7 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 - [x] Login: our greeter on KWin; session starts `startplasma-wayland`
 - [~] Checked in the VM by screenshot (docs/DESKTOP.md, Plasma section)
 - [~] Own icon theme (SVG tiles over Breeze Dark, Papirus gone), calm Files and Terminal defaults, Flatpak icon dirs in the session (docs/DESKTOP.md, Icons and calm apps); builds, not yet seen on screen
-- [ ] To remove from crates/ui once Plasma is accepted: `displays`, `splash`, `desktop`, `dim`, `lock`, `keeper`, `snap`, `switch`, `osd`, `quick`, `battery-ring`, the niri-based Settings pages (Wi-Fi, Bluetooth, Sound, Display, Appearance, Power, Notifications, Keyboard, Mouse, Printers, Accessibility, now `#[allow(dead_code)]`), `keys` (cheat sheet lists niri keys), and the `foot` shim in os/files/usr/bin once orb.rs launches Konsole
+- [ ] To remove from crates/ui once Plasma is accepted: `displays`, `splash`, `desktop`, `dim`, `lock`, `keeper`, `snap`, `switch`, `osd`, `quick`, `battery-ring`, `keys` (cheat sheet lists niri keys), and the `foot` shim in os/files/usr/bin once orb.rs launches Konsole
 
 ## Tiles shell (2026-11-25, branch `tiles-shell`)
 

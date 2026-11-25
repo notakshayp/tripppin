@@ -1,6 +1,5 @@
 //! Bluetooth through BlueZ's `bluetoothctl`: the adapter, paired and nearby devices,
-//! pairing, connecting and removing. Pairing that needs a PIN typed on a keyboard goes to
-//! blueman (themed GTK) from the page's "more options".
+//! pairing, connecting and removing (devices that show a confirmation code pair on their own).
 
 use std::process::Command;
 

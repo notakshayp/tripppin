@@ -25,25 +25,25 @@ use std::rc::Rc;
 /// The sections, in sidebar order: (id, title, icon, page).
 type Section = (&'static str, &'static str, char, fn() -> gtk::ScrolledWindow);
 pub(crate) const SECTIONS: [Section; 22] = [
-    ("wifi", "Wi-Fi", icons::WIFI, kde_wifi),
-    ("network", "Network & VPN", icons::NETWORK, kde_network),
-    ("bluetooth", "Bluetooth", icons::BLUETOOTH, kde_bluetooth),
-    ("sound", "Sound", icons::SOUND, kde_sound),
-    ("display", "Display", icons::DISPLAY, kde_display),
-    ("appearance", "Appearance", icons::PALETTE, kde_appearance),
-    ("power", "Power & battery", icons::BATTERY, kde_power),
+    ("wifi", "Wi-Fi", icons::WIFI, wifi_page),
+    ("network", "Network & VPN", icons::NETWORK, network_page),
+    ("bluetooth", "Bluetooth", icons::BLUETOOTH, bluetooth_page),
+    ("sound", "Sound", icons::SOUND, sound_page),
+    ("display", "Display", icons::DISPLAY, display_page),
+    ("appearance", "Appearance", icons::PALETTE, appearance_page),
+    ("power", "Power & battery", icons::BATTERY, power_page),
     ("ai", "AI", icons::SPARKLES, ai_page),
     ("dictation", "Dictation", icons::MIC, dictation_page),
-    ("notifications", "Notifications", icons::BELL, kde_notifications),
+    ("notifications", "Notifications", icons::BELL, notifications_page),
     ("apps", "Apps", icons::APPS, apps_page),
-    ("keyboard", "Keyboard", icons::KEYBOARD, kde_keyboard),
-    ("pointer", "Mouse & touchpad", icons::POINTER, kde_pointer),
-    ("printers", "Printers & scanners", icons::PRINTER, kde_printers),
+    ("keyboard", "Keyboard", icons::KEYBOARD, keyboard_page),
+    ("pointer", "Mouse & touchpad", icons::POINTER, pointer_page),
+    ("printers", "Printers & scanners", icons::PRINTER, printers_page),
     ("time", "Date & time", icons::CLOCK, time_page),
     ("language", "Language & region", icons::LANGUAGE, language_page),
-    ("accounts", "Accounts", icons::USERS, accounts_page),
+    ("account", "Account", icons::USERS, accounts_page),
     ("privacy", "Privacy", icons::SHIELD, privacy_page),
-    ("accessibility", "Accessibility", icons::ACCESSIBILITY, kde_accessibility),
+    ("accessibility", "Accessibility", icons::ACCESSIBILITY, accessibility_page),
     ("storage", "Storage", icons::DISK, storage_page),
     ("updates", "Updates", icons::UPDATE, updates_page),
     ("about", "About", icons::INFO, about_page),
@@ -134,6 +134,8 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
     let open: Rc<dyn Fn(&str)> = {
         let (stack, view, title) = (stack.clone(), view.clone(), title.clone());
         Rc::new(move |id: &str| {
+            // "accounts" was this page's name before it became "Account".
+            let id = if id == "accounts" { "account" } else { id };
             if let Some(i) = SECTIONS.iter().position(|(sid, ..)| *sid == id) {
                 show_section(&stack, i);
                 title.set_text(&SECTIONS[i].1.to_lowercase());
@@ -196,73 +198,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
     (window, open)
 }
 
-/// A page: its name is in the title bar; the page starts with a status line, with an
-/// optional control (an on/off switch, "Advanced") on the right.
-/// A section that System Settings (KDE) covers: a short line and one button that opens it
-/// on the matching page. Plasma replaced the niri-era pages for these.
-fn kde_page(title: &str, what: &str, kcm: &'static str) -> gtk::ScrolledWindow {
-    let (scroll, body, status, _right) = page(title);
-    status.set_text(what);
-    let open = gtk::Button::with_label("Open in System Settings");
-    open.add_css_class("link");
-    open.add_css_class("accent");
-    open.connect_clicked(move |_| {
-        let _ = std::process::Command::new("systemsettings").arg(kcm).spawn();
-    });
-    let list = card();
-    list.append(&setting_row(title, &open));
-    body.append(&list);
-    scroll
-}
-
-fn kde_wifi() -> gtk::ScrolledWindow {
-    kde_page("Wi-Fi", "Wi-Fi and wired networks, VPN and hotspots", "kcm_networkmanagement")
-}
-
-fn kde_network() -> gtk::ScrolledWindow {
-    kde_page("Network & VPN", "Network details, proxy and VPN", "kcm_networkmanagement")
-}
-
-fn kde_bluetooth() -> gtk::ScrolledWindow {
-    kde_page("Bluetooth", "Pair and manage Bluetooth devices", "kcm_bluetooth")
-}
-
-fn kde_sound() -> gtk::ScrolledWindow {
-    kde_page("Sound", "Output and input devices, volume and per-app sound", "kcm_pulseaudio")
-}
-
-fn kde_display() -> gtk::ScrolledWindow {
-    kde_page("Display", "Resolution, scale, refresh rate, rotation and night light", "kcm_kscreen")
-}
-
-fn kde_appearance() -> gtk::ScrolledWindow {
-    kde_page("Appearance", "Wallpaper, colours, fonts, icons and the Plasma style", "kcm_lookandfeel")
-}
-
-fn kde_power() -> gtk::ScrolledWindow {
-    kde_page("Power & battery", "Battery, power mode, screen off, sleep and lid action", "kcm_powerdevilprofilesconfig")
-}
-
-fn kde_notifications() -> gtk::ScrolledWindow {
-    kde_page("Notifications", "Do not disturb and per-app notifications", "kcm_notifications")
-}
-
-fn kde_keyboard() -> gtk::ScrolledWindow {
-    kde_page("Keyboard", "Layouts, repeat rate and shortcuts", "kcm_keyboard")
-}
-
-fn kde_pointer() -> gtk::ScrolledWindow {
-    kde_page("Mouse & touchpad", "Mouse and touchpad speed, tap to click and gestures", "kcm_mouse")
-}
-
-fn kde_printers() -> gtk::ScrolledWindow {
-    kde_page("Printers & scanners", "Add printers, the default and the queue", "kcm_printer_manager")
-}
-
-fn kde_accessibility() -> gtk::ScrolledWindow {
-    kde_page("Accessibility", "Screen reader, larger text, high contrast and sticky keys", "kcm_access")
-}
-
+/// A page: a status line at the top, with an optional control (an on/off switch) on the right.
 fn page(_title: &str) -> (gtk::ScrolledWindow, gtk::Box, gtk::Label, gtk::Box) {
     let body = gtk::Box::new(gtk::Orientation::Vertical, 24);
     body.add_css_class("page");
@@ -324,7 +260,6 @@ fn signal_icon(signal: u8, connected: bool) -> gtk::DrawingArea {
     area
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn wifi_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Wi-Fi");
     // The radio's real state straight away (a quick query), so the switch never shows "off"
@@ -338,33 +273,24 @@ fn wifi_page() -> gtk::ScrolledWindow {
     error.set_visible(false);
 
     let extras = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    extras.set_homogeneous(true);
     let saved_label = label("None yet", &["card-sub"]);
     let hotspot_label = label("Share this connection", &["card-sub"]);
-    for (title, sub) in [
-        ("Hotspot", &hotspot_label),
-        ("VPN", &label("WireGuard, OpenVPN", &["card-sub"])),
-        ("Saved networks", &saved_label),
-    ] {
+    {
         let card = gtk::Button::new();
         card.add_css_class("small-card");
+        card.set_halign(gtk::Align::Start);
         let inner = gtk::Box::new(gtk::Orientation::Vertical, 4);
-        inner.append(&label(title, &["card-title"]));
-        inner.append(sub);
+        inner.append(&label("Hotspot", &["card-title"]));
+        inner.append(&hotspot_label);
         card.set_child(Some(&inner));
         let hotspot_label = hotspot_label.clone();
-        card.connect_clicked(move |_| match title {
-            "Hotspot" => {
-                let l = hotspot_label.clone();
-                l.set_text("Starting…");
-                background(nm::hotspot, move |r| match r {
-                    Ok((ssid, psk)) => l.set_text(&format!("On · {ssid} · {psk}")),
-                    Err(e) => l.set_text(&e),
-                });
-            }
-            _ => {
-                let _ = std::process::Command::new("nm-connection-editor").spawn();
-            }
+        card.connect_clicked(move |_| {
+            let l = hotspot_label.clone();
+            l.set_text("Starting…");
+            background(nm::hotspot, move |r| match r {
+                Ok((ssid, psk)) => l.set_text(&format!("On · {ssid} · {psk}")),
+                Err(e) => l.set_text(&e),
+            });
         });
         extras.append(&card);
     }
@@ -709,7 +635,6 @@ fn clear(list: &gtk::ListBox) {
     }
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn bluetooth_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Bluetooth");
     let switch = gtk::Switch::new();
@@ -737,19 +662,12 @@ fn bluetooth_page() -> gtk::ScrolledWindow {
     near.set_selection_mode(gtk::SelectionMode::None);
     let error = label("", &["error"]);
     error.set_visible(false);
-    let more = gtk::Button::with_label("More options");
-    more.add_css_class("link");
-    more.set_halign(gtk::Align::Start);
-    more.connect_clicked(|_| {
-        let _ = std::process::Command::new("blueman-manager").spawn();
-    });
     for w in [
         mine_caption.upcast_ref::<gtk::Widget>(),
         mine.upcast_ref(),
         near_head.upcast_ref(),
         near.upcast_ref(),
         error.upcast_ref(),
-        more.upcast_ref(),
     ] {
         body.append(w);
     }
@@ -785,18 +703,10 @@ fn bluetooth_page() -> gtk::ScrolledWindow {
         })
     };
     let load: Rc<dyn Fn(bool)> = {
-        let (mine, status, switch, error, reload, scan, parts, more) = (
-            mine.clone(),
-            status.clone(),
-            switch.clone(),
-            error.clone(),
-            reload.clone(),
-            scan.clone(),
-            parts.clone(),
-            more.clone(),
-        );
+        let (mine, status, switch, error, reload, scan, parts) =
+            (mine.clone(), status.clone(), switch.clone(), error.clone(), reload.clone(), scan.clone(), parts.clone());
         Rc::new(move |also_scan: bool| {
-            let (mine, status, switch, error, reload, scan, parts, more) = (
+            let (mine, status, switch, error, reload, scan, parts) = (
                 mine.clone(),
                 status.clone(),
                 switch.clone(),
@@ -804,13 +714,11 @@ fn bluetooth_page() -> gtk::ScrolledWindow {
                 reload.clone(),
                 scan.clone(),
                 parts.clone(),
-                more.clone(),
             );
             background(
                 || (bt::has_adapter(), bt::status(), bt::paired()),
                 move |(has, (on, name), devices)| {
                     switch.set_visible(has);
-                    more.set_visible(has);
                     for p in &parts {
                         p.set_visible(has && on);
                     }
@@ -1061,7 +969,6 @@ fn fill_devices(list: &gtk::ListBox, devices: &[snd::Device], default: &str, out
     }
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn sound_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Sound");
     let outs = gtk::ListBox::new();
@@ -1071,19 +978,12 @@ fn sound_page() -> gtk::ScrolledWindow {
         l.add_css_class("list-card");
         l.set_selection_mode(gtk::SelectionMode::None);
     }
-    let more = gtk::Button::with_label("More options");
-    more.add_css_class("link");
-    more.set_halign(gtk::Align::Start);
-    more.connect_clicked(|_| {
-        let _ = std::process::Command::new("pavucontrol").spawn();
-    });
     body.append(&caption("Output"));
     body.append(&outs);
     body.append(&caption("Input"));
     body.append(&ins);
     body.append(&caption("Apps"));
     body.append(&apps);
-    body.append(&more);
 
     let reload: Rc<RefCell<Reload>> = Rc::new(RefCell::new(None));
     let load: Rc<dyn Fn(bool)> = {
@@ -1179,7 +1079,6 @@ fn dropdown(items: &[String], selected: usize) -> gtk::DropDown {
     d
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn display_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Display");
     let screens = gtk::Box::new(gtk::Orientation::Vertical, 22);
@@ -1188,17 +1087,10 @@ fn display_page() -> gtk::ScrolledWindow {
     light.set_selection_mode(gtk::SelectionMode::None);
     let error = label("", &["error"]);
     error.set_visible(false);
-    let arrange = gtk::Button::with_label("Arrange screens");
-    arrange.add_css_class("link");
-    arrange.set_halign(gtk::Align::Start);
-    arrange.connect_clicked(|_| {
-        let _ = std::process::Command::new("wdisplays").spawn();
-    });
     body.append(&screens);
     body.append(&caption("Light"));
     body.append(&light);
     body.append(&error);
-    body.append(&arrange);
 
     let load: Rc<dyn Fn()> = {
         let (screens, light, status, error) = (screens.clone(), light.clone(), status.clone(), error.clone());
@@ -1218,8 +1110,8 @@ fn display_page() -> gtk::ScrolledWindow {
                         }
                         None => status.set_text("No screen found"),
                     }
-                    for o in &outs {
-                        screens.append(&screen_card(o, &error));
+                    for (i, o) in outs.iter().enumerate() {
+                        screens.append(&screen_card(o, outs.first().filter(|_| i > 0), &error));
                     }
                     clear(&light);
                     if let Some(b) = bright {
@@ -1245,7 +1137,7 @@ fn display_page() -> gtk::ScrolledWindow {
     scroll
 }
 
-fn screen_card(o: &display::Output, error: &gtk::Label) -> gtk::Box {
+fn screen_card(o: &display::Output, anchor: Option<&display::Output>, error: &gtk::Label) -> gtk::Box {
     let card = gtk::Box::new(gtk::Orientation::Vertical, 10);
     card.append(&caption(&o.title));
     let list = gtk::ListBox::new();
@@ -1266,6 +1158,28 @@ fn screen_card(o: &display::Output, error: &gtk::Label) -> gtk::Box {
     list.append(&setting_row("Resolution", &modes));
     list.append(&setting_row("Scale", &scales));
     list.append(&setting_row("Rotation", &rotations));
+    // A second screen says where it sits next to the first.
+    if let Some(anchor) = anchor {
+        let names: Vec<String> = display::SIDES.iter().map(|s| s.1.to_string()).collect();
+        let side_now = display::SIDES.iter().position(|s| s.0 == display::side_of(o, anchor)).unwrap_or(0);
+        let sides = dropdown(&names, side_now);
+        let (o, other, error) = (o.clone(), anchor.clone(), error.clone());
+        sides.connect_selected_notify(move |d| {
+            let pos = display::place(&o, &other, display::SIDES[d.selected() as usize].0);
+            let (o, error) = (o.clone(), error.clone());
+            background(
+                move || display::set_position(&o, pos),
+                move |r| match r {
+                    Ok(()) => error.set_visible(false),
+                    Err(e) => {
+                        error.set_text(&format!("Couldn't move the screen: {e}"));
+                        error.set_visible(true);
+                    }
+                },
+            );
+        });
+        list.append(&setting_row(&format!("Place it, next to {}", anchor.title.to_lowercase()), &sides));
+    }
     card.append(&list);
     let apply = {
         let (o, modes, scales, rotations, error) =
@@ -1296,26 +1210,37 @@ fn screen_card(o: &display::Output, error: &gtk::Label) -> gtk::Box {
 
 const WALLPAPERS: [(&str, &str); 4] = [("ink", "Ink"), ("night", "Night"), ("forest", "Forest"), ("paper", "Paper")];
 const TEXT_SIZES: [(&str, f64); 4] = [("Small", 0.9), ("Default", 1.0), ("Large", 1.15), ("Larger", 1.3)];
+/// The colour of buttons, switches and highlights: the tile palette's, green first.
+pub(crate) const ACCENTS: [(&str, &str); 6] = [
+    ("#3fae7a", "Green"),
+    ("#0f7c8c", "Teal"),
+    ("#2c5aa0", "Blue"),
+    ("#6b3f8f", "Purple"),
+    ("#c2502e", "Orange"),
+    ("#b8862b", "Amber"),
+];
 
 fn tripppin_config() -> std::path::PathBuf {
-    std::env::var_os("XDG_CONFIG_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))
-        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-        .join("tripppin")
+    crate::kde::config_home().join("tripppin")
 }
 
-/// Copies an image to ~/.config/tripppin/wallpaper and restarts swaybg with it.
-fn set_wallpaper(from: &std::path::Path, name: &str) -> std::io::Result<()> {
+/// Sets the desktop wallpaper with Plasma's own tool. An image from elsewhere is copied
+/// into ~/.local/share/wallpapers first, so it stays if the original moves.
+fn set_wallpaper(from: &std::path::Path, name: &str) -> Result<(), String> {
+    let mut path = from.to_path_buf();
+    if !from.starts_with("/usr/share/tripppin/wallpapers") {
+        let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+        let dir = home.join(".local/share/wallpapers");
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        path = dir.join(from.file_name().unwrap_or_default());
+        if path != from {
+            std::fs::copy(from, &path).map_err(|e| e.to_string())?;
+        }
+    }
+    crate::kde::run("plasma-apply-wallpaperimage", &[&path.to_string_lossy()])?;
     let dir = tripppin_config();
-    std::fs::create_dir_all(&dir)?;
-    std::fs::copy(from, dir.join("wallpaper"))?;
-    std::fs::write(dir.join("wallpaper-name"), name)?;
-    let _ = std::process::Command::new("pkill").args(["-x", "swaybg"]).status();
-    let wall = dir.join("wallpaper");
-    let _ = std::process::Command::new("niri")
-        .args(["msg", "action", "spawn", "--", "swaybg", "-i", &wall.to_string_lossy(), "-m", "fill"])
-        .status();
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::write(dir.join("wallpaper-name"), name);
     Ok(())
 }
 
@@ -1332,11 +1257,34 @@ fn gsettings_set(key: &str, value: &str) {
     let _ = std::process::Command::new("gsettings").args(["set", "org.gnome.desktop.interface", key, value]).status();
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
+/// Text size for GTK apps now, and for Qt/KDE apps through the font DPI Plasma reads at the
+/// next login.
+pub(crate) fn set_text_scale(factor: f64) {
+    gsettings_set("text-scaling-factor", &factor.to_string());
+    if (factor - 1.0).abs() < 0.01 {
+        crate::kde::delete("kcmfonts", "General", "forceFontDPI");
+        crate::kde::delete("kcmfonts", "General", "forceFontDPIWayland");
+    } else {
+        let dpi = (96.0 * factor).round().to_string();
+        crate::kde::write("kcmfonts", "General", "forceFontDPI", &dpi);
+        crate::kde::write("kcmfonts", "General", "forceFontDPIWayland", &dpi);
+    }
+}
+
+/// The accent now, as one of ACCENTS' hex codes (the first when none is set).
+fn accent_now() -> &'static str {
+    crate::kde::read("kdeglobals", "General", "AccentColor")
+        .and_then(|v| crate::kde::rgb_to_hex(&v))
+        .and_then(|hex| ACCENTS.iter().map(|a| a.0).find(|a| a.eq_ignore_ascii_case(&hex)))
+        .unwrap_or(ACCENTS[0].0)
+}
+
 fn appearance_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Appearance");
     let current = std::fs::read_to_string(tripppin_config().join("wallpaper-name")).unwrap_or_else(|_| "ink".into());
     status.set_text(&format!("Dark · {} wallpaper", current.trim()));
+    let error = label("", &["error"]);
+    error.set_visible(false);
     body.append(&caption("Wallpaper"));
     let grid = gtk::FlowBox::new();
     grid.set_selection_mode(gtk::SelectionMode::None);
@@ -1360,15 +1308,27 @@ fn appearance_page() -> gtk::ScrolledWindow {
         inner.append(&pic);
         inner.append(&label(name, &["card-sub"]));
         tile.set_child(Some(&inner));
-        let (tiles2, status) = (tiles.clone(), status.clone());
+        let (tiles2, status, error) = (tiles.clone(), status.clone(), error.clone());
         tile.connect_clicked(move |b| {
-            if set_wallpaper(&path, id).is_ok() {
-                for t in tiles2.borrow().iter() {
-                    t.remove_css_class("selected");
-                }
-                b.add_css_class("selected");
-                status.set_text(&format!("Dark · {id} wallpaper"));
-            }
+            let (b, tiles, status, error, path) =
+                (b.clone(), tiles2.clone(), status.clone(), error.clone(), path.clone());
+            background(
+                move || set_wallpaper(&path, id),
+                move |r| match r {
+                    Ok(()) => {
+                        error.set_visible(false);
+                        for t in tiles.borrow().iter() {
+                            t.remove_css_class("selected");
+                        }
+                        b.add_css_class("selected");
+                        status.set_text(&format!("Dark · {id} wallpaper"));
+                    }
+                    Err(e) => {
+                        error.set_text(&format!("Couldn't change the wallpaper: {e}"));
+                        error.set_visible(true);
+                    }
+                },
+            );
         });
         tiles.borrow_mut().push(tile.clone());
         grid.insert(&tile, -1);
@@ -1379,7 +1339,7 @@ fn appearance_page() -> gtk::ScrolledWindow {
     own.add_css_class("accent");
     own.set_halign(gtk::Align::Start);
     {
-        let (status, tiles) = (status.clone(), tiles.clone());
+        let (status, tiles, error) = (status.clone(), tiles.clone(), error.clone());
         own.connect_clicked(move |b| {
             let filter = gtk::FileFilter::new();
             filter.add_mime_type("image/*");
@@ -1388,36 +1348,82 @@ fn appearance_page() -> gtk::ScrolledWindow {
             filters.append(&filter);
             let dialog = gtk::FileDialog::builder().title("Choose a wallpaper").filters(&filters).modal(true).build();
             let window = b.root().and_downcast::<gtk::Window>();
-            let (status, tiles) = (status.clone(), tiles.clone());
+            let (status, tiles, error) = (status.clone(), tiles.clone(), error.clone());
             dialog.open(window.as_ref(), gio::Cancellable::NONE, move |r| {
-                if let Ok(file) = r
-                    && let Some(path) = file.path()
-                    && set_wallpaper(&path, "your own").is_ok()
-                {
-                    for t in tiles.borrow().iter() {
-                        t.remove_css_class("selected");
-                    }
-                    status.set_text("Dark · your own wallpaper");
-                }
+                let Ok(file) = r else { return };
+                let Some(path) = file.path() else { return };
+                let (status, tiles, error) = (status.clone(), tiles.clone(), error.clone());
+                background(
+                    move || set_wallpaper(&path, "your own"),
+                    move |r| match r {
+                        Ok(()) => {
+                            error.set_visible(false);
+                            for t in tiles.borrow().iter() {
+                                t.remove_css_class("selected");
+                            }
+                            status.set_text("Dark · your own wallpaper");
+                        }
+                        Err(e) => {
+                            error.set_text(&format!("Couldn't change the wallpaper: {e}"));
+                            error.set_visible(true);
+                        }
+                    },
+                );
             });
         });
     }
     body.append(&own);
 
+    body.append(&caption("Colour"));
+    let swatches = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    let picked = accent_now();
+    let all: Rc<RefCell<Vec<gtk::Button>>> = Rc::default();
+    for (hex, name) in ACCENTS {
+        let b = gtk::Button::new();
+        b.add_css_class("swatch");
+        b.add_css_class(&format!("c{}", &hex[1..]));
+        b.set_tooltip_text(Some(name));
+        if hex == picked {
+            b.add_css_class("selected");
+        }
+        let (all2, error) = (all.clone(), error.clone());
+        b.connect_clicked(move |b| {
+            let (b, all, error) = (b.clone(), all2.clone(), error.clone());
+            background(
+                move || crate::kde::run("plasma-apply-colorscheme", &["--accent-color", hex]),
+                move |r| match r {
+                    Ok(_) => {
+                        error.set_visible(false);
+                        for x in all.borrow().iter() {
+                            x.remove_css_class("selected");
+                        }
+                        b.add_css_class("selected");
+                    }
+                    Err(e) => {
+                        error.set_text(&format!("Couldn't change the colour: {e}"));
+                        error.set_visible(true);
+                    }
+                },
+            );
+        });
+        all.borrow_mut().push(b.clone());
+        swatches.append(&b);
+    }
+    body.append(&swatches);
+
     body.append(&caption("Look"));
     let look = gtk::ListBox::new();
     look.add_css_class("list-card");
     look.set_selection_mode(gtk::SelectionMode::None);
-    look.append(&setting_row("Mode", &label("Dark · light mode comes in a later update", &["row-sub"])));
     let sizes: Vec<String> = TEXT_SIZES.iter().map(|s| s.0.to_string()).collect();
     let now = text_scale();
     let size_now = TEXT_SIZES.iter().position(|s| (s.1 - now).abs() < 0.02).unwrap_or(1);
     let size = dropdown(&sizes, size_now);
     size.connect_selected_notify(|d| {
-        gsettings_set("text-scaling-factor", &TEXT_SIZES[d.selected() as usize].1.to_string())
+        let factor = TEXT_SIZES[d.selected() as usize].1;
+        background(move || set_text_scale(factor), |()| {});
     });
     look.append(&setting_row("Text size", &size));
-    look.append(&setting_row("Corners", &corners_choice()));
     let motion = gtk::Switch::new();
     motion.set_active(display::reduce_motion());
     motion.connect_state_set(|_, on| {
@@ -1427,35 +1433,8 @@ fn appearance_page() -> gtk::ScrolledWindow {
     });
     look.append(&setting_row("Reduce motion", &motion));
     body.append(&look);
+    body.append(&error);
     scroll
-}
-
-/// Sharp, Default or Round: three segments, applied at once to windows, the bar, quick
-/// settings, the launcher and our own screens (look.rs).
-fn corners_choice() -> gtk::Box {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    let now = crate::look::current();
-    let buttons: Rc<RefCell<Vec<gtk::Button>>> = Rc::default();
-    for (choice, word, what) in crate::look::ALL {
-        let b = gtk::Button::with_label(word);
-        b.add_css_class("segment");
-        b.set_tooltip_text(Some(what));
-        if choice == now {
-            b.add_css_class("selected");
-        }
-        let all = buttons.clone();
-        b.connect_clicked(move |b| {
-            if crate::look::set(choice).is_ok() {
-                for other in all.borrow().iter() {
-                    other.remove_css_class("selected");
-                }
-                b.add_css_class("selected");
-            }
-        });
-        buttons.borrow_mut().push(b.clone());
-        row.append(&b);
-    }
-    row
 }
 
 fn minutes(m: u32) -> String {
@@ -1466,7 +1445,6 @@ fn minutes(m: u32) -> String {
     }
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn power_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Power & battery");
     let battery_caption = caption("Battery");
@@ -1509,6 +1487,20 @@ fn power_page() -> gtk::ScrolledWindow {
     for d in [&lock, &screen, &sleep] {
         let save = save.clone();
         d.connect_selected_notify(move |_| save());
+    }
+    // A laptop also says what closing the lid does.
+    if power::battery().is_some() {
+        let lid = gtk::Switch::new();
+        lid.set_active(power::lid_sleeps());
+        let error = error.clone();
+        lid.connect_state_set(move |_, on| {
+            if let Err(e) = power::set_lid_sleeps(on) {
+                error.set_text(&format!("Couldn't save: {e}"));
+                error.set_visible(true);
+            }
+            glib::Propagation::Proceed
+        });
+        idle_list.append(&setting_row("Sleep when the lid is closed", &lid));
     }
     body.append(&idle_list);
     body.append(&error);
@@ -2705,7 +2697,6 @@ fn activity_section() -> (gtk::Box, Rc<dyn Fn()>) {
     (root, load)
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn notifications_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, right) = page("Notifications");
     let dnd = gtk::Switch::new();
@@ -2731,7 +2722,7 @@ fn notifications_page() -> gtk::ScrolledWindow {
     body.append(&quiet);
 
     body.append(&caption("Muted apps"));
-    body.append(&label("Their notifications are dropped quietly.", &["row-sub"]));
+    body.append(&label("Their pop-ups stay quiet; they still collect in the notification history.", &["row-sub"]));
     let muted = gtk::ListBox::new();
     muted.add_css_class("list-card");
     muted.set_selection_mode(gtk::SelectionMode::None);
@@ -2840,23 +2831,27 @@ fn notifications_page() -> gtk::ScrolledWindow {
                         let unmute = gtk::Button::with_label("Unmute");
                         unmute.add_css_class("link");
                         unmute.add_css_class("accent");
+                        let shown = installed.iter().find(|a| a.id == *n).map_or(n.clone(), |a| a.name.clone());
                         let (n, names, save) = (n.clone(), names.clone(), save.clone());
-                        let row = setting_row(&n.to_lowercase(), &unmute);
+                        let row = setting_row(&shown.to_lowercase(), &unmute);
                         unmute.connect_clicked(move |b| {
                             b.set_sensitive(false);
                             save(names.iter().filter(|x| **x != n).cloned().collect())
                         });
                         muted_list.append(&row);
                     }
-                    let choices: Vec<String> =
-                        installed.iter().map(|a| a.name.clone()).filter(|n| !names.contains(n)).collect();
+                    let choices: Vec<(String, String)> = installed
+                        .iter()
+                        .filter(|a| !names.contains(&a.id))
+                        .map(|a| (a.id.clone(), a.name.clone()))
+                        .collect();
                     if choices.is_empty() {
                         return;
                     }
                     // Short labels, so a long app name can't widen the window.
                     let lower: Vec<String> = choices
                         .iter()
-                        .map(|c| {
+                        .map(|(_, c)| {
                             let c = c.to_lowercase();
                             if c.chars().count() > 26 {
                                 format!("{}…", c.chars().take(25).collect::<String>())
@@ -2877,7 +2872,7 @@ fn notifications_page() -> gtk::ScrolledWindow {
                         let (pick, names) = (pick.clone(), names.clone());
                         mute.connect_clicked(move |_| {
                             let mut next: Vec<String> = names.to_vec();
-                            next.push(choices[pick.selected() as usize].clone());
+                            next.push(choices[pick.selected() as usize].0.clone());
                             save(next);
                         });
                     }
@@ -3100,7 +3095,6 @@ fn apps_page() -> gtk::ScrolledWindow {
     scroll
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn keyboard_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Keyboard");
     let error = label("", &["error"]);
@@ -3244,7 +3238,6 @@ fn keyboard_page() -> gtk::ScrolledWindow {
     scroll
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn pointer_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Mouse & touchpad");
     let error = label("", &["error"]);
@@ -4293,10 +4286,9 @@ fn dictation_page() -> gtk::ScrolledWindow {
     scroll
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn accessibility_page() -> gtk::ScrolledWindow {
     let (scroll, body, status, _right) = page("Accessibility");
-    status.set_text("Seeing, moving and typing");
+    status.set_text("Seeing and moving");
     let error = label("", &["error"]);
     error.set_visible(false);
 
@@ -4310,21 +4302,15 @@ fn accessibility_page() -> gtk::ScrolledWindow {
             glib::Propagation::Proceed
         });
         seeing.append(&setting_row("Screen reader: reads the screen aloud", &reader));
-    } else {
-        seeing.append(&setting_row("Screen reader", &label("Comes with the next update", &["row-sub"])));
     }
     let large = gtk::Switch::new();
-    large.set_active(
-        privacy::gsettings_get("org.gnome.desktop.interface", "text-scaling-factor").parse::<f64>().unwrap_or(1.0)
-            > 1.05,
-    );
+    large.set_active(text_scale() > 1.05);
     large.connect_state_set(|_, on| {
-        privacy::gsettings_set("org.gnome.desktop.interface", "text-scaling-factor", if on { "1.25" } else { "1.0" });
+        let factor = if on { 1.25 } else { 1.0 };
+        background(move || set_text_scale(factor), |()| {});
         glib::Propagation::Proceed
     });
     seeing.append(&setting_row("Larger text", &large));
-    seeing
-        .append(&setting_row("High contrast", &gsettings_switch("org.gnome.desktop.a11y.interface", "high-contrast")));
     let names: Vec<String> = privacy::CURSOR_SIZES.iter().map(|c| c.1.to_string()).collect();
     let now = privacy::CURSOR_SIZES.iter().position(|c| c.0 == privacy::cursor_size()).unwrap_or(0);
     let cursor = dropdown(&names, now);
@@ -4338,10 +4324,9 @@ fn accessibility_page() -> gtk::ScrolledWindow {
         });
     }
     seeing.append(&setting_row("Pointer size", &cursor));
-    seeing.append(&setting_row("Zoom in on part of the screen", &label("Not available yet", &["row-sub"])));
     body.append(&seeing);
 
-    body.append(&caption("Moving and typing"));
+    body.append(&caption("Moving"));
     let moving = card();
     let motion = gtk::Switch::new();
     motion.set_active(display::reduce_motion());
@@ -4351,10 +4336,6 @@ fn accessibility_page() -> gtk::ScrolledWindow {
         glib::Propagation::Proceed
     });
     moving.append(&setting_row("Reduce motion", &motion));
-    moving.append(&setting_row(
-        "Sticky keys: press shortcuts one key at a time",
-        &label("Not available yet", &["row-sub"]),
-    ));
     moving.append(&setting_row("Do things by asking", &label("Super + Space, then say it in words", &["row-sub"])));
     body.append(&moving);
     body.append(&error);
@@ -4364,16 +4345,8 @@ fn accessibility_page() -> gtk::ScrolledWindow {
 const PROXY_MODES: [(&str, &str); 3] =
     [("none", "No proxy"), ("auto", "Automatic (a PAC address)"), ("manual", "One proxy for everything")];
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn network_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("Network & VPN");
-    let advanced = gtk::Button::with_label("Advanced");
-    advanced.add_css_class("link");
-    advanced.add_css_class("accent");
-    advanced.connect_clicked(|_| {
-        let _ = std::process::Command::new("nm-connection-editor").spawn();
-    });
-    right.append(&advanced);
+    let (scroll, body, status, _right) = page("Network & VPN");
     let links = gtk::Box::new(gtk::Orientation::Vertical, 22);
     body.append(&links);
     body.append(&caption("VPN"));
@@ -4599,16 +4572,8 @@ fn network_page() -> gtk::ScrolledWindow {
     scroll
 }
 
-#[allow(dead_code)] // kept until removed: System Settings has this page now
 fn printers_page() -> gtk::ScrolledWindow {
-    let (scroll, body, status, right) = page("Printers & scanners");
-    let add = gtk::Button::with_label("Add a printer");
-    add.add_css_class("link");
-    add.add_css_class("accent");
-    add.connect_clicked(|_| {
-        let _ = std::process::Command::new("system-config-printer").spawn();
-    });
-    right.append(&add);
+    let (scroll, body, status, _right) = page("Printers & scanners");
     let list = card();
     body.append(&list);
     body.append(&caption("Waiting to print"));
@@ -4637,8 +4602,8 @@ fn printers_page() -> gtk::ScrolledWindow {
     {
         let slot = load.clone();
         *load.borrow_mut() = Some(Rc::new(move || {
-            let (slot, list, queue, status, error, add, scan) =
-                (slot.clone(), list.clone(), queue.clone(), status.clone(), error.clone(), add.clone(), scan.clone());
+            let (slot, list, queue, status, error, scan) =
+                (slot.clone(), list.clone(), queue.clone(), status.clone(), error.clone(), scan.clone());
             background(
                 || (printers::printers(), printers::jobs()),
                 move |(found, jobs)| {
@@ -4654,7 +4619,6 @@ fn printers_page() -> gtk::ScrolledWindow {
                     clear(&queue);
                     let Some(found) = found else {
                         status.set_text("Printing comes with the next update");
-                        add.set_visible(false);
                         scan.set_visible(false);
                         list.append(&setting_row("Printers", &label("Comes with the next update", &["row-sub"])));
                         queue.append(&setting_row("Nothing waiting", &label("", &["row-sub"])));

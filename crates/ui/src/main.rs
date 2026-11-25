@@ -38,6 +38,7 @@ mod glyph;
 mod greetd;
 mod greeter;
 mod hub;
+mod kde;
 mod keeper;
 mod keyboard;
 mod keys;
@@ -104,6 +105,11 @@ fn main() -> ExitCode {
         };
     }
     // Not a screen either: run by waybar every 30 seconds.
+    // Not a screen: `tripppin-ui dnd on|off`, for the quiet-hours timers.
+    if args.first().map(String::as_str) == Some("dnd") {
+        apps::set_dnd(args.get(1).map(String::as_str) == Some("on"));
+        return ExitCode::SUCCESS;
+    }
     if args.first().map(String::as_str) == Some("battery-ring") {
         return battery::run();
     }

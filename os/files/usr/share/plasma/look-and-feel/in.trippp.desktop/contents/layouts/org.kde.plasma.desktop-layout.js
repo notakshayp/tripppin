@@ -25,7 +25,7 @@ panel.addWidget("in.trippp.start");
 
 var tasks = panel.addWidget("org.kde.plasma.icontasks");
 tasks.currentConfigGroup = ["General"];
-tasks.writeConfig("launchers", "applications:org.mozilla.firefox.desktop,applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop");
+tasks.writeConfig("launchers", "applications:org.mozilla.firefox.desktop,applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:in.trippp.Settings.desktop");
 tasks.writeConfig("iconSpacing", "0");
 tasks.writeConfig("maxStripes", "1");
 tasks.writeConfig("indicateAudioStreams", "false");
