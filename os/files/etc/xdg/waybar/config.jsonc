@@ -49,7 +49,7 @@
         "exec": "f=%H:%M; [ \"$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/tripppin/clock 2>/dev/null)\" = 12 ] && f='%-I:%M %p'; date \"+%a %d %b · $f\"",
         "interval": 15,
         "tooltip": false,
-        "on-click": "tripppin-ui calendar"
+        "on-click": "tripppin-ui calendar --popover"
     },
     // Recording the screen: a red dot (click to stop).
     "custom/recording": {

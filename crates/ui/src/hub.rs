@@ -179,7 +179,7 @@ pub fn load_css() {
     let provider = gtk::CssProvider::new();
     let mut css = include_str!("hub.css").to_string();
     for c in PALETTE {
-        css.push_str(&format!(".hub-tile.c{} {{ background: {c}; }}\n", &c[1..]));
+        css.push_str(&format!(".hub-tile.c{0}, .cal-block.c{0}, .cal-bar.c{0} {{ background: {c}; }}\n", &c[1..]));
     }
     provider.load_from_string(&css);
     gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 2);

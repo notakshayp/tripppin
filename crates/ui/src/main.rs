@@ -7,6 +7,7 @@
 //! - `first-boot`: fetches the model the first time someone logs in.
 //! - `osd`: the volume, mic and brightness pop-ups.
 //! - `settings`: the Settings app.
+//! - `calendar`: the Calendar app (`--popover`: the small one that drops from the clock; `--remind`: announce events that just started).
 //! - `askpass`: the password pop-up for administrator commands the AI runs.
 //! - `displays`: gives each screen a whole-number scale at login, so text stays sharp.
 //! - `corners sharp|default|round`: the corner style everywhere (Settings → Appearance).
@@ -21,7 +22,9 @@ mod apps;
 mod askpass;
 mod battery;
 mod bt;
+mod cal;
 mod calendar;
+mod calendar_app;
 mod common;
 mod desktop;
 mod dim;
@@ -101,6 +104,11 @@ fn main() -> ExitCode {
     if args.first().map(String::as_str) == Some("toggle") {
         return quick::main(&args[1..]);
     }
+    // Not a screen: announces calendar events that just started (the user timer runs it).
+    if args.first().map(String::as_str) == Some("calendar") && args.get(1).map(String::as_str) == Some("--remind") {
+        calendar_app::remind_now();
+        return ExitCode::SUCCESS;
+    }
     use_software_rendering_without_3d();
     match args.first().map(String::as_str) {
         Some("orb") => orb::run(),
@@ -109,7 +117,8 @@ fn main() -> ExitCode {
         Some("first-boot") => firstboot::run(),
         Some("osd") => osd::run(),
         Some("settings") => settings::run(),
-        Some("calendar") => calendar::run(),
+        Some("calendar") if args.get(1).map(String::as_str) == Some("--popover") => calendar::run(),
+        Some("calendar") => calendar_app::run(),
         Some("keys") => keys::run(),
         Some("dim") => dim::run(),
         Some("askpass") => askpass::run(),
@@ -121,7 +130,7 @@ fn main() -> ExitCode {
         Some("widgets") => widgets::cli(&args[1..]),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | desktop | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state] | corners sharp|default|round"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar [--popover|--remind] | keys | switch | snap <where> | desktop | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state] | corners sharp|default|round"
             );
             ExitCode::from(2)
         }

@@ -145,6 +145,7 @@ RUN { trip logo --static --bare; printf '\n  \\S{PRETTY_NAME}  ·  \\l\n\n'; } >
 # The desktop starts on tty1 through greetd; other consoles (Ctrl+Alt+F2…) are kmscon.
 RUN systemctl enable tripppin-llm.service greetd.service bluetooth.service kmsconvt@.service firewalld.service cups.socket \
       tripppin-firefox.service tripppin-hostname.service greenboot-healthcheck.service greenboot-set-rollback-trigger.service \
+    && systemctl --global enable tripppin-calendar-remind.timer \
     && systemctl set-default graphical.target \
     && dconf update \
     && fc-cache -f

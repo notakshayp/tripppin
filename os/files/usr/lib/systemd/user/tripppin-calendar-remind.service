@@ -1,0 +1,6 @@
+[Unit]
+Description=Announce calendar events that have just started
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/tripppin-ui calendar --remind
