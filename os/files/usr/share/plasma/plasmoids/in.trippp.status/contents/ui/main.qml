@@ -43,10 +43,30 @@ PlasmoidItem {
         }
     }
 
+    // A press opens the one quick panel (tripppin-ui quick); Plasma's own tray popups are gone.
+    P5Support.DataSource {
+        id: run
+        engine: "executable"
+        onNewData: (source, data) => disconnectSource(source)
+    }
+
     fullRepresentation: Item {
         Layout.minimumWidth: label.implicitWidth + 24
         Layout.preferredWidth: label.implicitWidth + 24
         Layout.minimumHeight: 40
+
+        Rectangle {
+            anchors.fill: parent
+            color: "#ffffff"
+            opacity: press.containsMouse ? 0.08 : 0
+            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+        }
+        MouseArea {
+            id: press
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: run.connectSource("tripppin-ui quick")
+        }
 
         Text {
             id: label

@@ -1,4 +1,4 @@
-/* The start screen, from the Tiles design: flat, square, solid colour, light type. */
+/* The bridge (start screen), from the Tiles design: flat, square, solid colour, light type. */
 window.start-win { background: #101418; color: #fff; font-family: Inter, sans-serif; }
 window.start-win * { border-radius: 0; }
 .start-root { background: #101418; color: #fff; animation: start-in 200ms cubic-bezier(0.32, 0.72, 0, 1) both; }
@@ -87,3 +87,5 @@ popover.start-menu button.swatch.tc6, popover.start-menu button.swatch.tc6:hover
 popover.start-menu button.swatch.tc7, popover.start-menu button.swatch.tc7:hover { background: #3a2a22; }
 popover.start-menu button.swatch.tc8, popover.start-menu button.swatch.tc8:hover { background: #2a3640; }
 popover.start-menu button.swatch.tc9, popover.start-menu button.swatch.tc9:hover { background: #182423; }
+.start-root button.me { padding: 0; min-height: 0; min-width: 0; background: none; box-shadow: none; border: none; transition: opacity 150ms ease-out; }
+.start-root button.me:hover { opacity: 0.8; }

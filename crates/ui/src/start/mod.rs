@@ -1,4 +1,4 @@
-//! `tripppin-ui start`: the start screen. A full-screen layer over everything: named groups of
+//! `tripppin-ui bridge` (also `start`): the bridge, the start screen. A full-screen layer over everything: named groups of
 //! live tiles you size, colour and drag, and an all-apps list with a letter jump grid. Run it
 //! again (the taskbar button, the Meta key) to close it; Esc closes it; typing searches.
 //! `--window` opens an ordinary window instead of a layer, for screenshots and development.
@@ -123,7 +123,7 @@ impl Ui {
         header.set_margin_start(36);
         header.set_margin_end(30);
         header.set_margin_top(26);
-        let title = lbl("start", &["hub"]);
+        let title = lbl("bridge", &["hub"]);
         title.set_valign(gtk::Align::Start);
         header.append(&title);
         let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -145,8 +145,17 @@ impl Ui {
         avatar.add_css_class(&format!("tc{}", model::colour_of(&user)));
         avatar.set_valign(gtk::Align::Start);
         avatar.set_margin_top(4);
-        header.append(&who);
-        header.append(&avatar);
+        // Name and avatar are one button: it opens Settings at the account and closes the bridge.
+        let me = gtk::Button::new();
+        me.add_css_class("plain");
+        me.add_css_class("me");
+        me.set_valign(gtk::Align::Start);
+        me.set_tooltip_text(Some("your account"));
+        let me_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        me_row.append(&who);
+        me_row.append(&avatar);
+        me.set_child(Some(&me_row));
+        header.append(&me);
         root.add_overlay(&header);
 
         // Page one: the groups, sideways.
@@ -252,7 +261,7 @@ impl Ui {
             closing: Cell::new(false),
             save,
         });
-        ui.wire(&all, &back);
+        ui.wire(&all, &back, &me);
         window.present();
 
         // Reading the .desktop files and the saved layout happens off the UI thread.
@@ -287,11 +296,41 @@ impl Ui {
         ui
     }
 
-    fn wire(self: &Rc<Self>, all: &gtk::Button, back: &gtk::Button) {
+    fn wire(self: &Rc<Self>, all: &gtk::Button, back: &gtk::Button, me: &gtk::Button) {
         let u = Rc::clone(self);
         all.connect_clicked(move |_| u.show_page("apps"));
         let u = Rc::clone(self);
         back.connect_clicked(move |_| u.show_page("start"));
+        let u = Rc::clone(self);
+        me.connect_clicked(move |_| {
+            spawn("tripppin-ui", &["settings", "account"]);
+            u.close();
+        });
+
+        // A click on empty space (not a tile, button, list row or the search box) closes the bridge.
+        let empty = gtk::GestureClick::new();
+        empty.set_propagation_phase(gtk::PropagationPhase::Bubble);
+        let u = Rc::clone(self);
+        empty.connect_released(move |g, _, x, y| {
+            let Some(root) = u.window.child() else { return };
+            let mut w = root.pick(x, y, gtk::PickFlags::DEFAULT);
+            while let Some(cur) = w {
+                if cur.is::<gtk::Button>()
+                    || cur.is::<gtk::Editable>()
+                    || cur.has_css_class("tile")
+                    || cur.has_css_class("jump")
+                    || cur.has_css_class("row")
+                    || cur.has_css_class("groupname")
+                    || cur.has_css_class("hub")
+                {
+                    return;
+                }
+                w = cur.parent();
+            }
+            g.set_state(gtk::EventSequenceState::Claimed);
+            u.close();
+        });
+        self.window.child().unwrap().add_controller(empty);
 
         let u = Rc::clone(self);
         self.search.connect_changed(move |s| {
@@ -344,7 +383,7 @@ impl Ui {
 
     fn show_page(&self, name: &str) {
         self.stack.set_visible_child_name(name);
-        self.title.set_text(name);
+        self.title.set_text(if name == "start" { "bridge" } else { name });
         self.search.set_visible(name == "apps");
         self.jump.set_visible(false);
         if name == "apps" {

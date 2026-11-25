@@ -3,8 +3,8 @@ import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.plasma5support as P5Support
 
-// The taskbar's start button (mock section 02): a 40 x 40 accent square with the white
-// mark. One press runs `tripppin-ui start`, the start screen. The mark is drawn from the
+// The taskbar's bridge button (mock section 02): a 40 x 40 accent square with the white
+// mark. One press runs `tripppin-ui bridge`, the bridge. The mark is drawn from the
 // logo's own path data (brand/logo.svg), so it is vector at any scale.
 PlasmoidItem {
     id: root
@@ -44,7 +44,7 @@ PlasmoidItem {
             id: press
             anchors.fill: parent
             hoverEnabled: true
-            onClicked: run.connectSource("tripppin-ui start")
+            onClicked: run.connectSource("tripppin-ui bridge")
         }
     }
 
@@ -54,5 +54,5 @@ PlasmoidItem {
         onNewData: (source, data) => disconnectSource(source)
     }
 
-    Plasmoid.onActivated: run.connectSource("tripppin-ui start")
+    Plasmoid.onActivated: run.connectSource("tripppin-ui bridge")
 }
