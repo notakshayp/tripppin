@@ -17,7 +17,7 @@ P = {
     "wifi-weak": "M8.5 16a5 5 0 0 1 7 0M12 19.5h.01",
     "wifi-ok": "M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01",
     "wifi-off": "M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01M3 3l18 18",
-    "wired": "M3 7h18v8H3zM7 15v4M12 15v4M17 15v4M7 7v3M12 7v3M17 7v3",
+    "wired": "M9 3v5M15 3v5M7 8h10v4a5 5 0 0 1-10 0zM12 17v4",
     "volume": "M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12",
     "volume-medium": "M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6",
     "volume-low": "M4 9h4l5-4v14l-5-4H4z",
