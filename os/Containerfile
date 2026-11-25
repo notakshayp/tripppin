@@ -70,7 +70,11 @@ COPY --from=whisper /src/whisper.cpp/LICENSE /usr/share/licenses/whisper.cpp/LIC
 # Dictation's speech model: multilingual base, 5-bit (MIT, ggerganov/whisper.cpp), pinned to a revision and checked.
 ARG WHISPER_MODEL_REV=5359861c739e955e79d9a303bcbc70fb988958b1
 ARG WHISPER_MODEL_SHA256=422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898
-ADD --checksum=sha256:${WHISPER_MODEL_SHA256} https://huggingface.co/ggerganov/whisper.cpp/resolve/${WHISPER_MODEL_REV}/ggml-base-q5_1.bin /usr/share/tripppin/whisper/ggml-base-q5_1.bin
+# Downloaded and checked by hash in a RUN step: CI's buildah has no ADD --checksum.
+RUN mkdir -p /usr/share/tripppin/whisper \
+    && curl -fsSL -o /usr/share/tripppin/whisper/ggml-base-q5_1.bin \
+         "https://huggingface.co/ggerganov/whisper.cpp/resolve/${WHISPER_MODEL_REV}/ggml-base-q5_1.bin" \
+    && echo "${WHISPER_MODEL_SHA256}  /usr/share/tripppin/whisper/ggml-base-q5_1.bin" | sha256sum -c -
 
 # What llama.cpp needs at runtime: the Vulkan loader and Mesa's GPU drivers.
 RUN dnf -y install --setopt=install_weak_deps=False vulkan-loader mesa-vulkan-drivers libgomp && dnf clean all
