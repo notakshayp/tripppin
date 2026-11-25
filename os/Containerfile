@@ -81,10 +81,15 @@ RUN dnf -y install --setopt=install_weak_deps=False NetworkManager-wifi wpa_supp
       iwlwifi-mvm-firmware iwlwifi-dvm-firmware realtek-firmware mt7xxx-firmware atheros-firmware brcmfmac-firmware \
     && dnf clean all
 
-# Apps install as Flatpaks from Flathub, since the system image itself is read-only.
+# Apps install as Flatpaks from Flathub, since the system image itself is read-only. The
+# Store (tripppin-ui store, trip store) is our front end to that catalogue. The remote is
+# configured system-wide, so everyone on the computer sees the same apps.
+ARG FLATHUBREPO_SHA256=3371dd250e61d9e1633630073fefda153cd4426f72f4afa0c3373ae2e8fea03a
 RUN dnf -y install --setopt=install_weak_deps=False flatpak && dnf clean all \
     && mkdir -p /usr/share/flatpak/remotes.d \
-    && curl -fsSL -o /usr/share/flatpak/remotes.d/flathub.flatpakrepo https://dl.flathub.org/repo/flathub.flatpakrepo
+    && curl -fsSL -o /usr/share/flatpak/remotes.d/flathub.flatpakrepo https://dl.flathub.org/repo/flathub.flatpakrepo \
+    && echo "${FLATHUBREPO_SHA256}  /usr/share/flatpak/remotes.d/flathub.flatpakrepo" | sha256sum -c - \
+    && flatpak remote-add --system --if-not-exists flathub /usr/share/flatpak/remotes.d/flathub.flatpakrepo
 
 # The console: kmscon (scrollback, mouse, real fonts) in DM Mono, with DejaVu Sans
 # Mono for the block and line characters DM Mono doesn't have.
@@ -192,12 +197,14 @@ RUN set -e; src=/usr/share/icons/Papirus; dst=/usr/share/icons/Tripppin; \
 # The boot splash: our Plymouth theme, built into the initramfs so it shows from the start.
 # A clean app list: hide helpers, duplicates and tool windows from Plasma's launcher (they
 # still open from files and links), and give the two everyday apps plain names. Our
+# Discover stays installed as a fallback, but our Store (in.trippp.Store) is the one in the launcher.
 # Settings' own pages are found by searching "Settings" words instead of listing entries.
 RUN cd /usr/share/applications \
     && for f in kdesystemsettings org.kde.kmenuedit org.kde.plasma.emojier org.kde.ark org.kde.kinfocenter \
          org.gnome.SimpleScan org.kde.plasma-systemmonitor org.kde.kuserfeedback-console \
          org.freedesktop.IBus.Panel.Emojier org.freedesktop.IBus.Panel.Extension.Gtk3 \
-         org.freedesktop.IBus.Setup nm-connection-editor; do \
+         org.freedesktop.IBus.Setup nm-connection-editor \
+         org.kde.discover org.kde.discover.notifier org.kde.discover.urlhandler; do \
          [ ! -f "$f.desktop" ] || sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$f.desktop"; \
        done \
     && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \

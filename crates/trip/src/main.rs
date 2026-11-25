@@ -5,6 +5,7 @@ use serde::Serialize;
 
 mod demo;
 mod shell;
+mod storecmd;
 
 use trip::{agent, logo, model};
 
@@ -49,6 +50,9 @@ enum Command {
     /// Manage local models.
     #[command(subcommand)]
     Model(ModelCommand),
+    /// Find, install and remove apps (Flathub).
+    #[command(subcommand)]
+    Store(StoreCommand),
     /// Show the tripppin logo with a short system summary.
     Logo {
         /// Draw it once without animating.
@@ -57,6 +61,36 @@ enum Command {
         /// Only the logo, without the system summary (used for the login banner).
         #[arg(long)]
         bare: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum StoreCommand {
+    /// Search the catalogue.
+    Search {
+        #[arg(required = true, trailing_var_arg = true)]
+        words: Vec<String>,
+    },
+    /// What an app is, and what it can use.
+    Info {
+        #[arg(required = true, trailing_var_arg = true)]
+        words: Vec<String>,
+    },
+    /// Install an app, by id or by what it's called.
+    Install {
+        #[arg(required = true, trailing_var_arg = true)]
+        words: Vec<String>,
+    },
+    /// Remove an installed app.
+    Remove {
+        #[arg(required = true, trailing_var_arg = true)]
+        words: Vec<String>,
+    },
+    /// List the apps with an update waiting.
+    Updates {
+        /// Install them too.
+        #[arg(long)]
+        apply: bool,
     },
 }
 
@@ -89,6 +123,11 @@ fn main() -> Result<()> {
         Command::Model(ModelCommand::List) => model::list(),
         Command::Model(ModelCommand::Pull { tier }) => model::pull(tier.as_deref()),
         Command::Model(ModelCommand::Serve) => model::serve(),
+        Command::Store(StoreCommand::Search { words }) => storecmd::search(&words),
+        Command::Store(StoreCommand::Info { words }) => storecmd::info(&words),
+        Command::Store(StoreCommand::Install { words }) => storecmd::install(&words),
+        Command::Store(StoreCommand::Remove { words }) => storecmd::remove(&words),
+        Command::Store(StoreCommand::Updates { apply }) => storecmd::updates(apply),
         Command::Logo { still, bare } => {
             let info = if bare { Vec::new() } else { summary() };
             Ok(logo::show(&info, !still)?)

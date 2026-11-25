@@ -35,3 +35,14 @@ polkit.addRule(function (action, subject) {
         return polkit.Result.YES;
     }
 });
+
+// The Store (tripppin-ui store, trip store): administrators install, update and remove
+// Flatpak apps for everyone on the computer without a password (Flatpak's own rule for
+// the wheel group does the same on Fedora; this keeps it true if that file changes).
+polkit.addRule(function (action, subject) {
+    if (action.id.indexOf("org.freedesktop.Flatpak.") == 0 &&
+        action.id != "org.freedesktop.Flatpak.install-bundle" &&
+        subject.local && subject.active && subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});
