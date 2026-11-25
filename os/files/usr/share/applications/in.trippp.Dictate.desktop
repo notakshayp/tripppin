@@ -3,6 +3,6 @@ Type=Application
 Name=Dictate
 Comment=Speak and it's typed where you were (press again to finish)
 Exec=tripppin-ui dictate
-Icon=tripppin
+Icon=in.trippp.Dictate
 NoDisplay=true
 Categories=Utility;

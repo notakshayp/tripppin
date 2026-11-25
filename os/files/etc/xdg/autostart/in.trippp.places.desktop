@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Tripppin places
+Exec=/usr/libexec/tripppin-places
+NoDisplay=true
+X-KDE-autostart-phase=1
