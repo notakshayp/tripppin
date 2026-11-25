@@ -74,7 +74,7 @@ site/         plan pages (static HTML)
 
 ## Develop
 
-Needs Rust (stable, 1.85 or newer).
+Needs Rust (stable, 1.89 or newer).
 
 ```bash
 cargo fmt --all

@@ -87,12 +87,12 @@ impl Log {
     }
 
     pub fn write(&mut self, event: &Live) {
-        if let Some(f) = &mut self.file {
-            if let Ok(mut line) = serde_json::to_string(event) {
-                line.push('\n');
-                // One write per line, so a reader sees whole lines or a clean cut.
-                let _ = f.write_all(line.as_bytes());
-            }
+        if let Some(f) = &mut self.file
+            && let Ok(mut line) = serde_json::to_string(event)
+        {
+            line.push('\n');
+            // One write per line, so a reader sees whole lines or a clean cut.
+            let _ = f.write_all(line.as_bytes());
         }
     }
 

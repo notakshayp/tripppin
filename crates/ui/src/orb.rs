@@ -2227,8 +2227,8 @@ impl Orb {
         if let Some(s) = req.session.borrow().as_ref() {
             s.save();
         }
-        let spawned = std::process::Command::new("foot")
-            .args(["--title", "tripppin", "--", "trip", "shell", "--continue", &req.id])
+        let spawned = std::process::Command::new("konsole")
+            .args(["--title", "tripppin", "-e", "trip", "shell", "--continue", &req.id])
             .env("TRIPPPIN_IN_SHELL", "1")
             .spawn();
         if spawned.is_ok() {

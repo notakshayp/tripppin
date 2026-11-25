@@ -70,17 +70,17 @@ pub fn start() {
         }
         // An update downloaded and waiting.
         let st = crate::system::status();
-        if let Some(next) = st.staged {
-            if *staged.borrow() != next.version {
-                *staged.borrow_mut() = next.version.clone();
-                notify(
-                    "updates",
-                    "system-software-update",
-                    "An update is ready",
-                    "It starts the next time you restart",
-                    "normal",
-                );
-            }
+        if let Some(next) = st.staged
+            && *staged.borrow() != next.version
+        {
+            *staged.borrow_mut() = next.version.clone();
+            notify(
+                "updates",
+                "system-software-update",
+                "An update is ready",
+                "It starts the next time you restart",
+                "normal",
+            );
         }
         // Crashes since we last looked.
         let out = Command::new("coredumpctl")

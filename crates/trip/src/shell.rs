@@ -455,11 +455,11 @@ pub fn run(resume: Option<&str>) -> Result<()> {
                         respond(&mut session, &cancel)
                     }
                 };
-                if let (Some(u), Ok(mut i)) = (usage, info.lock()) {
-                    if u.context > 0 {
-                        i.context = u.context;
-                        i.fill = Some(tui::context_fill(&u));
-                    }
+                if let (Some(u), Ok(mut i)) = (usage, info.lock())
+                    && u.context > 0
+                {
+                    i.context = u.context;
+                    i.fill = Some(tui::context_fill(&u));
                 }
             }
         }
