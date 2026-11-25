@@ -9,7 +9,7 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 | Base | Fedora bootc 45, image-based. The whole OS is one signed OCI image; machines update atomically and roll back on failed boots. |
 | Language | Rust for everything we write (edition 2024, MSRV 1.85). |
 | Model engine | llama.cpp server as a supervised child process; Vulkan by default, NVIDIA image variant later. |
-| Desktop | niri (packaged by Fedora) with lightweight parts restyled to our design (waybar, SwayNotificationCenter, fuzzel, foot), and our own screens in Rust (orb, login, lock, Settings). Hyprland was the first plan; COSMIC was tried and dropped as too generic. |
+| Desktop | KDE Plasma 6 on KWin (Wayland), restyled end to end ("Tripppin" look-and-feel, colour scheme, Plasma style, Konsole profile), with our own screens in Rust (orb, login, Settings hub). Replaced niri on 2026-11-25: niri lacked desktop icons, right-click menus and a complete file manager. Hyprland was the first plan; COSMIC was dropped as too generic. |
 | Shell | Plain text goes to the model. `!cmd` runs a raw command; `/term` opens a classic shell. |
 | Safety | Code is the boundary (taint labels, policy engine, sandbox); an AI verifier checks intent on top. YOLO keeps two exceptions. |
 | Minimum | 16 GB memory for local AI; below that, a cloud key or the user's own server. |
@@ -144,3 +144,11 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 3. **Branch protection:** turn it on now, or once a second contributor joins?
 4. **Repo visibility:** private repos get 2,000 free Actions minutes a month. Nightly image builds use roughly 15–25 minutes each. Going public later makes standard runners free.
 - [~] Right-click desktop menu and ~/Desktop icons (`tripppin-ui desktop`, see docs/DESKTOP.md); not yet checked in a session
+
+## Plasma switch (2026-11-25, branch `plasma`)
+
+- [x] Plasma 6 package set in os/Containerfile (explicit, not @kde-desktop); niri, waybar, swaync, fuzzel, wlogout, swaybg, swayidle, Thunar, blueman, wdisplays, pavucontrol, foot, mate-polkit, cliphist, qt5ct/qt6ct, grim/slurp/swappy/wf-recorder, udiskie removed with their config
+- [x] Look-and-feel package `in.trippp.desktop`, colour scheme, Plasma style, Konsole profile, /etc/xdg defaults, shortcut map (docs/DESKTOP.md)
+- [x] Login: our greeter on KWin; session starts `startplasma-wayland`
+- [~] Checked in the VM by screenshot (docs/DESKTOP.md, Plasma section)
+- [ ] To remove from crates/ui once Plasma is accepted: `displays`, `splash`, `desktop`, `dim`, `lock`, `keeper`, `snap`, `switch`, `osd`, `quick`, `battery-ring`, the niri-based Settings pages (Wi-Fi, Bluetooth, Sound, Display, Appearance, Power, Notifications, Keyboard, Mouse, Printers, Accessibility, now `#[allow(dead_code)]`), `keys` (cheat sheet lists niri keys), and the `foot` shim in os/files/usr/bin once orb.rs launches Konsole
