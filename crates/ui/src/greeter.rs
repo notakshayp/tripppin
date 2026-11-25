@@ -18,11 +18,17 @@ const SESSION: &str = "/usr/libexec/tripppin-session";
 /// everything, the password box in the lock screen's style (raised, 2 px outline, accent
 /// when focused).
 const TILES_CSS: &str = r#"
-window.tiles-greeter.screen {
+window.tiles-greeter.screen { background: #101418; color: #ffffff; }
+window.tiles-greeter .tiles-curtain {
   background-color: #0f3d3a;
   background-image: linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.45));
-  color: #ffffff;
 }
+window.tiles-greeter .tiles-stage2 { background: #101418; }
+window.tiles-greeter .tiles-big {
+  min-width: 120px; min-height: 120px; font-family: Inter; font-weight: 300; font-size: 64px;
+  background: #1f6b45; color: #ffffff; border-radius: 0;
+}
+window.tiles-greeter .tiles-name { font-family: Inter; font-weight: 300; font-size: 30px; color: #ffffff; }
 window.tiles-greeter .clock-big {
   font-family: Inter; font-weight: 200; font-size: 140px; letter-spacing: -2.8px;
   color: #ffffff; margin: 0; padding: 0; line-height: 1;
@@ -32,7 +38,7 @@ window.tiles-greeter .date {
 }
 window.tiles-greeter .tiles-top { font-size: 13px; color: #ffffff; }
 window.tiles-greeter .pw-pill {
-  background: rgba(16,20,24,0.63); border: 2px solid #3a444b; border-radius: 0; box-shadow: none;
+  background: #1a2025; border: 2px solid #3a444b; border-radius: 0; box-shadow: none;
   padding: 0; min-height: 52px;
 }
 window.tiles-greeter .pw-pill:focus-within { border-color: #3fae7a; }
@@ -45,7 +51,7 @@ window.tiles-greeter button.go {
   min-width: 52px; min-height: 52px; margin: -2px; padding: 0;
 }
 window.tiles-greeter button.go:hover { background: #2a7b54; }
-window.tiles-greeter .avatar { border-radius: 0; background: #c2502e; color: #ffffff; }
+window.tiles-greeter .avatar { border-radius: 0; color: #ffffff; }
 window.tiles-greeter .who { font-family: Inter; font-weight: 300; font-size: 20px; color: #ffffff; }
 window.tiles-greeter .status { color: #9aa4ab; font-family: Inter; font-size: 13px; }
 window.tiles-greeter .tiles-top.status { color: #ffffff; }
@@ -110,13 +116,23 @@ fn build(app: &gtk::Application) {
     window.set_exclusive_zone(-1);
     window.set_keyboard_mode(KeyboardMode::Exclusive);
 
-    let overlay = gtk::Overlay::new();
-    let flat = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    flat.set_hexpand(true);
-    flat.set_vexpand(true);
-    overlay.set_child(Some(&flat));
+    // Two stages, like the lock screen: the curtain (the mock: time, date, hint, no password
+    // field) and, behind it, who you are and the password. A key, a click or an upward swipe
+    // slides the curtain up; Esc or ten idle seconds drop it again.
+    let flat = || {
+        let b = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        b.set_hexpand(true);
+        b.set_vexpand(true);
+        b
+    };
+    let curtain = gtk::Overlay::new();
+    curtain.add_css_class("tiles-curtain");
+    curtain.set_child(Some(&flat()));
+    let stage2 = gtk::Overlay::new();
+    stage2.add_css_class("tiles-stage2");
+    stage2.set_child(Some(&flat()));
 
-    // Everything bottom-left in one column: the time, the date, then who and the password.
+    // The time and the date, bottom-left.
     let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
     column.set_halign(gtk::Align::Start);
     column.set_valign(gtk::Align::End);
@@ -131,25 +147,25 @@ fn build(app: &gtk::Application) {
     time.append(&clock);
     time.append(&date);
     column.append(&time);
+    curtain.add_overlay(&column);
 
     // Who and the password.
     let people = common::people();
     let user = people.first().cloned().unwrap_or_default();
     let form = gtk::Box::new(gtk::Orientation::Vertical, 18);
-    form.set_halign(gtk::Align::Start);
-    form.set_margin_top(28);
+    form.set_halign(gtk::Align::Center);
+    form.set_valign(gtk::Align::Center);
     form.set_size_request(380, -1);
-    let who = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    let who = gtk::Box::new(gtk::Orientation::Vertical, 24);
+    who.set_halign(gtk::Align::Center);
     let name = common::display_name(&user);
     let initial = name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default();
     let avatar = gtk::Label::new(Some(&initial));
     avatar.add_css_class("avatar");
-    let names = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    names.set_valign(gtk::Align::Center);
-    names.append(&label(&name, &["who"]));
-    names.append(&label("Tripppin desktop", &["status"]));
+    avatar.add_css_class("tiles-big");
+    avatar.set_halign(gtk::Align::Center);
     who.append(&avatar);
-    who.append(&names);
+    who.append(&label(&name, &["tiles-name"]));
     // More than one person: a name field instead of a fixed name.
     let username = gtk::Entry::new();
     username.add_css_class("pw");
@@ -247,8 +263,7 @@ fn build(app: &gtk::Application) {
     }
     form.append(&forgot);
     form.append(&help);
-    column.append(&form);
-    overlay.add_overlay(&column);
+    stage2.add_overlay(&form);
 
     // Wi-Fi and battery, top-right: "Wi-Fi   82%", as on the lock screen.
     let top = gtk::Box::new(gtk::Orientation::Horizontal, 16);
@@ -262,9 +277,34 @@ fn build(app: &gtk::Application) {
     if let Some(b) = common::battery() {
         top.append(&label(&format!("{b}%"), &["status", "tiles-top"]));
     }
-    overlay.add_overlay(&top);
+    curtain.add_overlay(&top);
 
-    // Power, bottom-right, where the lock screen has its hint.
+    // "Swipe up or type", bottom-right, with a chevron.
+    let hint = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    hint.set_halign(gtk::Align::End);
+    hint.set_valign(gtk::Align::End);
+    hint.set_margin_end(40);
+    hint.set_margin_bottom(60);
+    let chevron = gtk::DrawingArea::new();
+    chevron.set_content_width(22);
+    chevron.set_content_height(22);
+    chevron.set_halign(gtk::Align::Center);
+    chevron.set_draw_func(|_, cr, w, h| {
+        let k = f64::from(w.min(h)) / 24.0;
+        cr.set_source_rgb(0.604, 0.643, 0.671);
+        cr.set_line_width(1.5 * k);
+        cr.set_line_cap(gtk::cairo::LineCap::Round);
+        cr.set_line_join(gtk::cairo::LineJoin::Round);
+        cr.move_to(6.0 * k, 15.0 * k);
+        cr.line_to(12.0 * k, 9.0 * k);
+        cr.line_to(18.0 * k, 15.0 * k);
+        let _ = cr.stroke();
+    });
+    hint.append(&chevron);
+    hint.append(&label("Swipe up or type", &["status"]));
+    curtain.add_overlay(&hint);
+
+    // Power, bottom-right of the second stage.
     let status = gtk::Box::new(gtk::Orientation::Horizontal, 22);
     status.set_halign(gtk::Align::End);
     status.set_valign(gtk::Align::End);
@@ -286,8 +326,117 @@ fn build(app: &gtk::Application) {
         app.add_action(&action);
     }
     status.append(&power);
-    overlay.add_overlay(&status);
-    window.set_child(Some(&overlay));
+    stage2.add_overlay(&status);
+
+    let stack = gtk::Stack::new();
+    stack.set_transition_duration(250);
+    stack.add_named(&curtain, Some("curtain"));
+    stack.add_named(&stage2, Some("form"));
+    stack.set_visible_child_name("curtain");
+    window.set_child(Some(&stack));
+
+    // Raise and drop the curtain. `last` is the time of the last input, for the idle drop.
+    let last = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let raise = {
+        let (stack, password, last) = (stack.clone(), password.clone(), last.clone());
+        move |typed: Option<String>| {
+            last.set(std::time::Instant::now());
+            if stack.visible_child_name().as_deref() != Some("form") {
+                stack.set_visible_child_full("form", gtk::StackTransitionType::UnderUp);
+            }
+            password.grab_focus();
+            if let Some(t) = typed {
+                password.set_text(&format!("{}{t}", password.text()));
+                password.set_position(-1);
+            }
+        }
+    };
+    let drop_curtain = {
+        let (stack, password, error, last) = (stack.clone(), password.clone(), error.clone(), last.clone());
+        move || {
+            last.set(std::time::Instant::now());
+            if stack.visible_child_name().as_deref() == Some("form") {
+                stack.set_visible_child_full("curtain", gtk::StackTransitionType::OverDown);
+            }
+            password.set_text("");
+            error.set_visible(false);
+        }
+    };
+    {
+        // Keys: on the curtain any key raises it (a printable one other than Space goes into
+        // the box); on the second stage Esc drops it.
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let (stack, raise, drop_curtain, last) = (stack.clone(), raise.clone(), drop_curtain.clone(), last.clone());
+        keys.connect_key_pressed(move |_, key, _, _| {
+            use gtk::gdk::Key;
+            last.set(std::time::Instant::now());
+            let on_curtain = stack.visible_child_name().as_deref() != Some("form");
+            if matches!(
+                key,
+                Key::Shift_L
+                    | Key::Shift_R
+                    | Key::Control_L
+                    | Key::Control_R
+                    | Key::Alt_L
+                    | Key::Alt_R
+                    | Key::Super_L
+                    | Key::Super_R
+                    | Key::Meta_L
+                    | Key::Meta_R
+                    | Key::Caps_Lock
+                    | Key::ISO_Level3_Shift
+            ) {
+                return glib::Propagation::Proceed;
+            }
+            if key == Key::Escape {
+                if !on_curtain {
+                    drop_curtain();
+                }
+                return glib::Propagation::Stop;
+            }
+            if on_curtain {
+                let typed = key.to_unicode().filter(|c| !c.is_control() && *c != ' ').map(|c| c.to_string());
+                raise(typed);
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        window.add_controller(keys);
+    }
+    {
+        // A click, or a drag upward, raises the curtain.
+        let click = gtk::GestureClick::new();
+        let r = raise.clone();
+        click.connect_pressed(move |_, _, _, _| r(None));
+        curtain.add_controller(click);
+        let drag = gtk::GestureDrag::new();
+        let r = raise.clone();
+        drag.connect_drag_update(move |_, _, dy| {
+            if dy < -40.0 {
+                r(None);
+            }
+        });
+        curtain.add_controller(drag);
+    }
+    {
+        // Ten seconds without input drops the curtain, unless something is typed.
+        let (stack, password, last, drop_curtain) =
+            (stack.clone(), password.clone(), last.clone(), drop_curtain.clone());
+        password.connect_changed({
+            let last = last.clone();
+            move |_| last.set(std::time::Instant::now())
+        });
+        glib::timeout_add_seconds_local(1, move || {
+            if stack.visible_child_name().as_deref() == Some("form")
+                && last.get().elapsed() > std::time::Duration::from_secs(10)
+                && password.text().is_empty()
+            {
+                drop_curtain();
+            }
+            glib::ControlFlow::Continue
+        });
+    }
 
     glib::timeout_add_seconds_local(5, move || {
         clock.set_text(&common::clock());
@@ -329,5 +478,4 @@ fn build(app: &gtk::Application) {
     if let Some(c) = window.child() {
         crate::common::play(&c, "fade");
     }
-    password.grab_focus();
 }

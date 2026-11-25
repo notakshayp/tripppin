@@ -42,4 +42,4 @@ tray.currentConfigGroup = ["General"];
 tray.writeConfig("extraItems", "org.kde.plasma.notifications");
 tray.writeConfig("shownItems", "org.kde.plasma.notifications");
 tray.writeConfig("hiddenItems", "");
-tray.writeConfig("scaleIconsToFit", "false");
+tray.writeConfig("scaleIconsToFit", "true");

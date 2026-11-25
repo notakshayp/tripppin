@@ -16,6 +16,10 @@ PlasmoidItem {
 
     BatteryControlModel { id: battery }
 
+    // Writes the unread counts the lock screen shows (its own file, so a failure here only
+    // loses the badges).
+    Loader { source: "Unread.qml" }
+
     Timer {
         interval: 1000
         running: true

@@ -149,6 +149,7 @@ pub fn animated_logo(width: i32, waiting: bool) -> gtk::DrawingArea {
 }
 
 /// The desktop's backdrop: the huge, faint mark off the top right, as on the wallpaper.
+#[allow(dead_code)] // the previous login look; the Tiles greeter is flat
 pub fn backdrop() -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
     area.set_hexpand(true);

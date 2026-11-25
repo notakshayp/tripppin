@@ -160,5 +160,6 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 - [~] Taskbar: 40 px bottom panel, start button plasmoid, icons-only tasks with accent underline, status-line plasmoid, tray reduced to notifications; Meta tap opens `tripppin-ui start`
 - [~] Plasma style `tripppin-tiles`, colour scheme to the tokens, QML window decoration (36 px strip), Kvantum "Tripppin" theme for Qt apps
 - [~] Lock screen (QML) and login screen in the Tiles look; splash with Shapes
-- [ ] Next-event line on the lock screen (needs the calendar store); `tripppin-ui start` bound once it lands
+- [~] Lock and login are two-stage curtains; the lock's event line and unread badges read small files (next-event.json from the calendar app, unread.json from the status plasmoid) and are hidden without data
+- [ ] Calendar app writes `~/.local/share/tripppin/next-event.json`; `tripppin-ui start` bound once it lands
 - [ ] Checked at scale 1, 1.5 and 2 on the laptop (checked in the VM at 1)
