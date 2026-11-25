@@ -84,6 +84,7 @@ Reordered on 2026-11-20: the AI comes before the desktop. The AI shell runs in a
 - [x] Agent loop in `trip`: the model calls tools until it answers in plain text (25-step cap, Ctrl-C stops it)
 - [x] Tools: `exec` (bash, live output, timeout, sudo prompts work), `read_file`, `write_file`
 - [x] Task notebook and compaction for small models: the model's plan and notes plus one line per step, shown at every step; old steps dropped when the context fills (the notebook keeps them); every session saved and listed (`/history`, the orb's history), continued in the terminal
+- [x] Follow mode: while the orb runs a request it appends each agent event as a JSON line to `<session>.live`; "Continue in terminal" renders the history, then follows the run live with the shell's own rendering (Ctrl+C writes `<session>.stop`, which the orb honours), then carries on as a chat
 - [x] Task plan (`plan` / `done` tools): short steps, one at a time, each checked; kept in the session across compaction and `--continue`; stuck detection (repeats, no progress, failures in a row) nudges, then makes the model stop and explain
 - [x] Compaction on the server's real token counts with headroom (85 % → 55 %); the notebook sent as its own message so the prompt cache holds; what was dropped recorded in the session; UI events for waiting, token usage and the plan ([HARNESS.md](HARNESS.md))
 - [x] Administrator commands: sudo asks through a pop-up showing the command; Settings → AI can allow installs, services or updates without a password
