@@ -1,7 +1,7 @@
 // The Tripppin desktop, first login (the "Tiles" design, mock section 02): flat #101418 on
 // every screen (the desktop itself shows ~/Desktop as icons) and one thin taskbar docked at
-// the bottom, 40 px, solid ink, square: the start button (a 40 x 40 accent square, runs
-// `tripppin-ui start`), then icons-only running apps with a 2 px accent underline, then at the
+// the bottom, 40 px, solid ink, square: the bridge button (a 40 x 40 accent square, runs
+// `tripppin-ui bridge`), then icons-only running apps with a 2 px accent underline, then at the
 // far right the status line in plain text ("Wi-Fi   82%   21:14") and the notifications bell.
 
 var desktops = desktopsForActivity(currentActivity());
@@ -10,6 +10,17 @@ for (var i = 0; i < desktops.length; i++) {
     d.wallpaperPlugin = "org.kde.color";
     d.currentConfigGroup = ["Wallpaper", "org.kde.color", "General"];
     d.writeConfig("Color", "#101418");
+    // Plasma's own right-click menu is emptied: ours (tripppin-ui desktop, on the layer above
+    // the wallpaper) has New folder, Change wallpaper and Display settings that open our
+    // Settings, and Open terminal. Nothing here may lead to KDE's own configuration dialogs.
+    d.currentConfigGroup = ["ActionPlugins", "0"];
+    d.writeConfig("RightButton;NoModifier", "org.kde.contextmenu");
+    d.currentConfigGroup = ["ActionPlugins", "0", "RightButton;NoModifier"];
+    var hidden = ["_context", "_sep1", "_sep2", "_sep3", "_add widgets", "_add panel", "_manage_activities",
+        "_wallpaper", "_lock_screen", "_logout", "_run_command", "_open_terminal", "_edit_mode", "_display_settings"];
+    for (var h = 0; h < hidden.length; h++) {
+        d.writeConfig(hidden[h], "false");
+    }
 }
 
 var panel = new Panel();

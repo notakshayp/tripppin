@@ -8,7 +8,7 @@ _launch=Meta+Space,none,Ask Tripppin
 _launch=Meta+M,none,Dictate
 
 [services][in.trippp.Launcher.desktop]
-_launch=Meta+A\tMeta+D,none,Open the start screen
+_launch=Meta+A\tMeta+D,none,Open the bridge
 
 [services][in.trippp.Keys.desktop]
 _launch=Meta+/,none,Keyboard shortcuts

@@ -35,13 +35,23 @@ use trip::follow;
 use trip::model::{PlanStep, Usage};
 use trip::session::Session;
 
-const SUGGESTIONS: [&str; 3] = ["Free up some space", "Connect my headphones", "What changed today?"];
+const SUGGESTIONS: [&str; 3] = ["free up some space", "connect my headphones", "what changed today?"];
 
 const ORB_TIP: &str = "Ask Tripppin (Super + Space)\ndrag to move it · right-click to tuck it away";
 
 /// Space between the orb's glow and the screen edge, and room for the bar at the top.
 const EDGE: i32 = 6;
 const BELOW_BAR: i32 = 46;
+/// The orb button's own size, without its glow.
+const ORB_BOX: i32 = 44;
+
+/// The width of the first screen, to find the middle before the window exists.
+fn screen_width() -> i32 {
+    gtk::gdk::Display::default()
+        .and_then(|d| d.monitors().item(0))
+        .and_then(|m| m.downcast::<gtk::gdk::Monitor>().ok())
+        .map_or(1280, |m| m.geometry().width())
+}
 /// The glow around the orb, inside its window (clicks pass through it).
 const GLOW: i32 = 14;
 /// The conversation's height in the card: room for a few steps from the start, then it scrolls.
@@ -54,10 +64,13 @@ pub enum Corner {
     TopRight,
     BottomLeft,
     BottomRight,
+    /// Bottom-centre, above the taskbar: the default, clear of the notifications at the right.
+    BottomCentre,
 }
 
 impl Corner {
-    const ALL: [Corner; 4] = [Corner::TopLeft, Corner::TopRight, Corner::BottomLeft, Corner::BottomRight];
+    const ALL: [Corner; 5] =
+        [Corner::TopLeft, Corner::TopRight, Corner::BottomLeft, Corner::BottomRight, Corner::BottomCentre];
 
     fn name(self) -> &'static str {
         match self {
@@ -65,6 +78,7 @@ impl Corner {
             Corner::TopRight => "top-right",
             Corner::BottomLeft => "bottom-left",
             Corner::BottomRight => "bottom-right",
+            Corner::BottomCentre => "bottom-centre",
         }
     }
 
@@ -73,11 +87,14 @@ impl Corner {
     }
 
     fn left(self) -> bool {
-        matches!(self, Corner::TopLeft | Corner::BottomLeft)
+        matches!(self, Corner::TopLeft | Corner::BottomLeft | Corner::BottomCentre)
     }
 
     /// The corner nearest a point on a `w` x `h` screen.
     pub fn nearest(x: f64, y: f64, w: f64, h: f64) -> Corner {
+        if y >= h / 2.0 && (x - w / 2.0).abs() < w / 6.0 {
+            return Corner::BottomCentre;
+        }
         match (x < w / 2.0, y < h / 2.0) {
             (true, true) => Corner::TopLeft,
             (false, true) => Corner::TopRight,
@@ -101,8 +118,15 @@ impl Corner {
         w.set_margin(if self.top() { Edge::Top } else { Edge::Bottom }, end);
     }
 
+    /// Where the orb rests: its margin from the side edge and from the top or bottom (the
+    /// taskbar sits at the bottom, so the bottom spots rest above it).
     fn rest(self) -> (i32, i32) {
-        (EDGE, if self.top() { BELOW_BAR } else { EDGE })
+        let end = if self.top() { EDGE } else { BELOW_BAR };
+        match self {
+            // Anchored from the left, so the middle is a margin worked out from the screen.
+            Corner::BottomCentre => ((screen_width() - (ORB_BOX + 2 * GLOW)) / 2, end),
+            _ => (EDGE, end),
+        }
     }
 }
 
@@ -117,7 +141,7 @@ fn prefs_file() -> std::path::PathBuf {
 
 pub fn parse_prefs(text: &str) -> (Corner, bool) {
     let corner = Corner::ALL.into_iter().find(|c| text.lines().any(|l| l.trim() == c.name()));
-    (corner.unwrap_or(Corner::BottomRight), text.lines().any(|l| l.trim() == "tucked"))
+    (corner.unwrap_or(Corner::BottomCentre), text.lines().any(|l| l.trim() == "tucked"))
 }
 
 fn load_prefs() -> (Corner, bool) {
@@ -364,6 +388,21 @@ fn tick(glyph: char, failed: bool) -> gtk::Label {
     t
 }
 
+/// Five small squares that light one after another: the "now" mark, as on the website. The
+/// motion is CSS (opacity only), so it costs nothing.
+fn marching() -> gtk::Box {
+    let b = gtk::Box::new(gtk::Orientation::Horizontal, 3);
+    b.add_css_class("marching");
+    b.set_valign(gtk::Align::Center);
+    for i in 0..5 {
+        let d = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        d.add_css_class("march-dot");
+        d.add_css_class(&format!("md{i}"));
+        b.append(&d);
+    }
+    b
+}
+
 /// Lines of a step's output kept to show when it's opened.
 const OUTPUT_LINES: usize = 60;
 
@@ -374,6 +413,7 @@ struct StepRow {
     done: Cell<bool>,
     mark: gtk::Stack,
     title: gtk::Label,
+    state: gtk::Label,
     detail: gtk::Label,
     output: gtk::Label,
     lines: RefCell<VecDeque<String>>,
@@ -386,7 +426,7 @@ impl StepRow {
         mark.set_margin_top(1);
         mark.set_transition_type(gtk::StackTransitionType::Crossfade);
         mark.set_transition_duration(160);
-        mark.add_named(&common::spinner(16), Some("running"));
+        mark.add_named(&marching(), Some("running"));
         mark.add_named(&tick(icons::CHECK, false), Some("done"));
         mark.add_named(&tick(icons::ALERT, true), Some("failed"));
         mark.set_visible_child_name("running");
@@ -396,8 +436,11 @@ impl StepRow {
         title.set_hexpand(true);
         let chevron = common::icon(icons::CHEVRON_RIGHT, &["step-chevron"]);
         chevron.set_valign(gtk::Align::Start);
-        let head = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let state = label("now", &["step-state"]);
+        state.set_valign(gtk::Align::Start);
+        let head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         head.append(&title);
+        head.append(&state);
         head.append(&chevron);
         let detail = label(full.lines().next().unwrap_or(""), &["step-detail"]);
         detail.set_ellipsize(gtk::pango::EllipsizeMode::End);
@@ -433,6 +476,7 @@ impl StepRow {
         text.append(&revealer);
         let root = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         root.add_css_class("step");
+        root.add_css_class("now");
         root.set_tooltip_text(Some("Click to see the command and what it printed"));
         root.append(&mark);
         root.append(&text);
@@ -442,6 +486,7 @@ impl StepRow {
             done: Cell::new(false),
             mark,
             title,
+            state,
             detail,
             output,
             lines: RefCell::new(VecDeque::new()),
@@ -473,6 +518,7 @@ impl StepRow {
             None => {
                 row.mark.set_visible_child_name("done");
                 row.title.remove_css_class("running");
+                row.settle_look(true);
             }
         }
         row
@@ -501,6 +547,14 @@ impl StepRow {
         }
         self.mark.set_visible_child_name(if ok { "done" } else { "failed" });
         self.title.remove_css_class("running");
+        self.settle_look(ok);
+    }
+
+    /// The row's colour and word: amber "now", green "done", rust "failed".
+    fn settle_look(&self, ok: bool) {
+        self.root.remove_css_class("now");
+        self.root.add_css_class(if ok { "done" } else { "failed" });
+        self.state.set_text(if ok { "done" } else { "failed" });
     }
 }
 
@@ -868,6 +922,15 @@ struct Orb {
     state: RefCell<State>,
 }
 
+/// The Tiles look of the orb (orb.css), over the shared stylesheet: flat, square, solid
+/// colour, the website's ask demo.
+fn load_orb_css() {
+    let Some(display) = gtk::gdk::Display::default() else { return };
+    let provider = gtk::CssProvider::new();
+    provider.load_from_string(include_str!("orb.css"));
+    gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 2);
+}
+
 pub fn run() -> glib::ExitCode {
     let app = gtk::Application::builder()
         .application_id("in.trippp.Orb")
@@ -877,6 +940,7 @@ pub fn run() -> glib::ExitCode {
     let started = orb.clone();
     app.connect_startup(move |app| {
         common::load_css();
+        load_orb_css();
         let built = build(app);
         *started.borrow_mut() = Some(built);
         write_status("");
@@ -934,6 +998,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
         logo.set_visible(false);
     }
     let hint = label("Super + Space", &["orb-hint"]);
+    hint.set_visible(corner_at != Corner::BottomCentre);
     hint.set_valign(gtk::Align::Center);
     // The hint teaches the shortcut; once the orb has been opened it fades out for good.
     // (Faded, not removed: removing it would leave the corner window at its old width and
@@ -984,11 +1049,11 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     entry.add_css_class("ask");
     entry.set_hexpand(true);
     entry.set_valign(gtk::Align::Center);
-    entry.set_placeholder_text(Some("Tell your computer what you want, or open an app"));
+    entry.set_placeholder_text(Some("what do you want?"));
     let send = gtk::Button::new();
     send.add_css_class("send");
     send.set_valign(gtk::Align::Center);
-    send.set_child(Some(&common::arrow(true)));
+    send.set_label("ask");
     send.set_tooltip_text(Some("Send"));
     pill.append(&pill_orb);
     pill.append(&entry);
@@ -1009,16 +1074,16 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     let footer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     footer.set_margin_start(12);
     footer.set_margin_end(12);
-    let keys = label("Enter to send · Esc to close", &["hint"]);
+    let keys = label("enter to send · esc to close", &["hint", "model-line"]);
     keys.set_hexpand(true);
     footer.append(&keys);
-    let ask_history = gtk::Button::with_label("History");
+    let ask_history = gtk::Button::with_label("history");
     ask_history.add_css_class("link");
     ask_history.add_css_class("hint-link");
     ask_history.set_margin_end(12);
     ask_history.set_tooltip_text(Some("Earlier requests and their steps"));
     footer.append(&ask_history);
-    let model = label(&model_line(), &["hint"]);
+    let model = label(&model_line(), &["hint", "model-line"]);
     footer.append(&model);
     column.append(&pill);
     column.append(&chips);
@@ -1050,6 +1115,7 @@ fn build(app: &gtk::Application) -> Rc<Orb> {
     body.set_margin_start(24);
     body.set_margin_end(24);
     let top = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    top.add_css_class("title-strip");
     let caption = label("You asked", &["caption"]);
     caption.set_hexpand(true);
     caption.set_valign(gtk::Align::Center);
@@ -1537,12 +1603,14 @@ impl Orb {
         let (side, end) = c.rest();
         // Past the orb (its glow box) with the card's own shadow margin taken back.
         let orb_box = 44 + 2 * GLOW;
+        let side = if c == Corner::BottomCentre { (screen_width() - 400) / 2 + 24 - GLOW } else { side };
         c.place(&self.card, (side + GLOW - 24).max(0), end + orb_box - 20);
         let origin = match c {
             Corner::TopLeft => "left top",
             Corner::TopRight => "right top",
             Corner::BottomLeft => "left bottom",
             Corner::BottomRight => "right bottom",
+            Corner::BottomCentre => "left bottom",
         };
         for o in ["origin-left-top", "origin-right-top", "origin-left-bottom", "origin-right-bottom"] {
             self.body.remove_css_class(o);
@@ -1634,6 +1702,7 @@ impl Orb {
         to.place(w, from_side.round() as i32, from_end.round() as i32);
         if to != c {
             // The hint sits on the screen side of the orb.
+            self.hint.set_visible(to != Corner::BottomCentre);
             self.row.remove(&self.hint);
             if to.left() {
                 self.row.append(&self.hint);
@@ -2348,10 +2417,12 @@ mod tests {
 
     #[test]
     fn remembers_where_the_orb_rests() {
-        assert_eq!(parse_prefs(""), (Corner::BottomRight, false));
+        assert_eq!(parse_prefs(""), (Corner::BottomCentre, false));
+        assert_eq!(parse_prefs("bottom-right\n"), (Corner::BottomRight, false));
         assert_eq!(parse_prefs("top-left\ntucked\n"), (Corner::TopLeft, true));
         assert_eq!(parse_prefs("bottom-left\n"), (Corner::BottomLeft, false));
         assert_eq!(Corner::nearest(100.0, 700.0, 1280.0, 800.0), Corner::BottomLeft);
+        assert_eq!(Corner::nearest(640.0, 700.0, 1280.0, 800.0), Corner::BottomCentre);
         assert_eq!(Corner::nearest(1200.0, 60.0, 1280.0, 800.0), Corner::TopRight);
     }
 

@@ -2,11 +2,11 @@
     "KPackageStructure": "Plasma/Applet",
     "KPlugin": {
         "Authors": [{ "Name": "Tripppin" }],
-        "Description": "Opens the start screen",
+        "Description": "Opens the bridge",
         "Icon": "tripppin",
         "Id": "in.trippp.start",
         "License": "Apache-2.0",
-        "Name": "Start button"
+        "Name": "Bridge button"
     },
     "X-Plasma-API-Minimum-Version": "6.0"
 }

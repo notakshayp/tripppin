@@ -1,0 +1,199 @@
+/* The orb in the Tiles theme, after the ask demo on trippp.in: a raised bar with the spark and
+   an accent line under it, flat chips, then the steps as solid rows (done green, now amber with
+   marching dots, next dim) and the answer on white. Square, flat, no shadows; motion is
+   opacity and transform only. Loaded over style.css (orb.rs: load_orb_css). */
+
+window.clear * { border-radius: 0; }
+window.clear { font-family: Inter, sans-serif; }
+
+/* ---- the resting orb: a raised square, the spark, an accent line under it ---- */
+button.orb {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: none;
+    border-bottom: 2px solid #3fae7a;
+    background: #1a2025;
+    background-image: none;
+    box-shadow: none;
+    transition: transform 180ms ease-out, opacity 180ms ease-out, background 180ms ease-out;
+}
+button.orb:hover { background: #222a30; transform: translateY(-1px); }
+button.orb:active { transform: scale(0.96); }
+button.orb.tucked { min-width: 18px; min-height: 18px; opacity: 0.55; box-shadow: none; }
+button.orb.tucked:hover { opacity: 1; }
+button.orb.dragging { transform: scale(1.06); box-shadow: none; }
+button.orb.working {
+    border: none;
+    border-bottom: 2px solid #b8862b;
+    background-image: none;
+    animation: orb-work 1.2s ease-in-out infinite alternate;
+}
+@keyframes orb-work { from { opacity: 0.8; } to { opacity: 1; } }
+.orb-hint { font-size: 12px; color: #9aa4ab; }
+
+/* ---- the ask bar ---- */
+.backdrop { background: rgba(16, 20, 24, 0.72); }
+.ask-pill {
+    min-height: 64px;
+    padding: 0 8px 0 20px;
+    background: #1a2025;
+    border: none;
+    border-bottom: 2px solid #3fae7a;
+    box-shadow: none;
+}
+.ask-orb { min-width: 30px; min-height: 30px; background: none; background-image: none; }
+entry.ask {
+    background: none;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    font-size: 18px;
+    font-weight: 300;
+    color: #fff;
+    caret-color: #3fae7a;
+}
+entry.ask > text > placeholder { color: #9aa4ab; }
+button.send {
+    min-width: 48px;
+    min-height: 48px;
+    padding: 0 20px;
+    border: none;
+    box-shadow: none;
+    background: #1f6b45;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+button.send:hover { background: #26805a; }
+button.send.small { min-width: 40px; min-height: 40px; padding: 0 14px; }
+
+button.chip {
+    min-height: 44px;
+    padding: 0 18px;
+    border: none;
+    box-shadow: none;
+    background: #1a2025;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 300;
+}
+button.chip:hover { background: #3a4a5a; color: #fff; }
+button.chip.app-chip { border: none; color: #fff; }
+
+/* The model and usage line, and the key hints: one small muted label. */
+.hint, .model-line { font-size: 11px; font-weight: 400; color: #9aa4ab; letter-spacing: 0.02em; }
+button.link.hint-link { font-size: 11px; color: #9aa4ab; }
+button.link.hint-link:hover { color: #fff; }
+
+/* ---- the card ---- */
+.card {
+    padding: 0 0 14px 0;
+    background: #101418;
+    border: none;
+    box-shadow: none;
+}
+.card > * { margin-left: 0; }
+/* The title strip: the request's name and the icon buttons on a raised bar. */
+.title-strip { background: #1a2025; padding: 6px 8px 6px 20px; margin-bottom: 0; }
+.card > :not(.title-strip) { margin-left: 20px; margin-right: 20px; }
+.caption { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: #9aa4ab; }
+.caption.live { color: #3fae7a; }
+.caption.orb-status { color: #fff; font-weight: 400; letter-spacing: 0; }
+.asked { font-size: 26px; font-weight: 200; letter-spacing: -0.02em; color: #fff; }
+button.icon-button { min-width: 36px; min-height: 36px; border-radius: 0; color: #9aa4ab; }
+button.icon-button:hover { background: #222a30; color: #fff; }
+.context-meter { margin-top: 0; }
+
+/* Steps: flat coloured rows. */
+.step, .plan-step {
+    padding: 14px 18px;
+    margin: 0 0 5px 0;
+    background: #1d2429;
+    color: #9aa4ab;
+    transition: background 200ms ease-out, opacity 200ms ease-out;
+}
+.step:hover { background: #222a30; }
+.step.now, .plan-step.now { background: #b8862b; color: #101418; }
+.step.done, .plan-step.done { background: #1f6b45; color: #fff; }
+.step.failed { background: #c2502e; color: #fff; }
+.step.now:hover { background: #c4912f; }
+.step.done:hover { background: #247a4f; }
+.step-title, .plan-text { font-size: 15px; font-weight: 400; color: inherit; }
+.step-title.running { color: inherit; font-weight: 400; }
+.plan-step.now .plan-text, .plan-step.done .plan-text { color: inherit; font-weight: 400; }
+.step-detail { font-size: 12px; color: inherit; opacity: 0.75; }
+.step-chevron { color: inherit; opacity: 0.7; }
+.step:hover .step-chevron { color: inherit; opacity: 1; }
+.step-state {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: inherit;
+}
+.step-more { background: rgba(16, 20, 24, 0.45); border: none; padding: 10px 12px; }
+.step-command, .step-output { color: inherit; }
+.tick { background: none; color: inherit; min-width: 16px; min-height: 16px; animation: none; }
+.tick.failed { background: none; color: inherit; }
+.plan {
+    padding: 0;
+    border: none;
+    background: none;
+}
+.plan-caption { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: #9aa4ab; margin-bottom: 5px; }
+.plan-todo { background: none; border: 1px solid #5b666d; min-width: 8px; min-height: 8px; }
+.plan-now { background: #101418; min-width: 8px; min-height: 8px; }
+.icon.plan-done { color: #fff; }
+
+/* The marching dots of "now": five squares lighting in turn. */
+.marching { min-width: 38px; }
+.march-dot { min-width: 5px; min-height: 5px; background: #101418; opacity: 0.25; animation: march 1.2s ease-in-out infinite; }
+.md1 { animation-delay: 120ms; }
+.md2 { animation-delay: 240ms; }
+.md3 { animation-delay: 360ms; }
+.md4 { animation-delay: 480ms; }
+@keyframes march { 0%, 100% { opacity: 0.25; } 25% { opacity: 1; } }
+
+/* The answer: white, dark text. */
+.answer { background: #fff; color: #101418; padding: 18px 20px; font-size: 15px; font-weight: 400; margin-top: 0; }
+.follow-up { background: #1f6b45; color: #fff; padding: 12px 16px; font-size: 15px; font-weight: 300; }
+.turn-usage, .session-usage { font-family: Inter, sans-serif; font-size: 11px; color: #9aa4ab; }
+
+/* Follow-up field: a raised bar with the accent line. */
+.follow-row { padding: 0 0 0 16px; background: #1a2025; border: none; border-bottom: 2px solid #3fae7a; }
+.follow-row:focus-within { border-bottom-color: #3fae7a; }
+entry.follow { font-size: 15px; font-weight: 300; color: #fff; caret-color: #3fae7a; }
+entry.follow > text > placeholder { color: #9aa4ab; }
+
+.card-foot { padding-top: 12px; }
+button.link { color: #9aa4ab; font-size: 13px; font-weight: 400; }
+button.link:hover { color: #fff; }
+button.stop {
+    min-height: 36px;
+    padding: 0 16px;
+    border: none;
+    background: #c2502e;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+/* Requests side by side, and the history. */
+button.request-tab { min-height: 32px; border: none; background: #1a2025; color: #9aa4ab; font-size: 13px; }
+button.request-tab:hover { background: #222a30; color: #fff; }
+button.request-tab.selected { background: #1f6b45; color: #fff; }
+.request-tab-dot { background: #5b666d; }
+.request-tab-dot.unseen { background: #3fae7a; }
+list.sessions > row { background: none; }
+.session-row { padding: 12px 16px; margin-bottom: 5px; background: #1a2025; }
+.session-row:hover { background: #222a30; }
+.session-row.current { border: none; }
+.session-row.current.on-show { background: #222a30; }
+.orb-dim { background: rgba(16, 20, 24, 0.55); }
+
+/* Entrances and exits: opacity and a short move, no scale pops. */
+.pop-a, .pop-b, .rise-a, .rise-b { animation-duration: 200ms; animation-timing-function: ease-out; }
+.drop-a, .drop-b { animation-duration: 200ms; animation-timing-function: ease-out; }
+.leave { animation-duration: 150ms; }

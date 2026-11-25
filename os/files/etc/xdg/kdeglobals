@@ -22,10 +22,27 @@ LookAndFeelPackage=in.trippp.desktop
 widgetStyle=kvantum
 # Double-click opens, like on the desktops people come from; one click selects.
 SingleClick=false
-AnimationDurationFactor=0.7
+AnimationDurationFactor=0.8
 
 [Icons]
 Theme=TripppinLine
 
 [WM]
 activeFont=
+
+# No KDE jargon: Handbook, bug reports, donations, "About KDE", language and shortcut
+# configuration are removed from every KDE app's hamburger and menus (Files, Terminal, ...).
+[KDE Action Restrictions][$i]
+help_contents=false
+help_whats_this=false
+help_report_bug=false
+help_donate=false
+help_about_kde=false
+help_about_app=false
+switch_application_language=false
+options_configure_keybinding=false
+options_configure_toolbars=false
+# Right-click menus keep the essentials: service menus (share, compress, open with, set as
+# wallpaper...) are off, see kservicemenurc.
+action/open_with=false
+action/kdeconnect=false

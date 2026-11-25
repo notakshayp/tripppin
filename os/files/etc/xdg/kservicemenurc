@@ -1,0 +1,24 @@
+# Right-click menus in Files and on the desktop: essentials only (Open, New folder, Rename,
+# Copy, Cut, Paste, Move to Trash, Properties). Every stock service menu and file action is
+# switched off here; ours (usr/share/kio/servicemenus) stay. Names are the plugin or .desktop
+# ids; an unknown name does nothing.
+[Show]
+compressfileitemaction=false
+extractfileitemaction=false
+forgetfileitemaction=false
+setaswallpaper=false
+wallpaperfileitemaction=false
+slideshowfileitemaction=false
+kdeconnectfileitemaction=false
+sharefileitemaction=false
+mountisoaction=false
+kactivitymanagerd_fileitem_plugin=false
+kio_trash=true
+installfontaction=false
+ktexteditor_insert=false
+openwithfileitemaction=false
+runnerfileitemaction=false
+kompare=false
+ark_servicemenu=false
+ark_addtoservicemenu=false
+ark_extractservicemenu=false
