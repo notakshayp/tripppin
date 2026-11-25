@@ -13,6 +13,7 @@
 //! - `battery-ring`: the bar's battery ring, as an SVG for waybar.
 //! - `toggle`: the on/off tiles in quick settings.
 //! - `snap`: puts the focused window in a half, a quarter, or fills the screen.
+//! - `store`: the Store, apps from Flathub in the Tiles design.
 //! - `desktop`: right-click menu and the icons of ~/Desktop, on the background layer.
 //! - `widgets`: the desktop widgets host, and `widgets add/list/test/remove/pin` to manage them.
 
@@ -48,6 +49,7 @@ mod snap;
 mod snd;
 mod splash;
 mod storage;
+mod store;
 mod switch;
 mod system;
 mod watch;
@@ -116,10 +118,11 @@ fn main() -> ExitCode {
         Some("switch") => switch::run(),
         Some("snap") => snap::run(args.get(1).map(String::as_str).unwrap_or("")),
         Some("desktop") => desktop::run(),
+        Some("store") => store::run(),
         Some("widgets") => widgets::cli(&args[1..]),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | desktop | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state] | corners sharp|default|round"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar | keys | switch | snap <where> | desktop | store | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state] | corners sharp|default|round"
             );
             ExitCode::from(2)
         }
