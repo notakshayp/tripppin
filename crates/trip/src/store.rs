@@ -211,7 +211,9 @@ pub fn parse_appstream(source: impl Read) -> Vec<App> {
                     && let Some(mut app) = cur.take()
                 {
                     app.brand = brand.take();
-                    app.id = bundle_id.take().unwrap_or_else(|| app.id.trim_end_matches(".desktop").to_string());
+                    if let Some(b) = bundle_id.take() {
+                        app.id = b;
+                    }
                     app.description = tidy_description(&desc);
                     if !app.id.is_empty() && !app.name.is_empty() {
                         apps.push(app);
@@ -849,6 +851,7 @@ mod tests {
   <component type="runtime"><id>org.x.Platform</id><name>Platform</name></component>
   <component type="desktop-application">
     <id>org.gnome.Calculator.desktop</id>
+    <bundle type="flatpak">app/org.gnome.Calculator/x86_64/stable</bundle>
     <name>Calculator</name>
     <summary>Do sums and play video of numbers</summary>
     <keywords><keyword>maths</keyword></keywords>

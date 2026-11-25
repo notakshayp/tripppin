@@ -501,7 +501,7 @@ fn rebuild_home(ui: &Rc<Ui>) {
                 colour: store::PALETTE[i % 8].into(),
                 icon: None,
                 big: None,
-                sub: format!("{n} apps"),
+                sub: if n == 1 { "1 app".into() } else { format!("{n} apps") },
             }
         })
         .collect();
