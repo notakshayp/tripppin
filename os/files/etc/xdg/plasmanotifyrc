@@ -16,10 +16,9 @@ ShowInHistory=false
 [Applications][org.kde.drkonqi]
 ShowInHistory=false
 
-# History is kept so the lock screen can show how many are unread per app.
 [Applications][@other]
-ShowInHistory=true
+ShowInHistory=false
 ShowBadges=false
 
 [Services][libnotificationmanager]
-ShowInHistory=true
+ShowInHistory=false

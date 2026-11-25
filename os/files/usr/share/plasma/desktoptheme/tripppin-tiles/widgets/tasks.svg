@@ -14,15 +14,15 @@
   <rect id="normal-hint-left-margin" x="0" y="0" width="9" height="1" fill="none"/>
   <rect id="normal-hint-right-margin" x="0" y="0" width="9" height="1" fill="none"/>
   <rect id="normal-hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>
-  <g id="focus-topleft"><rect x="0" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/></g>
-  <g id="focus-top"><rect x="2" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/></g>
-  <g id="focus-topright"><rect x="4" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/></g>
-  <g id="focus-left"><rect x="0" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/></g>
-  <g id="focus-center"><rect x="2" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/></g>
-  <g id="focus-right"><rect x="4" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/></g>
-  <g id="focus-bottomleft"><rect x="0" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/><rect x="0" y="4" width="2" height="2" fill="#3fae7a"/></g>
-  <g id="focus-bottom"><rect x="2" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/><rect x="2" y="4" width="2" height="2" fill="#3fae7a"/></g>
-  <g id="focus-bottomright"><rect x="4" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.1"/><rect x="4" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <g id="focus-topleft"><rect x="0" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-top"><rect x="2" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-topright"><rect x="4" y="0" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-left"><rect x="0" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-center"><rect x="2" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-right"><rect x="4" y="2" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/></g>
+  <g id="focus-bottomleft"><rect x="0" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/><rect x="0" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <g id="focus-bottom"><rect x="2" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/><rect x="2" y="4" width="2" height="2" fill="#3fae7a"/></g>
+  <g id="focus-bottomright"><rect x="4" y="4" width="2" height="2" fill="#ffffff" fill-opacity="0.0"/><rect x="4" y="4" width="2" height="2" fill="#3fae7a"/></g>
   <rect id="focus-hint-top-margin" x="0" y="0" width="1" height="9" fill="none"/>
   <rect id="focus-hint-bottom-margin" x="0" y="0" width="1" height="9" fill="none"/>
   <rect id="focus-hint-left-margin" x="0" y="0" width="9" height="1" fill="none"/>

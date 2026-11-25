@@ -77,7 +77,7 @@ write("widgets/tooltip.svg", svg(frame("", RAISED, 6, border=LINE)))
 # underline; the active one also a faint lift.
 tasks = [
     frame("normal-", ACCENT, 9, fill_opacity=0.0, underline=None),
-    frame("focus-", "#ffffff", 9, fill_opacity=0.10, underline=ACCENT),
+    frame("focus-", "#ffffff", 9, fill_opacity=0.0, underline=ACCENT),
     frame("hover-", "#ffffff", 9, fill_opacity=0.08),
     frame("attention-", "#c2502e", 9, fill_opacity=0.25, underline="#c2502e"),
     frame("minimized-", ACCENT, 9, fill_opacity=0.0, underline=ACCENT),
