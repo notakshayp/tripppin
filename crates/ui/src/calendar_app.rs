@@ -26,7 +26,44 @@ pub fn now() -> Stamp {
 /// `tripppin-ui calendar --remind`: announces events that just started. Run every minute by
 /// the user timer (tripppin-calendar-remind.timer), so reminders come with the app closed.
 pub fn remind_now() {
-    cal::remind(now());
+    let now = now();
+    cal::remind(now);
+    write_next_event(now);
+}
+
+/// Leaves the next event for the lock screen in ~/.local/share/tripppin/next-event.json
+/// (`{"title","when","until"}`, `until` in Unix seconds), or removes the file when there's none.
+fn write_next_event(now: Stamp) {
+    let path = cal::dir().parent().map(|d| d.join("next-event.json"));
+    let Some(path) = path else { return };
+    let next = cal::load_from(&cal::dir()).into_iter().filter(|e| e.end() > now).min_by_key(|e| e.start);
+    let Some(e) = next else {
+        let _ = std::fs::remove_file(&path);
+        return;
+    };
+    let day = if e.start.date == now.date {
+        "Today".to_string()
+    } else if e.start.date == now.date.plus(1) {
+        "Tomorrow".to_string()
+    } else {
+        let w = e.start.date.weekday_name();
+        w[..1].to_uppercase() + &w[1..]
+    };
+    let end = e.end();
+    let until = glib::DateTime::new(
+        &glib::TimeZone::local(),
+        end.date.y,
+        end.date.m as i32,
+        end.date.d as i32,
+        (end.min / 60) as i32,
+        (end.min % 60) as i32,
+        0.0,
+    )
+    .map(|t| t.to_unix())
+    .unwrap_or(0);
+    let when = format!("{day} {} – {}", cal::clock(e.start.min), cal::clock(end.min));
+    let json = serde_json::json!({ "title": e.title, "when": when, "until": until });
+    let _ = std::fs::write(&path, json.to_string());
 }
 
 struct State {
