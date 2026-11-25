@@ -13,6 +13,7 @@
 use crate::agent::Ui;
 use crate::markdown::{Markdown, Theme};
 use crate::model::{PlanStep, Usage};
+use crate::steps;
 use crate::term::{self, ACCENT, BOLD, DIM, FOREST, PAPER, RED, RESET};
 use std::collections::VecDeque;
 use std::io::{self, IsTerminal, Write};
@@ -246,7 +247,30 @@ impl Screen {
     /// Room for text after the gutter, keeping the last column free so rows never wrap by
     /// themselves.
     fn room(&self) -> usize {
-        self.width().saturating_sub(self.gutter() + 1).max(20)
+        self.width().saturating_sub(self.gutter() + 1 + self.side().map_or(0, |c| c + steps::GAP)).max(20)
+    }
+
+    /// The width of the right-hand step column: on a live, coloured terminal wide enough for it
+    /// while a task with a plan is running. Elsewhere the plan is the inline checklist.
+    fn side(&self) -> Option<usize> {
+        let wide = self.wide_plan();
+        let active = self.turn.is_some() || self.step.is_some();
+        (wide && active && !self.plan.is_empty()).then(|| steps::side_width(self.width())).flatten()
+    }
+
+    /// Whether plans go in the column rather than inline.
+    fn wide_plan(&self) -> bool {
+        self.mode.live && self.mode.color && steps::side_width(self.width()).is_some()
+    }
+
+    /// The token line at the foot of the step column.
+    fn token_line(&self) -> String {
+        let n = self.totals.prompt + self.totals.completion;
+        if n == 0 {
+            elapsed(self.started.elapsed())
+        } else {
+            format!("{} tokens · {}", short(n), elapsed(self.started.elapsed()))
+        }
     }
 
     fn paint(&self, code: &str, text: &str) -> String {
@@ -361,6 +385,7 @@ impl Screen {
 
     fn live(&self) -> Vec<String> {
         let mut rows = Vec::new();
+        let side = self.side();
         if !self.partial.is_empty() {
             rows.extend(self.md.partial(&self.partial, self.room()));
         } else {
@@ -373,6 +398,14 @@ impl Screen {
             }
         } else if let Some(status) = self.status() {
             rows.push(status);
+        }
+        if let Some(col) = side {
+            let tick = (self.started.elapsed().as_millis() / 160) as usize;
+            let max = self.height().saturating_sub(3).max(4);
+            let column =
+                steps::blocks(&self.plan, tick, col, max, &self.token_line(), self.mode.color, self.mode.unicode);
+            let left_w = self.width().saturating_sub(self.gutter() + 1 + col + steps::GAP);
+            return steps::join(&rows, &column, left_w);
         }
         rows
     }
@@ -605,6 +638,18 @@ impl Screen {
         }
         self.plan = steps.to_vec();
         self.flush_partial();
+        if self.wide_plan() {
+            // The step column shows it (and finish() leaves the checklist behind).
+            self.draw_live();
+            return;
+        }
+        let rows = self.plan_rows();
+        self.commit(rows, Kind::Plan);
+    }
+
+    /// The plan as an inline checklist.
+    fn plan_rows(&self) -> Vec<String> {
+        let steps = &self.plan;
         let done = steps.iter().filter(|s| s.done).count();
         let mut rows = vec![self.paint(DIM, &format!("Plan · {done} of {} done", steps.len()))];
         let room = self.room();
@@ -626,7 +671,7 @@ impl Screen {
                 rows.push(if i == 0 { format!("{mark} {body}") } else { format!("  {body}") });
             }
         }
-        self.commit(rows, Kind::Plan);
+        rows
     }
 
     fn thinking(&mut self) {
@@ -664,8 +709,14 @@ impl Screen {
         if self.step.is_some() {
             self.end_step(None);
         }
+        // The step column goes with the task; what it showed stays behind as the checklist.
+        let column_was_shown = self.side().is_some();
         self.turn = None;
         self.clear_live();
+        if column_was_shown {
+            let rows = self.plan_rows();
+            self.commit(rows, Kind::Plan);
+        }
         let parts = match &self.usage {
             Some(u) => {
                 let mut parts = vec![elapsed(self.started.elapsed())];
@@ -1002,6 +1053,46 @@ mod tests {
         let out = buf.text();
         assert_eq!(out.matches("Plan · 1 of 2 done").count(), 1, "{out}");
         assert!(out.contains("✓ find big folders\n○ clear caches"), "{out}");
+    }
+
+    fn three() -> Vec<PlanStep> {
+        vec![
+            PlanStep { text: "Found 14 invoices".into(), done: true },
+            PlanStep { text: "Moving files".into(), done: false },
+            PlanStep { text: "Summarise".into(), done: false },
+        ]
+    }
+
+    #[test]
+    fn a_wide_terminal_shows_the_steps_in_a_column() {
+        let mode = Mode { live: true, color: true, unicode: true };
+        let (mut t, buf) = terminal(mode, 120);
+        t.thinking();
+        t.plan(&three());
+        {
+            let frame: Vec<String> = t.screen().live().iter().map(|r| strip_ansi(r)).collect();
+            println!("{}", frame.join("\n"));
+            assert!(frame.iter().any(|r| r.contains("step 2 of 3")));
+            assert!(frame.iter().all(|r| crate::term::width(r) <= 120 - GUTTER), "{frame:?}");
+        }
+        t.finish(None);
+        drop(t);
+        let out = strip_ansi(&buf.text());
+        assert!(out.contains("step 2 of 3"), "{out}");
+        assert!(out.contains("Plan · 1 of 3 done"), "the checklist stays behind: {out}");
+    }
+
+    #[test]
+    fn a_narrow_terminal_keeps_the_inline_list() {
+        let mode = Mode { live: true, color: true, unicode: true };
+        let (mut t, buf) = terminal(mode, 99);
+        t.thinking();
+        t.plan(&three());
+        t.finish(None);
+        drop(t);
+        let out = strip_ansi(&buf.text());
+        assert!(!out.contains("step 2 of 3"), "{out}");
+        assert_eq!(out.matches("Plan · 1 of 3 done").count(), 1, "{out}");
     }
 
     #[test]
