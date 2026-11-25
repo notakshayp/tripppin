@@ -7,7 +7,7 @@
 # a new one, and that PR runs the full image pipeline before it can merge.
 
 # ---- Rust tools -------------------------------------------------------------
-FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS build
+FROM quay.io/fedora/fedora:45@sha256:92837d4834c1cff45cc2d534b655489b8e536271de1897932117e396cc9980c5 AS build
 RUN dnf -y install --setopt=install_weak_deps=False cargo rust gcc gtk4-devel gtk4-layer-shell-devel && dnf clean all
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rustfmt.toml ./
@@ -17,7 +17,7 @@ RUN cargo build --release --locked -p trip -p tripppin-ui
 
 # ---- llama.cpp ------------------------------------------------------------
 # Pinned release, Vulkan backend (falls back to the CPU when there's no GPU).
-FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS llama
+FROM quay.io/fedora/fedora:45@sha256:92837d4834c1cff45cc2d534b655489b8e536271de1897932117e396cc9980c5 AS llama
 ARG LLAMA_CPP_TAG=v1.0.0
 RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ vulkan-headers vulkan-loader-devel glslc spirv-headers-devel && dnf clean all
 RUN git clone --depth 1 --branch "$LLAMA_CPP_TAG" https://github.com/ggml-org/llama.cpp /src/llama.cpp
@@ -30,7 +30,7 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NAT
 # ---- whisper.cpp ----------------------------------------------------------
 # Dictation's speech to text. Fedora's whisper-cpp package ships only the libraries, no
 # whisper-cli, so build the pinned release (CPU only; the base model is fast enough there).
-FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS whisper
+FROM quay.io/fedora/fedora:45@sha256:92837d4834c1cff45cc2d534b655489b8e536271de1897932117e396cc9980c5 AS whisper
 ARG WHISPER_CPP_TAG=v1.8.7
 RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ && dnf clean all
 RUN git clone --depth 1 --branch "$WHISPER_CPP_TAG" https://github.com/ggml-org/whisper.cpp /src/whisper.cpp
@@ -41,7 +41,7 @@ RUN if [ "$(uname -m)" = x86_64 ]; then X86="-DGGML_AVX2=ON -DGGML_FMA=ON -DGGML
     && cmake --build build --target whisper-cli -j"$(nproc)"
 
 # ---- The OS -----------------------------------------------------------------
-FROM quay.io/fedora/fedora-bootc:45@sha256:d440aea898005f376bbf0bbe06c216abdba68dcdb6dfa5cb0fa246cd03fa8d8a
+FROM quay.io/fedora/fedora-bootc:45@sha256:2342f957281b061919c48a12227f9cd04f2d9825d17629fd914083aaa672002c
 
 LABEL org.opencontainers.image.title="tripppin" \
       org.opencontainers.image.description="A Linux with an AI built in." \

@@ -97,12 +97,14 @@ pub fn parse_appstream(source: impl Read) -> Vec<App> {
         buf.clear();
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
-                let name = String::from_utf8_lossy(e.name().as_ref()).into_owned();
+                let name = e.name().as_ref().to_owned();
                 let mut attrs = std::collections::HashMap::new();
                 for a in e.attributes().flatten() {
                     attrs.insert(
-                        String::from_utf8_lossy(a.key.as_ref()).into_owned(),
-                        a.unescape_value().map(|v| v.into_owned()).unwrap_or_default(),
+                        a.key.as_ref().to_owned(),
+                        a.normalized_value(quick_xml::XmlVersion::Implicit1_0)
+                            .map(|v| v.into_owned())
+                            .unwrap_or_default(),
                     );
                 }
                 stack.push(name.clone());
@@ -147,13 +149,30 @@ pub fn parse_appstream(source: impl Read) -> Vec<App> {
                 }
             }
             Ok(Event::Text(t)) => {
-                if skip.is_none()
-                    && let Ok(t) = t.unescape()
-                {
+                if skip.is_none() {
+                    let t = t.xml10_content();
                     if stack.iter().any(|s| s == "description") {
                         desc.push_str(&t);
                     }
                     text.push_str(&t);
+                }
+            }
+            Ok(Event::GeneralRef(r)) => {
+                let ch = match r.xml10_content().as_ref() {
+                    "amp" => Some('&'),
+                    "lt" => Some('<'),
+                    "gt" => Some('>'),
+                    "quot" => Some('"'),
+                    "apos" => Some('\''),
+                    _ => r.resolve_char_ref().ok().flatten(),
+                };
+                if skip.is_none()
+                    && let Some(c) = ch
+                {
+                    if stack.iter().any(|s| s == "description") {
+                        desc.push(c);
+                    }
+                    text.push(c);
                 }
             }
             Ok(Event::End(_)) => {
