@@ -140,7 +140,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       firewalld orca espeak-ng speech-dispatcher speech-dispatcher-espeak-ng NetworkManager-openvpn NetworkManager-openvpn-gnome \
       cups cups-filters ipp-usb nss-mdns sane-backends sane-airscan simple-scan unicode-emoji wtype google-noto-color-emoji-fonts plymouth plymouth-plugin-script \
       gvfs gvfs-mtp \
-      gnome-text-editor gnome-calculator celluloid gnome-system-monitor gnome-disk-utility \
+      gnome-text-editor gnome-calculator gnome-system-monitor gnome-disk-utility \
       greenboot greenboot-default-health-checks \
     && dnf clean all
 
@@ -191,7 +191,7 @@ RUN test -f /usr/share/icons/Tripppin/scalable/apps/org.kde.konsole.svg \
 # Discover stays installed as a fallback, but our Store (in.trippp.Store) is the one in the launcher.
 # Settings' own pages are found by searching "Settings" words instead of listing entries.
 RUN cd /usr/share/applications \
-    && for f in kdesystemsettings org.kde.kmenuedit org.kde.plasma.emojier org.kde.ark org.kde.kinfocenter \
+    && for f in kdesystemsettings systemsettings org.kde.systemsettings org.kde.kmenuedit org.kde.plasma.emojier org.kde.ark org.kde.kinfocenter \
          org.gnome.SimpleScan org.kde.plasma-systemmonitor org.kde.kuserfeedback-console \
          org.freedesktop.IBus.Panel.Emojier org.freedesktop.IBus.Panel.Extension.Gtk3 \
          org.freedesktop.IBus.Setup nm-connection-editor \
@@ -201,6 +201,7 @@ RUN cd /usr/share/applications \
     && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \
     && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Konsole$/Name=Terminal/' org.kde.konsole.desktop \
     && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Dolphin$/Name=Files/' org.kde.dolphin.desktop \
+    && { [ ! -f org.gnome.SystemMonitor.desktop ] || sed -i -e '/^Name\[/d' -e 's/^Name=.*/Name=System monitor/' org.gnome.SystemMonitor.desktop; } \
     && grep -q '^Name=Terminal$' org.kde.konsole.desktop && grep -q '^Name=Files$' org.kde.dolphin.desktop \
     && ! grep -q NoDisplay in.trippp.Settings.desktop
 
