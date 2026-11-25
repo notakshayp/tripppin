@@ -6,6 +6,7 @@
 //! - `lock`: the lock screen.
 //! - `first-boot`: fetches the model the first time someone logs in.
 //! - `osd`: the volume, mic and brightness pop-ups.
+//! - `dictate`: speak and it's typed (press again to finish); runs whisper.cpp on the device.
 //! - `settings`: the Settings app.
 //! - `calendar`: the Calendar app (`--popover`: the small one that drops from the clock; `--remind`: announce events that just started).
 //! - `askpass`: the password pop-up for administrator commands the AI runs.
@@ -27,6 +28,7 @@ mod calendar;
 mod calendar_app;
 mod common;
 mod desktop;
+mod dictate;
 mod dim;
 mod display;
 mod firstboot;
@@ -116,6 +118,7 @@ fn main() -> ExitCode {
         Some("lock") => lock::run(),
         Some("first-boot") => firstboot::run(),
         Some("osd") => osd::run(),
+        Some("dictate") => dictate::run(),
         Some("settings") => settings::run(),
         Some("calendar") if args.get(1).map(String::as_str) == Some("--popover") => calendar::run(),
         Some("calendar") => calendar_app::run(),
@@ -130,7 +133,7 @@ fn main() -> ExitCode {
         Some("widgets") => widgets::cli(&args[1..]),
         _ => {
             eprintln!(
-                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | settings [section] | calendar [--popover|--remind] | keys | switch | snap <where> | desktop | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state] | corners sharp|default|round"
+                "usage: tripppin-ui orb [--toggle] | greeter | lock [--release] | first-boot | osd volume|mic|brightness | dictate [cancel] | settings [section] | calendar [--popover|--remind] | keys | switch | snap <where> | desktop | widgets [add|list|test|remove|pin|…] | dim | welcome [--first-time] | splash | askpass | displays | battery-ring | toggle <what> [--state] | corners sharp|default|round"
             );
             ExitCode::from(2)
         }

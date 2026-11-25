@@ -2,6 +2,8 @@
 //! (the subset our icons use: M L H V C A Z, absolute and relative) is parsed once and
 //! stroked with cairo at whatever size the widget is, so nothing is a raster scaled up.
 
+#![allow(clippy::chunks_exact_to_as_chunks)] // path numbers come in runs of a runtime-checked size
+
 use gtk::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

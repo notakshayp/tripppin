@@ -89,7 +89,7 @@ impl Totals {
 
 /// A context size: 32k for 32,768 tokens.
 pub fn context_size(n: usize) -> String {
-    if n >= 1024 && n % 1024 == 0 { format!("{}k", n / 1024) } else { short(n) }
+    if n >= 1024 && n.is_multiple_of(1024) { format!("{}k", n / 1024) } else { short(n) }
 }
 
 /// A count the way people read it: 950, 1.2k, 38k, 1.2M.

@@ -117,6 +117,10 @@ fn bluetooth_state() -> String {
     }
 }
 
+fn dictation_state() -> String {
+    if crate::dictate::enabled() { "On · Super + M to speak".into() } else { "Off · turn it on in its page".into() }
+}
+
 fn battery_state() -> String {
     match crate::power::battery() {
         Some(b) => format!("{}% · {}", b.percent, b.state.replace('-', " ")),
@@ -145,7 +149,7 @@ pub fn rows() -> Vec<Row> {
         row("ai", "ai", "AI", "Model, providers, what it may do", 0, SPARK),
         row("dictation", "sound", "Microphone", "Pick the input you speak into", 2, MIC),
         row("dictation", "language", "Language & region", "What you speak and read", 6, GLOBE),
-        row("dictation", "", "Voice typing", "Not set up yet", 4, MIC),
+        Row { live: Some(dictation_state), ..row("dictation", "dictation", "Dictation", "", 4, MIC) },
         row("privacy", "privacy", "Privacy", "Location, camera, microphone", 3, SHIELD),
         row("privacy", "notifications", "Notifications", "What may interrupt you", 5, BELL),
         row("privacy", "accounts", "Accounts", "People who use this computer", 2, USER),
