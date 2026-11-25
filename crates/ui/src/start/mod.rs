@@ -176,13 +176,14 @@ impl Ui {
         let list_scroll = gtk::ScrolledWindow::new();
         list_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
         list_scroll.set_margin_top(96);
+        list_scroll.set_margin_bottom(64);
         list_scroll.set_hexpand(true);
         list_scroll.set_vexpand(true);
         let list = gtk::Box::new(gtk::Orientation::Vertical, 6);
         list.set_halign(gtk::Align::Start);
         list.set_width_request(380);
         list.set_margin_start(36);
-        list.set_margin_bottom(70);
+        list.set_margin_bottom(8);
         list_scroll.set_child(Some(&list));
         let apps_page = gtk::Overlay::new();
         apps_page.set_child(Some(&list_scroll));
@@ -346,6 +347,9 @@ impl Ui {
         self.title.set_text(name);
         self.search.set_visible(name == "apps");
         self.jump.set_visible(false);
+        if name == "apps" {
+            self.list_scroll.vadjustment().set_value(0.0);
+        }
         if name == "start" {
             self.search.set_text("");
             GtkWindowExt::set_focus(&self.window, None::<&gtk::Widget>);
@@ -893,14 +897,13 @@ impl Ui {
         b.add_css_class("plain");
         b.add_css_class("app-row");
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-        let tile = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        let tile = gtk::CenterBox::new();
+        tile.set_size_request(40, 40);
+        tile.set_halign(gtk::Align::Start);
         tile.add_css_class("app-icon");
         tile.add_css_class(&format!("tc{}", model::colour_of(&format!("app:{}", app.id))));
         let icon = self.icon_widget(&app.icon, 24, &app.name);
-        icon.set_halign(gtk::Align::Center);
-        icon.set_hexpand(true);
-        icon.set_valign(gtk::Align::Center);
-        tile.append(&icon);
+        tile.set_center_widget(Some(&icon));
         row.append(&tile);
         let nm = lbl(&app.name, &["nm"]);
         nm.set_valign(gtk::Align::Center);
@@ -943,6 +946,7 @@ impl Ui {
                 let tile = gtk::Button::new();
                 tile.add_css_class("plain");
                 tile.add_css_class("letter-tile");
+                tile.set_focusable(false);
                 let l = lbl(&letter.to_string(), &[]);
                 l.set_valign(gtk::Align::End);
                 tile.set_child(Some(&l));
@@ -962,6 +966,9 @@ impl Ui {
                 self.list.append(&self.app_row(a));
             }
         }
+        let adj = self.list_scroll.vadjustment();
+        adj.set_value(0.0);
+        glib::idle_add_local_once(move || adj.set_value(0.0));
         for (ch, b) in &self.jump_buttons {
             b.set_sensitive(true);
             if have.contains(ch) {

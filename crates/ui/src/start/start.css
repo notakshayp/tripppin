@@ -51,10 +51,10 @@ window.start-win * { border-radius: 0; }
 @keyframes tile-in { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
 
 /* All apps */
-.start-root .letter-tile {
-    min-width: 40px; min-height: 40px; border: 2px solid #3fae7a; color: #3fae7a; font-size: 18px; font-weight: 300; padding: 3px 6px;
+.start-root button.plain.letter-tile, .start-root button.plain.letter-tile:hover, .start-root button.plain.letter-tile:focus, .start-root button.plain.letter-tile:active {
+    min-width: 24px; min-height: 30px; border: 2px solid #3fae7a; color: #3fae7a; font-size: 18px; font-weight: 300; padding: 3px 6px;
 }
-.start-root .letter-tile:hover { background: rgba(63, 174, 122, 0.15); }
+.start-root button.plain.letter-tile:hover { background: rgba(63, 174, 122, 0.15); }
 .start-root .app-row { min-height: 40px; }
 .start-root .app-row .nm { font-size: 17px; font-weight: 300; }
 .start-root .app-row:hover .nm { color: #3fae7a; }
@@ -76,3 +76,14 @@ popover.start-menu .cap { font-size: 11px; color: #9aa4ab; padding: 6px 10px 2px
 popover.start-menu button.swatch { min-width: 22px; min-height: 22px; padding: 0; margin: 3px; }
 popover.start-menu button.swatch.on { box-shadow: inset 0 0 0 2px #fff; }
 popover.start-menu * { border-radius: 0; }
+popover.start-menu { font-family: Inter, sans-serif; }
+popover.start-menu button.swatch.tc0, popover.start-menu button.swatch.tc0:hover { background: #1f6b45; }
+popover.start-menu button.swatch.tc1, popover.start-menu button.swatch.tc1:hover { background: #0f7c8c; }
+popover.start-menu button.swatch.tc2, popover.start-menu button.swatch.tc2:hover { background: #c2502e; }
+popover.start-menu button.swatch.tc3, popover.start-menu button.swatch.tc3:hover { background: #6b3f8f; }
+popover.start-menu button.swatch.tc4, popover.start-menu button.swatch.tc4:hover { background: #3a4a5a; }
+popover.start-menu button.swatch.tc5, popover.start-menu button.swatch.tc5:hover { background: #b8862b; }
+popover.start-menu button.swatch.tc6, popover.start-menu button.swatch.tc6:hover { background: #2c5aa0; }
+popover.start-menu button.swatch.tc7, popover.start-menu button.swatch.tc7:hover { background: #3a2a22; }
+popover.start-menu button.swatch.tc8, popover.start-menu button.swatch.tc8:hover { background: #2a3640; }
+popover.start-menu button.swatch.tc9, popover.start-menu button.swatch.tc9:hover { background: #182423; }
