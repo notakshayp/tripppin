@@ -2,7 +2,6 @@
 //! notification settings that hang off them: do not disturb, quiet hours and muted apps,
 //! all through SwayNotificationCenter.
 
-use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -266,103 +265,79 @@ pub fn set_default(mimes: &[&str], app: &str) -> std::io::Result<()> {
 }
 
 // ---- notifications -----------------------------------------------------------------------
+//
+// Plasma's notification server reads plasmanotifyrc: do not disturb is `[DoNotDisturb] Until`
+// (a time in the future; far ahead means "until I turn it off") and an app is muted with
+// `[Applications][<desktop id>] ShowPopups=false`.
 
-fn swaync(args: &[&str]) -> Option<String> {
-    let out = Command::new("swaync-client").args(args).output().ok()?;
-    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+/// How far ahead "until I turn it off" is.
+const FOREVER: &str = "2099-12-31T23:59:59";
+
+fn now_iso() -> String {
+    Command::new("date")
+        .arg("+%Y-%m-%dT%H:%M:%S")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
+/// Whether do not disturb is on, from its `Until` time and the time now (both
+/// `YYYY-MM-DDTHH:MM:SS`, which sort as text).
+pub fn dnd_active(until: &str, now: &str) -> bool {
+    let (until, now) = (until.get(..19).unwrap_or(""), now.get(..19).unwrap_or(""));
+    !until.is_empty() && until > now
 }
 
 pub fn dnd() -> bool {
-    swaync(&["-D"]).is_some_and(|s| s == "true")
+    crate::kde::read("plasmanotifyrc", "DoNotDisturb", "Until").is_some_and(|u| dnd_active(&u, &now_iso()))
 }
 
 pub fn set_dnd(on: bool) {
-    swaync(&[if on { "-dn" } else { "-df" }]);
-}
-
-fn config_home() -> PathBuf {
-    std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-}
-
-const SYSTEM_CONFIG: &str = "/etc/xdg/swaync/config.json";
-const RULE_PREFIX: &str = "tripppin-muted: ";
-
-/// App names whose notifications are dropped, from swaync's notification-visibility rules.
-pub fn muted_in(config: &Value) -> Vec<String> {
-    let mut names: Vec<String> = config["notification-visibility"]
-        .as_object()
-        .map(|rules| rules.keys().filter_map(|k| k.strip_prefix(RULE_PREFIX)).map(str::to_string).collect())
-        .unwrap_or_default();
-    names.sort();
-    names
-}
-
-/// The config with exactly these apps muted (other rules are kept).
-pub fn with_muted(mut config: Value, names: &[String]) -> Value {
-    if !config["notification-visibility"].is_object() {
-        config["notification-visibility"] = Value::Object(Default::default());
+    if on {
+        crate::kde::write("plasmanotifyrc", "DoNotDisturb", "Until", FOREVER);
+    } else {
+        crate::kde::delete("plasmanotifyrc", "DoNotDisturb", "Until");
     }
-    let rules = config["notification-visibility"].as_object_mut().expect("just made an object");
-    rules.retain(|k, _| !k.starts_with(RULE_PREFIX));
-    for n in names {
-        // swaync matches app-name as a regular expression; match this name exactly.
-        let pattern = format!("^{}$", regex_escape(n));
-        rules.insert(format!("{RULE_PREFIX}{n}"), serde_json::json!({ "state": "ignored", "app-name": pattern }));
-    }
-    config
 }
 
-fn regex_escape(s: &str) -> String {
-    s.chars().fold(String::new(), |mut out, c| {
-        if "\\.+*?()|[]{}^$".contains(c) {
-            out.push('\\');
-        }
-        out.push(c);
-        out
-    })
+/// The desktop ids of the apps whose pop-ups are off, from plasmanotifyrc's text.
+pub fn muted_in(config: &str) -> Vec<String> {
+    let mut ids: Vec<String> = crate::kde::ini_groups(config, "Applications][")
+        .into_iter()
+        .filter_map(|g| g.strip_prefix("Applications][").map(str::to_string))
+        .filter(|id| {
+            crate::kde::ini_get(config, &format!("Applications][{id}"), "ShowPopups").as_deref() == Some("false")
+        })
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids
 }
 
-/// The person's swaync config if they have one, else the system's.
-fn notify_config() -> (PathBuf, Value) {
-    let mine = config_home().join("swaync/config.json");
-    let text = std::fs::read_to_string(&mine).or_else(|_| std::fs::read_to_string(SYSTEM_CONFIG)).unwrap_or_default();
-    (mine, serde_json::from_str(&text).unwrap_or_else(|_| serde_json::json!({})))
-}
-
+/// The desktop ids of the muted apps.
 pub fn muted() -> Vec<String> {
-    muted_in(&notify_config().1)
+    muted_in(&crate::kde::file_text("plasmanotifyrc"))
 }
 
-/// Saves the muted list into ~/.config/swaync/config.json (a copy of the system config plus
-/// the rules) and tells swaync to reload it.
-pub fn set_muted(names: &[String]) -> std::io::Result<()> {
-    let (path, config) = notify_config();
-    let config = with_muted(config, names);
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    std::fs::write(&path, serde_json::to_string_pretty(&config).unwrap_or_default())?;
-    // swaync only reads visibility rules at start (-R doesn't apply them), so restart it,
-    // keeping do-not-disturb as it was. The bar's counter reconnects by itself.
-    let quiet = dnd();
-    let _ = Command::new("pkill").args(["-x", "swaync"]).status();
-    let _ = Command::new("niri").args(["msg", "action", "spawn", "--", "swaync"]).status();
-    for _ in 0..20 {
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        if swaync(&["-D"]).is_some() {
-            break;
+/// Mutes exactly these apps (by desktop id): their pop-ups stop, but they stay in history.
+pub fn set_muted(ids: &[String]) -> std::io::Result<()> {
+    let mut ok = true;
+    for old in muted() {
+        if !ids.contains(&old) {
+            ok &= crate::kde::delete("plasmanotifyrc", &format!("Applications][{old}"), "ShowPopups");
         }
     }
-    if quiet {
-        set_dnd(true);
+    for id in ids {
+        ok &= crate::kde::write("plasmanotifyrc", &format!("Applications][{id}"), "ShowPopups", "false");
     }
-    Ok(())
+    if ok { Ok(()) } else { Err(std::io::Error::other("kwriteconfig6 failed")) }
 }
 
 // Quiet hours: two systemd user timers turn do-not-disturb on and off each day.
+
+fn config_home() -> PathBuf {
+    crate::kde::config_home()
+}
 
 fn unit_dir() -> PathBuf {
     config_home().join("systemd/user")
@@ -395,19 +370,19 @@ pub fn set_quiet_hours(hours: Option<(&str, &str)>) -> std::io::Result<()> {
         return Ok(());
     };
     std::fs::create_dir_all(&dir)?;
-    for (n, at, flag) in [(names[0], from, "-dn"), (names[1], to, "-df")] {
-        write_unit(&dir, n, at, flag)?;
+    for (n, at, state) in [(names[0], from, "on"), (names[1], to, "off")] {
+        write_unit(&dir, n, at, state)?;
     }
     systemctl_user(&["daemon-reload"]);
     systemctl_user(&["enable", "--now", "tripppin-quiet-on.timer", "tripppin-quiet-off.timer"]);
     Ok(())
 }
 
-fn write_unit(dir: &Path, name: &str, at: &str, flag: &str) -> std::io::Result<()> {
+fn write_unit(dir: &Path, name: &str, at: &str, state: &str) -> std::io::Result<()> {
     std::fs::write(
         dir.join(format!("{name}.service")),
         format!(
-            "[Unit]\nDescription=Quiet hours (tripppin)\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/swaync-client {flag}\n"
+            "[Unit]\nDescription=Quiet hours (tripppin)\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/tripppin-ui dnd {state}\n"
         ),
     )?;
     std::fs::write(
@@ -470,13 +445,12 @@ mod tests {
     }
 
     #[test]
-    fn mutes_apps_in_swaync_config() {
-        let base =
-            serde_json::json!({ "positionX": "right", "notification-visibility": { "mine": { "state": "muted" } } });
-        let c = with_muted(base, &["Slack".to_string(), "a.b".to_string()]);
-        assert_eq!(muted_in(&c), vec!["Slack".to_string(), "a.b".to_string()]);
-        assert_eq!(c["notification-visibility"]["tripppin-muted: a.b"]["app-name"], "^a\\.b$");
-        assert!(c["notification-visibility"]["mine"].is_object());
-        assert!(muted_in(&with_muted(c, &[])).is_empty());
+    fn reads_muted_apps_and_do_not_disturb() {
+        let config = "[Applications][org.mozilla.firefox]\nShowPopups=false\n\n[Applications][org.kde.konsole]\nShowPopups=true\n\n[Applications][slack]\nShowInHistory=false\n\n[Applications][a.b]\nShowPopups=false\n";
+        assert_eq!(muted_in(config), vec!["a.b".to_string(), "org.mozilla.firefox".to_string()]);
+        assert!(muted_in("").is_empty());
+        assert!(dnd_active("2099-12-31T23:59:59", "2026-11-25T10:00:00"));
+        assert!(!dnd_active("2026-11-25T09:00:00", "2026-11-25T10:00:00"));
+        assert!(!dnd_active("", "2026-11-25T10:00:00"));
     }
 }

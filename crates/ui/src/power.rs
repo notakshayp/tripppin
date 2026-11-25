@@ -1,7 +1,7 @@
 //! Power: the battery (UPower), the power mode (power-profiles-daemon) and what happens when
-//! the computer is left alone (swayidle, configured by ~/.config/tripppin/idle).
+//! the computer is left alone (powerdevil's settings in powerdevilrc, and the lock screen's
+//! in kscreenlockerrc).
 
-use std::path::PathBuf;
 use std::process::Command;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -94,82 +94,93 @@ impl Default for Idle {
 
 pub const IDLE_CHOICES: [u32; 7] = [1, 2, 5, 10, 15, 30, 0];
 
-fn idle_file() -> PathBuf {
-    std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("tripppin/idle")
+/// powerdevil's profiles that the timings apply to: on mains and on battery.
+const PROFILES: [&str; 2] = ["AC", "Battery"];
+
+/// Minutes as powerdevil writes them: seconds, with -1 for never.
+pub fn to_secs(minutes: u32) -> i64 {
+    if minutes == 0 { -1 } else { i64::from(minutes) * 60 }
 }
 
-/// The swayidle config for these timings. Lock and screen-off happen on battery and mains;
-/// "before-sleep" locks first so the computer never wakes up unlocked, and "lock" answers
-/// `loginctl lock-session`. `tripppin-ui lock` returns once locked, so swayidle (run with -w)
-/// carries on and the screen still turns off and sleeps while locked.
-pub fn swayidle_config(idle: &Idle) -> String {
-    let mut out = String::from("# When the computer is left alone. Written by tripppin settings.\n");
-    if idle.lock > 0 {
-        // Fade the screen half a minute first, so locking never comes as a surprise. In the
-        // background: swayidle -w waits for each command, and the fade lasts until you're back.
-        out.push_str(&format!(
-            "timeout {} 'tripppin-ui dim &' resume 'pkill -f \"^(/usr/bin/)?tripppin-ui dim\"'\n",
-            idle.lock * 60 - 30
-        ));
-        out.push_str(&format!("timeout {} 'tripppin-ui lock'\n", idle.lock * 60));
-    }
-    if idle.screen_off > 0 {
-        out.push_str(&format!(
-            "timeout {} 'niri msg action power-off-monitors' resume 'niri msg action power-on-monitors'\n",
-            idle.screen_off * 60
-        ));
-    }
-    if idle.sleep > 0 {
-        out.push_str(&format!("timeout {} 'systemctl suspend'\n", idle.sleep * 60));
-    }
-    out.push_str("before-sleep 'tripppin-ui lock'\n");
-    out.push_str("lock 'tripppin-ui lock'\n");
-    out
+/// Seconds as powerdevil writes them, back to minutes (0 for never).
+pub fn to_minutes(secs: i64) -> u32 {
+    if secs <= 0 { 0 } else { (secs / 60) as u32 }
 }
 
-/// Reads the timings back from the file (defaults where it says nothing).
-pub fn parse_idle(text: &str) -> Idle {
-    let mut idle = Idle { lock: 0, screen_off: 0, sleep: 0 };
-    for line in text.lines() {
-        let mut words = line.split_whitespace();
-        if words.next() != Some("timeout") {
-            continue;
-        }
-        let secs: u32 = words.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-        let rest = words.collect::<Vec<_>>().join(" ");
-        if rest.contains("dim") {
-            continue;
-        } else if rest.contains("lock") {
-            idle.lock = secs / 60;
-        } else if rest.contains("power-off-monitors") {
-            idle.screen_off = secs / 60;
-        } else if rest.contains("suspend") {
-            idle.sleep = secs / 60;
-        }
-    }
-    idle
-}
-
+/// Reads the timings back: the lock from kscreenlockerrc, the rest from powerdevilrc.
 pub fn idle() -> Idle {
-    std::fs::read_to_string(idle_file()).map(|t| parse_idle(&t)).unwrap_or_default()
+    use crate::kde::{read, read_bool, read_num};
+    let d = Idle::default();
+    let lock = if read_bool("kscreenlockerrc", "Daemon", "Autolock", true) {
+        read_num("kscreenlockerrc", "Daemon", "Timeout", d.lock)
+    } else {
+        0
+    };
+    let screen_off = read("powerdevilrc", "AC][Display", "TurnOffDisplayIdleTimeoutSec")
+        .and_then(|v| v.parse().ok())
+        .map_or(d.screen_off, to_minutes);
+    let sleep = if read_num("powerdevilrc", "AC][SuspendAndShutdown", "AutoSuspendAction", 1u32) == 0 {
+        0
+    } else {
+        read("powerdevilrc", "AC][SuspendAndShutdown", "AutoSuspendIdleTimeoutSec")
+            .and_then(|v| v.parse().ok())
+            .map_or(d.sleep, to_minutes)
+    };
+    Idle { lock, screen_off, sleep }
 }
 
-/// Saves the timings and restarts swayidle with them.
-pub fn set_idle(idle: &Idle) -> std::io::Result<()> {
-    let file = idle_file();
-    if let Some(dir) = file.parent() {
-        std::fs::create_dir_all(dir)?;
+/// What happens when the lid is closed: sleep (true) or nothing.
+pub fn lid_sleeps() -> bool {
+    crate::kde::read_num("powerdevilrc", "AC][SuspendAndShutdown", "LidAction", 1u32) == 1
+}
+
+pub fn set_lid_sleeps(on: bool) -> std::io::Result<()> {
+    let mut ok = true;
+    for p in PROFILES {
+        ok &= crate::kde::write(
+            "powerdevilrc",
+            &format!("{p}][SuspendAndShutdown"),
+            "LidAction",
+            if on { "1" } else { "0" },
+        );
     }
-    std::fs::write(&file, swayidle_config(idle))?;
-    let _ = Command::new("pkill").args(["-x", "swayidle"]).status();
-    let _ = Command::new("niri")
-        .args(["msg", "action", "spawn", "--", "swayidle", "-w", "-C", &file.to_string_lossy()])
-        .status();
-    Ok(())
+    reparse();
+    if ok { Ok(()) } else { Err(std::io::Error::other("kwriteconfig6 failed")) }
+}
+
+/// Saves the timings and tells the lock screen and powerdevil.
+pub fn set_idle(idle: &Idle) -> std::io::Result<()> {
+    use crate::kde::{write, write_bool};
+    let mut ok = write_bool("kscreenlockerrc", "Daemon", "Autolock", idle.lock > 0);
+    if idle.lock > 0 {
+        ok &= write("kscreenlockerrc", "Daemon", "Timeout", &idle.lock.to_string());
+    }
+    for p in PROFILES {
+        ok &= write(
+            "powerdevilrc",
+            &format!("{p}][Display"),
+            "TurnOffDisplayIdleTimeoutSec",
+            &to_secs(idle.screen_off).to_string(),
+        );
+        let group = format!("{p}][SuspendAndShutdown");
+        ok &= write("powerdevilrc", &group, "AutoSuspendAction", if idle.sleep > 0 { "1" } else { "0" });
+        if idle.sleep > 0 {
+            ok &= write("powerdevilrc", &group, "AutoSuspendIdleTimeoutSec", &to_secs(idle.sleep).to_string());
+        }
+    }
+    reparse();
+    if ok { Ok(()) } else { Err(std::io::Error::other("kwriteconfig6 failed")) }
+}
+
+/// Makes powerdevil read its settings again.
+fn reparse() {
+    let _ = crate::kde::call(
+        "org.kde.Solid.PowerManagement",
+        "/org/kde/Solid/PowerManagement",
+        "org.kde.Solid.PowerManagement",
+        "reparseConfiguration",
+        None,
+    );
 }
 
 #[cfg(test)]
@@ -190,11 +201,14 @@ mod tests {
     }
 
     #[test]
-    fn idle_timings_round_trip() {
-        let idle = Idle { lock: 5, screen_off: 10, sleep: 0 };
-        let text = swayidle_config(&idle);
-        assert!(text.contains("timeout 300 'tripppin-ui lock'"));
-        assert!(!text.contains("suspend'\ntimeout"));
-        assert_eq!(parse_idle(&text), idle);
+    fn minutes_and_seconds_convert() {
+        assert_eq!(to_secs(5), 300);
+        assert_eq!(to_secs(0), -1);
+        assert_eq!(to_minutes(300), 5);
+        assert_eq!(to_minutes(-1), 0);
+        assert_eq!(to_minutes(0), 0);
+        for m in IDLE_CHOICES {
+            assert_eq!(to_minutes(to_secs(m)), m);
+        }
     }
 }

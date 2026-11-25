@@ -194,6 +194,8 @@ RUN test -f /usr/share/icons/Tripppin/scalable/apps/org.kde.konsole.svg \
 # still open from files and links), and give the two everyday apps plain names. Our
 # Discover stays installed as a fallback, but our Store (in.trippp.Store) is the one in the launcher.
 # Settings' own pages are found by searching "Settings" words instead of listing entries.
+# KDE's System Settings and every kcm_* module entry are hidden: Tripppin's own Settings
+# (tripppin-ui settings) has every page, and nothing of ours launches systemsettings.
 RUN cd /usr/share/applications \
     && for f in kdesystemsettings systemsettings org.kde.systemsettings org.kde.kmenuedit org.kde.plasma.emojier org.kde.ark org.kde.kinfocenter \
          org.gnome.SimpleScan org.kde.plasma-systemmonitor org.kde.kuserfeedback-console \
@@ -203,6 +205,9 @@ RUN cd /usr/share/applications \
          [ ! -f "$f.desktop" ] || sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$f.desktop"; \
        done \
     && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \
+    && for d in kcm_*.desktop kdesystemsettings*.desktop systemsettings*.desktop org.kde.systemsettings*.desktop; do \
+         [ ! -f "$d" ] || grep -q '^NoDisplay=true' "$d" || sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; \
+       done \
     && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Konsole$/Name=Terminal/' org.kde.konsole.desktop \
     && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Dolphin$/Name=Files/' org.kde.dolphin.desktop \
     && { [ ! -f org.gnome.SystemMonitor.desktop ] || sed -i -e '/^Name\[/d' -e 's/^Name=.*/Name=System monitor/' org.gnome.SystemMonitor.desktop; } \

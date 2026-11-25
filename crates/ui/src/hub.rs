@@ -56,7 +56,8 @@ pub struct Row {
     pub toggle: Option<Toggle>,
 }
 
-pub const PIVOTS: [&str; 9] = ["network", "display", "sound", "power", "ai", "dictation", "privacy", "apps", "about"];
+pub const PIVOTS: [&str; 10] =
+    ["network", "display", "sound", "power", "ai", "dictation", "account", "privacy", "apps", "about"];
 
 const WIFI: &str = "M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01";
 const BT: &str = "M7 7l10 10-5 4V3l5 4L7 17";
@@ -150,9 +151,9 @@ pub fn rows() -> Vec<Row> {
         row("dictation", "sound", "Microphone", "Pick the input you speak into", 2, MIC),
         row("dictation", "language", "Language & region", "What you speak and read", 6, GLOBE),
         Row { live: Some(dictation_state), ..row("dictation", "dictation", "Dictation", "", 4, MIC) },
+        row("account", "account", "Account", "Your name, picture and password; other people", 2, USER),
         row("privacy", "privacy", "Privacy", "Location, camera, microphone", 3, SHIELD),
         row("privacy", "notifications", "Notifications", "What may interrupt you", 5, BELL),
-        row("privacy", "accounts", "Accounts", "People who use this computer", 2, USER),
         row("apps", "apps", "Apps", "Installed apps and what they may use", 1, GRID),
         row("about", "about", "About", "This computer and its software", 4, INFO),
         row("about", "storage", "Storage", "Space used and free", 0, ARCHIVE),
@@ -184,6 +185,9 @@ pub fn load_css() {
     let mut css = include_str!("hub.css").to_string();
     for c in PALETTE {
         css.push_str(&format!(".hub-tile.c{0}, .cal-block.c{0}, .cal-bar.c{0} {{ background: {c}; }}\n", &c[1..]));
+    }
+    for (c, _) in crate::settings::ACCENTS {
+        css.push_str(&format!("button.swatch.c{0} {{ background: {c}; }}\n", &c[1..]));
     }
     provider.load_from_string(&css);
     gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 2);
@@ -463,14 +467,15 @@ mod tests {
         assert_eq!(wifi[0].section, "wifi");
         assert!(filter(&rows, "volume sound").iter().any(|r| r.section == "sound"));
         assert!(filter(&rows, "zzz").is_empty());
-        let privacy = filter(&rows, "privacy");
-        assert!(privacy.iter().any(|r| r.section == "accounts"), "pivot name matches its rows");
+        let account = filter(&rows, "account");
+        assert!(account.iter().any(|r| r.section == "account"), "pivot name matches its rows");
+        assert!(filter(&rows, "password").iter().any(|r| r.section == "account"), "the hint is searched too");
     }
 
     #[test]
     fn pivots_stop_at_the_ends() {
-        assert_eq!(step(0, -1, 9), 0);
-        assert_eq!(step(8, 1, 9), 8);
-        assert_eq!(step(3, 1, 9), 4);
+        assert_eq!(step(0, -1, PIVOTS.len()), 0);
+        assert_eq!(step(PIVOTS.len() - 1, 1, PIVOTS.len()), PIVOTS.len() - 1);
+        assert_eq!(step(3, 1, PIVOTS.len()), 4);
     }
 }
