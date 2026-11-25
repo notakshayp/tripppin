@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Mouse & touchpad settings
-Comment=Settings → mouse & touchpad
-Exec=tripppin-ui settings pointer
-Icon=input-touchpad
-Keywords=mouse;touchpad;trackpad;tap;scroll;speed;
-Categories=Settings;

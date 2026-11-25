@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Keyboard settings
-Comment=Settings → keyboard
-Exec=tripppin-ui settings keyboard
-Icon=input-keyboard
-Keywords=layout;language;shortcuts;repeat;
-Categories=Settings;

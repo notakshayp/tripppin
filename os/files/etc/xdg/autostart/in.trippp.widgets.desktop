@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Tripppin widgets
+Exec=tripppin-ui widgets
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=2
+NoDisplay=true

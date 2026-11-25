@@ -31,6 +31,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use trip::agent::{self, Ui};
+use trip::follow;
 use trip::model::{PlanStep, Usage};
 use trip::session::Session;
 
@@ -1912,9 +1913,16 @@ impl Orb {
         let (tx, rx) = async_channel::unbounded::<(String, Event)>();
         let id = req.id.clone();
         std::thread::spawn(move || {
+            // Other processes (`trip shell --continue`) can follow the run through its live file.
+            let log = follow::Log::create(&follow::live_path(&id), &text, session.turns.len());
+            let finished = Arc::new(AtomicBool::new(false));
+            follow::watch(&id, cancel.clone(), finished.clone());
             session.ask(&text);
-            let mut ui = Sender { tx: tx.clone(), id: id.clone() };
+            let mut ui = follow::Tee { inner: Sender { tx: tx.clone(), id: id.clone() }, log };
             let result = agent::run(&mut session, &cancel, &mut ui).map(|_| ()).map_err(|e| format!("{e:#}"));
+            session.save();
+            ui.log.end(result.as_ref().err().cloned());
+            finished.store(true, Ordering::Relaxed);
             let _ = tx.send_blocking((id, Event::Done(result, Box::new(session))));
         });
         let orb = self.clone();
@@ -2219,8 +2227,8 @@ impl Orb {
         if let Some(s) = req.session.borrow().as_ref() {
             s.save();
         }
-        let spawned = std::process::Command::new("foot")
-            .args(["--title", "tripppin", "--", "trip", "shell", "--continue", &req.id])
+        let spawned = std::process::Command::new("konsole")
+            .args(["--title", "tripppin", "-e", "trip", "shell", "--continue", &req.id])
             .env("TRIPPPIN_IN_SHELL", "1")
             .spawn();
         if spawned.is_ok() {

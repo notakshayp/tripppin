@@ -27,6 +27,19 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NAT
       -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_HTML=OFF \
     && cmake --build build --target llama-server -j"$(nproc)"
 
+# ---- whisper.cpp ----------------------------------------------------------
+# Dictation's speech to text. Fedora's whisper-cpp package ships only the libraries, no
+# whisper-cli, so build the pinned release (CPU only; the base model is fast enough there).
+FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS whisper
+ARG WHISPER_CPP_TAG=v1.8.7
+RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ && dnf clean all
+RUN git clone --depth 1 --branch "$WHISPER_CPP_TAG" https://github.com/ggml-org/whisper.cpp /src/whisper.cpp
+WORKDIR /src/whisper.cpp
+RUN if [ "$(uname -m)" = x86_64 ]; then X86="-DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON"; fi; \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF $X86 \
+      -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DWHISPER_BUILD_EXAMPLES=ON \
+    && cmake --build build --target whisper-cli -j"$(nproc)"
+
 # ---- The OS -----------------------------------------------------------------
 FROM quay.io/fedora/fedora-bootc:45@sha256:d440aea898005f376bbf0bbe06c216abdba68dcdb6dfa5cb0fa246cd03fa8d8a
 
@@ -52,6 +65,12 @@ COPY --from=build /src/target/release/trip /usr/bin/trip
 COPY --from=build /src/target/release/tripppin-ui /usr/bin/tripppin-ui
 COPY --from=llama /src/llama.cpp/build/bin/llama-server /usr/bin/llama-server
 COPY --from=llama /src/llama.cpp/LICENSE /usr/share/licenses/llama.cpp/LICENSE
+COPY --from=whisper /src/whisper.cpp/build/bin/whisper-cli /usr/bin/whisper-cli
+COPY --from=whisper /src/whisper.cpp/LICENSE /usr/share/licenses/whisper.cpp/LICENSE
+# Dictation's speech model: multilingual base, 5-bit (MIT, ggerganov/whisper.cpp), pinned to a revision and checked.
+ARG WHISPER_MODEL_REV=5359861c739e955e79d9a303bcbc70fb988958b1
+ARG WHISPER_MODEL_SHA256=422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898
+ADD --checksum=sha256:${WHISPER_MODEL_SHA256} https://huggingface.co/ggerganov/whisper.cpp/resolve/${WHISPER_MODEL_REV}/ggml-base-q5_1.bin /usr/share/tripppin/whisper/ggml-base-q5_1.bin
 
 # What llama.cpp needs at runtime: the Vulkan loader and Mesa's GPU drivers.
 RUN dnf -y install --setopt=install_weak_deps=False vulkan-loader mesa-vulkan-drivers libgomp && dnf clean all
@@ -90,18 +109,23 @@ RUN mkdir -p /usr/share/fonts/lucide /usr/share/licenses/lucide \
     && curl -fsSL -o /usr/share/licenses/lucide/LICENSE "https://unpkg.com/lucide-static@${LUCIDE_VERSION}/LICENSE" \
     && fc-cache -f
 
-# The desktop: niri (a Wayland compositor) with every window floating, styled end
-# to end. waybar, fuzzel, mako, foot and swaybg are configured in os/files; the
-# orb, login and lock screens are ours (tripppin-ui). Inter is the interface font.
+# The desktop: KDE Plasma 6 on KWin (Wayland), a lean explicit set rather than the whole
+# @kde-desktop group, restyled end to end by os/files (the "Tripppin" look-and-feel package,
+# Plasma style, colour scheme, Konsole profile). The orb, login screen and Settings' AI pages
+# are ours (tripppin-ui). Inter is the interface font. Apps come as Flatpaks (Discover).
 RUN dnf -y install --setopt=install_weak_deps=False \
-      niri xwayland-satellite waybar fuzzel SwayNotificationCenter wlogout wlsunset swaybg swayidle foot \
-      greetd gtk4 gtk4-layer-shell libadwaita adwaita-icon-theme adwaita-cursor-theme \
-      rsms-inter-fonts mesa-dri-drivers pipewire wireplumber pipewire-pulseaudio pipewire-alsa \
+      plasma-workspace plasma-desktop kwin plasma-nm plasma-pa bluedevil powerdevil kscreen kscreenlocker \
+      kde-gtk-config xdg-desktop-portal-kde plasma-systemsettings kinfocenter plasma-print-manager polkit-kde \
+      dolphin konsole ark gwenview okular spectacle kio-extras kde-cli-tools plasma-integration \
+      kdegraphics-thumbnailers ffmpegthumbs breeze-icon-theme breeze-gtk plasma-breeze breeze-cursor-theme \
+      plasma-discover plasma-discover-flatpak \
+      greetd gtk4 gtk4-layer-shell libadwaita adwaita-icon-theme \
+      rsms-inter-fonts mesa-dri-drivers pipewire pipewire-utils wireplumber pipewire-pulseaudio pipewire-alsa \
       mesa-libEGL mesa-libGL libglvnd-egl libglvnd-gles libglvnd-opengl libglvnd-glx \
-      xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome xdg-user-dirs \
+      xdg-desktop-portal xdg-desktop-portal-gtk xdg-user-dirs \
       dconf polkit libnotify wl-clipboard brightnessctl playerctl \
-      adw-gtk3-theme papirus-icon-theme papirus-icon-theme-dark qt6ct qt5ct qt6-qtwayland \
-      grim slurp swappy wf-recorder cliphist nm-connection-editor blueman bluez pavucontrol pulseaudio-utils wdisplays upower power-profiles-daemon \
+      adw-gtk3-theme papirus-icon-theme papirus-icon-theme-dark qt6-qtwayland \
+      bluez pulseaudio-utils upower power-profiles-daemon \
       glibc-langpack-en glibc-langpack-hi glibc-langpack-bn glibc-langpack-ta glibc-langpack-te \
       glibc-langpack-mr glibc-langpack-kn glibc-langpack-ml glibc-langpack-gu glibc-langpack-pa \
       glibc-langpack-es glibc-langpack-fr glibc-langpack-de glibc-langpack-pt \
@@ -109,13 +133,14 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       google-noto-sans-telugu-vf-fonts google-noto-sans-kannada-vf-fonts google-noto-sans-malayalam-vf-fonts \
       google-noto-sans-gujarati-vf-fonts google-noto-sans-gurmukhi-vf-fonts \
       firewalld orca espeak-ng speech-dispatcher speech-dispatcher-espeak-ng NetworkManager-openvpn NetworkManager-openvpn-gnome \
-      cups cups-filters ipp-usb nss-mdns system-config-printer sane-backends sane-airscan simple-scan unicode-emoji wtype mate-polkit google-noto-color-emoji-fonts plymouth plymouth-plugin-script \
-      thunar thunar-volman thunar-archive-plugin tumbler gvfs gvfs-mtp file-roller \
-      gnome-text-editor loupe papers gnome-calculator celluloid gnome-system-monitor gnome-disk-utility \
-      udiskie greenboot greenboot-default-health-checks \
+      cups cups-filters ipp-usb nss-mdns sane-backends sane-airscan simple-scan unicode-emoji wtype google-noto-color-emoji-fonts plymouth plymouth-plugin-script \
+      gvfs gvfs-mtp \
+      gnome-text-editor gnome-calculator celluloid gnome-system-monitor gnome-disk-utility \
+      greenboot greenboot-default-health-checks \
     && dnf clean all
 
 COPY os/files/ /
+RUN test -x /usr/bin/startplasma-wayland && test -x /usr/bin/kwin_wayland && test -f /usr/share/icons/breeze_cursors/index.theme
 # The desktop widgets reference, for people and for the AI (`tripppin-ui widgets guide`).
 COPY docs/WIDGETS.md /usr/share/doc/tripppin/WIDGETS.md
 
@@ -165,18 +190,19 @@ RUN set -e; src=/usr/share/icons/Papirus; dst=/usr/share/icons/Tripppin; \
     test -f "$dst/48x48/places/folder.svg"
 
 # The boot splash: our Plymouth theme, built into the initramfs so it shows from the start.
-# A clean app list: hide helpers, duplicates of our Settings pages and Fedora's tool windows
-# (they still open from files and links), and give the two everyday apps plain names.
-# Settings' own pages are found by searching "Settings" words instead of listing 20 entries.
+# A clean app list: hide helpers, duplicates and tool windows from Plasma's launcher (they
+# still open from files and links), and give the two everyday apps plain names. Our
+# Settings' own pages are found by searching "Settings" words instead of listing entries.
 RUN cd /usr/share/applications \
-    && for f in blueman-manager blueman-adapters foot-server footclient qt5ct qt6ct system-config-printer \
-         thunar-bulk-rename thunar-settings network.cycles.wdisplays org.pulseaudio.pavucontrol \
-         org.gnome.FileRoller org.gnome.SimpleScan panel-preferences thunar-volman-settings; do \
+    && for f in kdesystemsettings org.kde.kmenuedit org.kde.plasma.emojier org.kde.ark org.kde.kinfocenter \
+         org.gnome.SimpleScan org.kde.plasma-systemmonitor org.kde.kuserfeedback-console \
+         org.freedesktop.IBus.Panel.Emojier org.freedesktop.IBus.Panel.Extension.Gtk3 \
+         org.freedesktop.IBus.Setup nm-connection-editor; do \
          [ ! -f "$f.desktop" ] || sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$f.desktop"; \
        done \
     && for d in in.trippp.Settings.*.desktop; do sed -i '/^\[Desktop Entry\]/a NoDisplay=true' "$d"; done \
-    && sed -i -e '/^Name\[/d' -e 's/^Name=Foot$/Name=Terminal/' foot.desktop \
-    && sed -i -e '/^Name\[/d' -e 's/^Name=Thunar File Manager$/Name=Files/' thunar.desktop \
+    && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Konsole$/Name=Terminal/' org.kde.konsole.desktop \
+    && sed -i -e '/^Name\[/d' -e '/^GenericName\[/d' -e 's/^Name=Dolphin$/Name=Files/' org.kde.dolphin.desktop \
     && ! grep -q NoDisplay in.trippp.Settings.desktop
 
 RUN plymouth-set-default-theme tripppin \

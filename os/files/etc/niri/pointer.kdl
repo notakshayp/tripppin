@@ -1,8 +1,0 @@
-// Mouse and touchpad defaults: tap to click, natural scrolling, and no touchpad while typing.
-input {
-    touchpad {
-        tap
-        natural-scroll
-        dwt
-    }
-}
