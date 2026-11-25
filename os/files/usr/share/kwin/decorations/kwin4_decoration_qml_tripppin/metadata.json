@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "KWin/Decoration",
+    "KPlugin": {
+        "Authors": [{ "Name": "Tripppin" }],
+        "Description": "Flat, square window frames: a 36 px strip in the accent colour when active",
+        "Id": "kwin4_decoration_qml_tripppin",
+        "License": "Apache-2.0",
+        "Name": "Tripppin Tiles",
+        "Website": "https://trippp.in"
+    },
+    "X-KWin-Config-TranslationDomain": "aurorae"
+}

@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{ "Name": "Tripppin" }],
+        "Description": "Wi-Fi, battery and the time as plain text",
+        "Icon": "preferences-system-time",
+        "Id": "in.trippp.status",
+        "License": "Apache-2.0",
+        "Name": "Status line"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

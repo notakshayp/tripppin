@@ -118,7 +118,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       kde-gtk-config xdg-desktop-portal-kde plasma-systemsettings kinfocenter plasma-print-manager polkit-kde \
       dolphin konsole ark gwenview okular spectacle kio-extras kde-cli-tools plasma-integration \
       kdegraphics-thumbnailers ffmpegthumbs breeze-icon-theme breeze-gtk plasma-breeze breeze-cursor-theme \
-      plasma-discover plasma-discover-flatpak \
+      plasma-discover plasma-discover-flatpak kvantum \
       greetd gtk4 gtk4-layer-shell libadwaita adwaita-icon-theme \
       rsms-inter-fonts mesa-dri-drivers pipewire pipewire-utils wireplumber pipewire-pulseaudio pipewire-alsa \
       mesa-libEGL mesa-libGL libglvnd-egl libglvnd-gles libglvnd-opengl libglvnd-glx \

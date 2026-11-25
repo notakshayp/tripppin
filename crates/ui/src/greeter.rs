@@ -1,6 +1,7 @@
-//! The login screen, run by greetd inside a minimal niri session (/etc/tripppin/greeter-niri.kdl).
-//! The clock top left; who you are and the password bottom left; network, battery and power
-//! bottom right; the faint mark behind it all.
+//! The login screen, run by greetd inside a minimal KWin session. It matches the lock screen
+//! (the "Tiles" design, mock section 01): flat teal with a darkening towards the bottom, the
+//! big light time bottom-left with the date, who you are and the password under them, Wi-Fi
+//! and battery top-right, power bottom-right.
 
 use crate::common::{self, label};
 use crate::greetd::{Greetd, Outcome};
@@ -11,6 +12,56 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 /// The desktop session greetd starts: it keeps the text console blank and ink, then runs
 /// niri-session (os/files/usr/libexec/tripppin-session).
 const SESSION: &str = "/usr/libexec/tripppin-session";
+
+/// The Tiles look for the login screen, on top of the shared stylesheet so it needs no change
+/// there: teal #0f3d3a darkening towards the bottom, the time in Inter 200 at 140 px, square
+/// everything, the password box in the lock screen's style (raised, 2 px outline, accent
+/// when focused).
+const TILES_CSS: &str = r#"
+window.tiles-greeter.screen {
+  background-color: #0f3d3a;
+  background-image: linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.45));
+  color: #ffffff;
+}
+window.tiles-greeter .clock-big {
+  font-family: Inter; font-weight: 200; font-size: 140px; letter-spacing: -2.8px;
+  color: #ffffff; margin: 0; padding: 0; line-height: 1;
+}
+window.tiles-greeter .date {
+  font-family: Inter; font-weight: 300; font-size: 30px; color: #ffffff; margin-top: 4px;
+}
+window.tiles-greeter .tiles-top { font-size: 13px; color: #ffffff; }
+window.tiles-greeter .pw-pill {
+  background: rgba(16,20,24,0.63); border: 2px solid #3a444b; border-radius: 0; box-shadow: none;
+  padding: 0; min-height: 52px;
+}
+window.tiles-greeter .pw-pill:focus-within { border-color: #3fae7a; }
+window.tiles-greeter .pw-pill entry, window.tiles-greeter .pw-pill text {
+  font-family: Inter; font-weight: 300; font-size: 20px; color: #ffffff; background: none;
+  border: none; box-shadow: none; outline: none; border-radius: 0; padding-left: 14px;
+}
+window.tiles-greeter button.go {
+  background: #1f6b45; color: #ffffff; border-radius: 0; border: none; box-shadow: none;
+  min-width: 52px; min-height: 52px; margin: -2px; padding: 0;
+}
+window.tiles-greeter button.go:hover { background: #2a7b54; }
+window.tiles-greeter .avatar { border-radius: 0; background: #c2502e; color: #ffffff; }
+window.tiles-greeter .who { font-family: Inter; font-weight: 300; font-size: 20px; color: #ffffff; }
+window.tiles-greeter .status { color: #9aa4ab; font-family: Inter; font-size: 13px; }
+window.tiles-greeter .tiles-top.status { color: #ffffff; }
+window.tiles-greeter button, window.tiles-greeter popover contents { border-radius: 0; }
+window.tiles-greeter button.person { border-radius: 0; background: rgba(16,20,24,0.5); border: 2px solid #3a444b; box-shadow: none; }
+window.tiles-greeter button.person.selected { border-color: #3fae7a; }
+window.tiles-greeter .error { color: #e8825c; }
+"#;
+
+fn load_tiles_css() {
+    let Some(display) = gtk::gdk::Display::default() else { return };
+    let provider = gtk::CssProvider::new();
+    provider.load_from_string(TILES_CSS);
+    // Above the shared stylesheet and the corner style (which sit at APPLICATION and +1).
+    gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 5);
+}
 
 /// Once logged in: everything on the login screen fades, leaving plain ink, and then the
 /// greeter quits. greetd starts the desktop only after that, and the desktop opens on the
@@ -48,6 +99,8 @@ fn build(app: &gtk::Application) {
     let window = gtk::Window::builder().application(app).decorated(false).build();
     window.add_css_class("tripppin");
     window.add_css_class("screen");
+    window.add_css_class("tiles-greeter");
+    load_tiles_css();
     window.init_layer_shell();
     window.set_namespace(Some("tripppin-greeter"));
     window.set_layer(Layer::Overlay);
@@ -58,28 +111,33 @@ fn build(app: &gtk::Application) {
     window.set_keyboard_mode(KeyboardMode::Exclusive);
 
     let overlay = gtk::Overlay::new();
-    overlay.set_child(Some(&common::backdrop()));
+    let flat = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    flat.set_hexpand(true);
+    flat.set_vexpand(true);
+    overlay.set_child(Some(&flat));
+
+    // Everything bottom-left in one column: the time, the date, then who and the password.
+    let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    column.set_halign(gtk::Align::Start);
+    column.set_valign(gtk::Align::End);
+    column.set_margin_start(48);
+    column.set_margin_bottom(60);
 
     // Clock.
-    let time = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let time = gtk::Box::new(gtk::Orientation::Vertical, 0);
     time.set_halign(gtk::Align::Start);
-    time.set_valign(gtk::Align::Start);
-    time.set_margin_start(96);
-    time.set_margin_top(96);
     let clock = label(&common::clock(), &["clock-big"]);
     let date = label(&common::long_date(), &["date"]);
     time.append(&clock);
     time.append(&date);
-    overlay.add_overlay(&time);
+    column.append(&time);
 
     // Who and the password.
     let people = common::people();
     let user = people.first().cloned().unwrap_or_default();
     let form = gtk::Box::new(gtk::Orientation::Vertical, 18);
     form.set_halign(gtk::Align::Start);
-    form.set_valign(gtk::Align::End);
-    form.set_margin_start(96);
-    form.set_margin_bottom(110);
+    form.set_margin_top(28);
     form.set_size_request(380, -1);
     let who = gtk::Box::new(gtk::Orientation::Horizontal, 14);
     let name = common::display_name(&user);
@@ -189,20 +247,29 @@ fn build(app: &gtk::Application) {
     }
     form.append(&forgot);
     form.append(&help);
-    overlay.add_overlay(&form);
+    column.append(&form);
+    overlay.add_overlay(&column);
 
-    // Network, battery, power.
+    // Wi-Fi and battery, top-right: "Wi-Fi   82%", as on the lock screen.
+    let top = gtk::Box::new(gtk::Orientation::Horizontal, 16);
+    top.set_halign(gtk::Align::End);
+    top.set_valign(gtk::Align::Start);
+    top.set_margin_end(40);
+    top.set_margin_top(30);
+    if common::wifi_name().is_some() {
+        top.append(&label("Wi-Fi", &["status", "tiles-top"]));
+    }
+    if let Some(b) = common::battery() {
+        top.append(&label(&format!("{b}%"), &["status", "tiles-top"]));
+    }
+    overlay.add_overlay(&top);
+
+    // Power, bottom-right, where the lock screen has its hint.
     let status = gtk::Box::new(gtk::Orientation::Horizontal, 22);
     status.set_halign(gtk::Align::End);
     status.set_valign(gtk::Align::End);
-    status.set_margin_end(48);
-    status.set_margin_bottom(40);
-    if let Some(ssid) = common::wifi_name() {
-        status.append(&label(&format!("Wi-Fi · {}", ssid), &["status"]));
-    }
-    if let Some(b) = common::battery() {
-        status.append(&label(&format!("Battery {b}%"), &["status"]));
-    }
+    status.set_margin_end(40);
+    status.set_margin_bottom(60);
     let power = gtk::MenuButton::new();
     power.set_label("Power");
     power.set_always_show_arrow(false);

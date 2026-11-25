@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "Plasma/Theme",
+    "KPlugin": {
+        "Authors": [{ "Name": "Tripppin Tiles" }],
+        "Description": "Flat, square, solid colour: the Tiles look",
+        "Id": "tripppin-tiles",
+        "License": "Apache-2.0",
+        "Name": "Tripppin Tiles",
+        "Version": "1.0",
+        "Website": "https://trippp.in"
+    }
+}

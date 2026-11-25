@@ -3,7 +3,7 @@
     "KPlugin": {
         "Authors": [{ "Name": "Tripppin" }],
         "Category": "",
-        "Description": "Ink and paper, a forest-green accent, Inter and DM Mono",
+        "Description": "Tiles: flat, square, solid colour, Inter and DM Mono",
         "Id": "in.trippp.desktop",
         "License": "Apache-2.0",
         "Name": "Tripppin",

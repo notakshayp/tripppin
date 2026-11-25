@@ -4,4 +4,10 @@
 # and send Plasma's startup messages to the journal, so the next thing on screen is Plasma's
 # splash (the Tripppin look-and-feel's), not text.
 /usr/libexec/tripppin-ink-console
+# Qt apps are drawn by Kvantum with our flat square "Tripppin" theme (usr/share/Kvantum).
+# Kvantum reads only the person's own config, so write it once if it is missing.
+kv="${XDG_CONFIG_HOME:-$HOME/.config}/Kvantum/kvantum.kvconfig"
+if [ ! -f "$kv" ]; then
+    mkdir -p "$(dirname "$kv")" && printf '[General]\ntheme=Tripppin\n' > "$kv"
+fi
 exec systemd-cat -t plasma-session /usr/libexec/plasma-dbus-run-session-if-needed /usr/bin/startplasma-wayland

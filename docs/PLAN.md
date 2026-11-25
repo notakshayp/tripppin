@@ -154,3 +154,11 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 - [x] Login: our greeter on KWin; session starts `startplasma-wayland`
 - [~] Checked in the VM by screenshot (docs/DESKTOP.md, Plasma section)
 - [ ] To remove from crates/ui once Plasma is accepted: `displays`, `splash`, `desktop`, `dim`, `lock`, `keeper`, `snap`, `switch`, `osd`, `quick`, `battery-ring`, the niri-based Settings pages (Wi-Fi, Bluetooth, Sound, Display, Appearance, Power, Notifications, Keyboard, Mouse, Printers, Accessibility, now `#[allow(dead_code)]`), `keys` (cheat sheet lists niri keys), and the `foot` shim in os/files/usr/bin once orb.rs launches Konsole
+
+## Tiles shell (2026-11-25, branch `tiles-shell`)
+
+- [~] Taskbar: 40 px bottom panel, start button plasmoid, icons-only tasks with accent underline, status-line plasmoid, tray reduced to notifications; Meta tap opens `tripppin-ui start`
+- [~] Plasma style `tripppin-tiles`, colour scheme to the tokens, QML window decoration (36 px strip), Kvantum "Tripppin" theme for Qt apps
+- [~] Lock screen (QML) and login screen in the Tiles look; splash with Shapes
+- [ ] Next-event line on the lock screen (needs the calendar store); `tripppin-ui start` bound once it lands
+- [ ] Checked at scale 1, 1.5 and 2 on the laptop (checked in the VM at 1)

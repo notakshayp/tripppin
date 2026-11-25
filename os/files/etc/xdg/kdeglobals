@@ -19,7 +19,7 @@ XftSubPixel=none
 
 [KDE]
 LookAndFeelPackage=in.trippp.desktop
-widgetStyle=Breeze
+widgetStyle=kvantum
 # Double-click opens, like on the desktops people come from; one click selects.
 SingleClick=false
 AnimationDurationFactor=0.7

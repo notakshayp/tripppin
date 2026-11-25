@@ -1,8 +1,10 @@
 # KWin: quiet window frames, quick tiling on (Meta + arrows, drag a window to an edge or a
-# corner), and a Meta tap that opens the launcher.
+# corner), and a Meta tap that opens the start screen (tripppin-ui start, through the
+# Open-the-launcher global shortcut). The frame is our QML decoration: square, flat, a 36 px
+# strip (os/files/usr/share/kwin/decorations/kwin4_decoration_qml_tripppin).
 [org.kde.kdecoration2]
-library=org.kde.breeze
-theme=Breeze
+library=org.kde.kwin.aurorae
+theme=kwin4_decoration_qml_tripppin
 ButtonsOnLeft=
 ButtonsOnRight=IAX
 BorderSize=None
@@ -17,7 +19,7 @@ Placement=Centered
 BorderlessMaximizedWindows=true
 
 [ModifierOnlyShortcuts]
-Meta=org.kde.plasmashell,/PlasmaShell,org.kde.PlasmaShell,activateLauncherMenu
+Meta=org.kde.kglobalaccel,/component/in_trippp_Launcher_desktop,org.kde.kglobalaccel.Component,invokeShortcut,_launch
 
 [Plugins]
 blurEnabled=true
@@ -25,6 +27,9 @@ contrastEnabled=true
 wobblywindowsEnabled=false
 magiclampEnabled=false
 squashEnabled=true
+fadeEnabled=true
+fadingpopupsEnabled=true
+maximizeEnabled=true
 overviewEnabled=true
 slidingpopupsEnabled=true
 

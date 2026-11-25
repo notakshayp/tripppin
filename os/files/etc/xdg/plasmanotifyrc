@@ -1,5 +1,5 @@
 [Notifications]
-PopupPosition=TopRight
+PopupPosition=BottomRight
 PopupTimeout=6
 
 # Screenshot notifications are explicit user interactions, always show them
@@ -16,9 +16,10 @@ ShowInHistory=false
 [Applications][org.kde.drkonqi]
 ShowInHistory=false
 
+# History is kept so the lock screen can show how many are unread per app.
 [Applications][@other]
-ShowInHistory=false
+ShowInHistory=true
 ShowBadges=false
 
 [Services][libnotificationmanager]
-ShowInHistory=false
+ShowInHistory=true

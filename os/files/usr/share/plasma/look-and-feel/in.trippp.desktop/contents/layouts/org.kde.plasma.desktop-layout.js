@@ -1,38 +1,45 @@
-// The Tripppin desktop, first login: the wallpaper on every screen (the desktop itself
-// shows ~/Desktop as icons) and one floating panel: launcher, icons-only task manager,
-// system tray, clock with the date.
-var wallpaper = "file:///usr/share/tripppin/wallpapers/ink.png";
+// The Tripppin desktop, first login (the "Tiles" design, mock section 02): flat #101418 on
+// every screen (the desktop itself shows ~/Desktop as icons) and one thin taskbar docked at
+// the bottom, 40 px, solid ink, square: the start button (a 40 x 40 accent square, runs
+// `tripppin-ui start`), then icons-only running apps with a 2 px accent underline, then at the
+// far right the status line in plain text ("Wi-Fi   82%   21:14") and the notifications bell.
 
 var desktops = desktopsForActivity(currentActivity());
 for (var i = 0; i < desktops.length; i++) {
     var d = desktops[i];
-    d.wallpaperPlugin = "org.kde.image";
-    d.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
-    d.writeConfig("Image", wallpaper);
+    d.wallpaperPlugin = "org.kde.color";
+    d.currentConfigGroup = ["Wallpaper", "org.kde.color", "General"];
+    d.writeConfig("Color", "#101418");
 }
 
 var panel = new Panel();
 panel.location = "bottom";
-panel.height = 2 * gridUnit + 8;
-panel.floating = true;
-panel.alignment = "center";
-panel.lengthMode = "fit";
+panel.height = 40;
+panel.floating = false;
+panel.alignment = "left";
+panel.lengthMode = "fill";
 panel.hiding = "none";
-panel.opacity = "adaptive";
+panel.opacity = "opaque";
 
-var launcher = panel.addWidget("org.kde.plasma.kickoff");
-launcher.currentConfigGroup = ["General"];
-launcher.writeConfig("icon", "tripppin");
+panel.addWidget("in.trippp.start");
 
 var tasks = panel.addWidget("org.kde.plasma.icontasks");
 tasks.currentConfigGroup = ["General"];
 tasks.writeConfig("launchers", "applications:org.mozilla.firefox.desktop,applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop");
+tasks.writeConfig("iconSpacing", "0");
+tasks.writeConfig("maxStripes", "1");
+tasks.writeConfig("indicateAudioStreams", "false");
+tasks.writeConfig("showToolTips", "true");
 
-panel.addWidget("org.kde.plasma.marginsseparator");
-panel.addWidget("org.kde.plasma.systemtray");
+panel.addWidget("org.kde.plasma.panelspacer");
 
-var clock = panel.addWidget("org.kde.plasma.digitalclock");
-clock.currentConfigGroup = ["Appearance"];
-clock.writeConfig("showDate", "true");
-clock.writeConfig("dateFormat", "shortDate");
-clock.writeConfig("use24hFormat", "2");
+panel.addWidget("in.trippp.status");
+
+// The tray shows nothing but notifications (so they stay reachable); Wi-Fi, battery and the
+// time are the status line's text.
+var tray = panel.addWidget("org.kde.plasma.systemtray");
+tray.currentConfigGroup = ["General"];
+tray.writeConfig("extraItems", "org.kde.plasma.notifications");
+tray.writeConfig("shownItems", "org.kde.plasma.notifications");
+tray.writeConfig("hiddenItems", "");
+tray.writeConfig("scaleIconsToFit", "false");

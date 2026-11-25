@@ -1,48 +1,61 @@
 #!/usr/bin/env python3
-"""Writes the Plasma style's frame SVGs (os/files/usr/share/plasma/desktoptheme/tripppin).
+"""Writes the Plasma style's frame SVGs (os/files/usr/share/plasma/desktoptheme/tripppin-tiles).
 
-Plasma draws panels, dialogs and tooltips from nine-patch SVGs (corners, edges, centre and
-`hint-*-margin` rectangles). Ours are plain rounded rectangles in the colour scheme's
-background with a neutral hairline: no glow, no gradients. Everything else in the theme falls
-back to Breeze's. Run from the repository root: python3 scripts/plasma-theme.py
+The "Tiles" look: flat, square (radius 0), solid colour, no shadow and no glow. Plasma draws
+panels, dialogs, tooltips and the task buttons from nine-patch SVGs (corners, edges, centre and
+`hint-*-margin` rectangles); ours are plain rectangles in the design tokens, all vector.
+Everything else in the theme falls back to Breeze's. Run from the repository root:
+python3 scripts/plasma-theme.py
 """
 import pathlib
 
-OUT = pathlib.Path("os/files/usr/share/plasma/desktoptheme/tripppin")
+OUT = pathlib.Path("os/files/usr/share/plasma/desktoptheme/tripppin-tiles")
+
+INK = "#0a0d10"  # taskbar
+BG = "#101418"
+RAISED = "#1a2025"
+LINE = "#2a3238"
+ACCENT = "#3fae7a"
+GREEN = "#1f6b45"
 
 
-def frame(prefixes, r, margin, opacity, hairline=0.14):
-    w = 4 * r
-    a, b = r, w - r
-    h = r - 0.5
+def frame(prefix, fill, margin, border=None, underline=None, fill_opacity=1.0):
+    """A nine-patch in 6 x 6 units: 2-unit corners and edges, a 2 x 2 centre.
+
+    `border` is a 1 px outline colour; `underline` a 2 px stripe along the bottom edge.
+    Corners and edges are plain rectangles, so the frame is square at any scale."""
+    p = prefix
+    cells = {
+        "topleft": (0, 0), "top": (2, 0), "topright": (4, 0),
+        "left": (0, 2), "center": (2, 2), "right": (4, 2),
+        "bottomleft": (0, 4), "bottom": (2, 4), "bottomright": (4, 4),
+    }
     parts = []
-    for p in prefixes:
-        fill = f'class="ColorScheme-Background" fill="currentColor" fill-opacity="{opacity}" stroke="none"'
-        line = f'class="ColorScheme-Text" fill="currentColor" fill-opacity="{hairline}" stroke="none"'
-        arc = f'class="ColorScheme-Text" fill="none" stroke="currentColor" stroke-opacity="{hairline}" stroke-width="1"'
-        parts += [
-            f'<g id="{p}topleft"><path {fill} d="M{a},0 A{r},{r} 0 0 0 0,{a} L{a},{a}Z"/><path {arc} d="M{a},0.5 A{h},{h} 0 0 0 0.5,{a}"/></g>',
-            f'<g id="{p}topright"><path {fill} d="M{b},0 A{r},{r} 0 0 1 {w},{a} L{b},{a}Z"/><path {arc} d="M{b},0.5 A{h},{h} 0 0 1 {w - 0.5},{a}"/></g>',
-            f'<g id="{p}bottomleft"><path {fill} d="M0,{b} A{r},{r} 0 0 0 {a},{w} L{a},{b}Z"/><path {arc} d="M0.5,{b} A{h},{h} 0 0 0 {a},{w - 0.5}"/></g>',
-            f'<g id="{p}bottomright"><path {fill} d="M{w},{b} A{r},{r} 0 0 1 {b},{w} L{b},{b}Z"/><path {arc} d="M{w - 0.5},{b} A{h},{h} 0 0 1 {b},{w - 0.5}"/></g>',
-            f'<g id="{p}top"><rect {fill} x="{a}" y="0" width="{b - a}" height="{a}"/><rect {line} x="{a}" y="0" width="{b - a}" height="1"/></g>',
-            f'<g id="{p}bottom"><rect {fill} x="{a}" y="{b}" width="{b - a}" height="{a}"/><rect {line} x="{a}" y="{w - 1}" width="{b - a}" height="1"/></g>',
-            f'<g id="{p}left"><rect {fill} x="0" y="{a}" width="{a}" height="{b - a}"/><rect {line} x="0" y="{a}" width="1" height="{b - a}"/></g>',
-            f'<g id="{p}right"><rect {fill} x="{b}" y="{a}" width="{a}" height="{b - a}"/><rect {line} x="{w - 1}" y="{a}" width="1" height="{b - a}"/></g>',
-            f'<rect id="{p}center" {fill} x="{a}" y="{a}" width="{b - a}" height="{b - a}"/>',
-            f'<rect id="{p}hint-top-margin" x="0" y="0" width="1" height="{margin}" fill="none"/>',
-            f'<rect id="{p}hint-bottom-margin" x="0" y="0" width="1" height="{margin}" fill="none"/>',
-            f'<rect id="{p}hint-left-margin" x="0" y="0" width="{margin}" height="1" fill="none"/>',
-            f'<rect id="{p}hint-right-margin" x="0" y="0" width="{margin}" height="1" fill="none"/>',
-            f'<rect id="{p}hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>',
-        ]
-    body = "\n  ".join(parts)
+    for name, (x, y) in cells.items():
+        el = f'<rect x="{x}" y="{y}" width="2" height="2" fill="{fill}" fill-opacity="{fill_opacity}"/>'
+        extra = ""
+        if border:
+            if y == 0:
+                extra += f'<rect x="{x}" y="0" width="2" height="1" fill="{border}"/>'
+            if y == 4:
+                extra += f'<rect x="{x}" y="5" width="2" height="1" fill="{border}"/>'
+            if x == 0:
+                extra += f'<rect x="0" y="{y}" width="1" height="2" fill="{border}"/>'
+            if x == 4:
+                extra += f'<rect x="5" y="{y}" width="1" height="2" fill="{border}"/>'
+        if underline and y == 4:
+            extra += f'<rect x="{x}" y="4" width="2" height="2" fill="{underline}"/>'
+        # The id'd group holds the fill and any outline: Plasma renders an element by id.
+        parts.append(f'<g id="{p}{name}">{el}{extra}</g>')
+    for side in ("top", "bottom", "left", "right"):
+        parts.append(f'<rect id="{p}hint-{side}-margin" x="0" y="0" width="{margin if side in ("left", "right") else 1}" height="{margin if side in ("top", "bottom") else 1}" fill="none"/>')
+    parts.append(f'<rect id="{p}hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>')
+    return "\n  ".join(parts)
+
+
+def svg(body):
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{w}" viewBox="0 0 {w} {w}">
-  <defs><style type="text/css" id="current-color-scheme">
-    .ColorScheme-Text {{ color:#eef2ee; }}
-    .ColorScheme-Background {{ color:#141a18; }}
-  </style></defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="6" height="6" viewBox="0 0 6 6">
   {body}
 </svg>
 """
@@ -54,7 +67,19 @@ def write(rel, text):
     path.write_text(text)
 
 
-# A floating panel with a softly rounded edge; dialogs a little rounder than tooltips.
-write("widgets/panel-background.svg", frame(["", "floating-"], 14, 6, 0.94))
-write("dialogs/background.svg", frame([""], 14, 10, 0.97))
-write("widgets/tooltip.svg", frame([""], 10, 6, 0.98))
+# Taskbar: solid #0a0d10, no margin, so the buttons sit flush top to bottom.
+write("widgets/panel-background.svg", svg(frame("", INK, 0) + "\n  " + frame("floating-", INK, 0)))
+# Pop-ups (tray, calendar, volume, OSD): the raised surface, a hairline.
+write("dialogs/background.svg", svg(frame("", RAISED, 8, border=LINE)))
+write("widgets/background.svg", svg(frame("", RAISED, 6)))
+write("widgets/tooltip.svg", svg(frame("", RAISED, 6, border=LINE)))
+# Task buttons (9 px margins make a 22 px icon in the 40 px cell): the cell is bare until hovered; the running app has its 2 px accent
+# underline; the active one also a faint lift.
+tasks = [
+    frame("normal-", ACCENT, 9, fill_opacity=0.0, underline=None),
+    frame("focus-", "#ffffff", 9, fill_opacity=0.10, underline=ACCENT),
+    frame("hover-", "#ffffff", 9, fill_opacity=0.08),
+    frame("attention-", "#c2502e", 9, fill_opacity=0.25, underline="#c2502e"),
+    frame("minimized-", ACCENT, 9, fill_opacity=0.0, underline=ACCENT),
+]
+write("widgets/tasks.svg", svg("\n  ".join(tasks)))
