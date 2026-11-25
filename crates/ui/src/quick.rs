@@ -169,42 +169,42 @@ const TASKBAR: i32 = 40;
 
 /// The switches, in the order they are drawn: id and the name on the tile.
 const TILES: [(&str, &str); 5] = [
-    ("wifi", "wi-fi"),
-    ("bluetooth", "bluetooth"),
-    ("airplane", "airplane"),
-    ("dnd", "do not disturb"),
-    ("night-light", "night light"),
+    ("wifi", "Wi-Fi"),
+    ("bluetooth", "Bluetooth"),
+    ("airplane", "Airplane"),
+    ("dnd", "Do not disturb"),
+    ("night-light", "Night light"),
 ];
 
 const CSS: &str = r#"
-window.quick-win { background: transparent; color: #fff; font-family: Inter, sans-serif; }
-window.quick-win * { border-radius: 0; }
-.quick-panel { background: #101418; padding: 5px; }
+window.quick-win { background: transparent; color: #f1f3f4; font-family: Manrope, Inter, sans-serif; }
+.quick-panel { background: #1f2225; border: 1px solid #2e3337; border-radius: 28px; padding: 14px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55); }
 .quick-panel.leave { animation: quick-out 150ms ease-out forwards; }
 .quick-panel.rise-a, .quick-panel.rise-b { animation-duration: 200ms; animation-timing-function: ease-out; }
 @keyframes quick-out { to { opacity: 0; transform: translateY(8px); } }
-.quick-panel button { border: none; box-shadow: none; padding: 0; transition: background 150ms ease-out, opacity 150ms ease-out; }
-button.qtile { background: #1a2025; color: #9aa4ab; min-height: 84px; padding: 12px 14px; }
-button.qtile:hover { background: #222a30; }
-button.qtile.on { background: #1f6b45; color: #fff; }
-button.qtile.on:hover { background: #247a4f; }
-button.qtile:active { opacity: 0.85; }
-.qtile .qname { font-size: 17px; font-weight: 300; }
-.qtile .qstate { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; opacity: 0.8; }
-.qrow { background: #1a2025; padding: 14px 16px; }
-.qrow .qlabel { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #9aa4ab; }
-.qrow .qvalue { font-size: 11px; color: #9aa4ab; }
-.quick-panel scale trough { background: #2a343b; background-image: none; border: none; box-shadow: none; outline: none; min-height: 4px; }
-.quick-panel scale highlight { background: #3fae7a; background-image: none; border: none; min-height: 4px; }
-.quick-panel scale slider { background: #fff; background-image: none; min-width: 10px; min-height: 22px; border: none; box-shadow: none; outline: none; }
+.quick-panel button { border: none; box-shadow: none; padding: 0; transition: background 150ms ease-out, transform 150ms ease-out; }
+button.qtile { background: #23272a; color: #9aa3a8; min-height: 84px; padding: 14px; border-radius: 20px; }
+button.qtile:hover { background: #2c3236; }
+button.qtile.on { background: #f2b84b; color: #16181a; }
+button.qtile.on:hover { background: #f5c162; }
+button.qtile:active { transform: scale(0.97); }
+.qtile .qname { font-size: 14px; font-weight: 700; }
+.qtile .qstate { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; opacity: 0.75; }
+.qrow { background: #23272a; padding: 14px 16px; border-radius: 20px; }
+.qrow .qlabel { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #9aa3a8; }
+.qrow .qvalue { font-size: 13px; font-weight: 800; color: #f1f3f4; }
+.quick-panel scale trough { background: #3a3f43; background-image: none; border: none; border-radius: 6px; box-shadow: none; outline: none; min-height: 10px; }
+.quick-panel scale highlight { background: #f2b84b; background-image: none; border: none; border-radius: 6px; min-height: 10px; }
+.quick-panel scale slider { background: #f1f3f4; background-image: none; min-width: 18px; min-height: 18px; margin: 0; border-radius: 50%; border: none; box-shadow: none; outline: none; opacity: 0; transition: opacity 150ms; }
+.quick-panel scale:hover slider { opacity: 1; }
 .quick-panel scale { padding: 0; min-height: 22px; }
-.qbattery { background: #1a2025; padding: 12px 16px; font-size: 13px; color: #9aa4ab; }
-button.qact { background: #3a4a5a; color: #fff; min-height: 48px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
-button.qact:hover { background: #46586a; }
-button.qact.power { background: #c2502e; }
-button.qact.power:hover { background: #d05d3a; }
-button.qopt { background: #1a2025; color: #fff; min-height: 44px; font-size: 14px; font-weight: 300; }
-button.qopt:hover { background: #222a30; }
+.qbattery { background: #63e6be; color: #06291e; padding: 14px 16px; border-radius: 20px; font-size: 14px; font-weight: 800; }
+button.qact { background: #2e3337; color: #f1f3f4; min-height: 48px; font-size: 13px; font-weight: 700; border-radius: 16px; }
+button.qact:hover { background: #3a3f43; }
+button.qact.power { background: #3a2724; color: #ff7a6b; }
+button.qact.power:hover { background: #4a302c; }
+button.qopt { background: #23272a; color: #f1f3f4; min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 16px; }
+button.qopt:hover { background: #2c3236; }
 "#;
 
 fn spawn(cmd: &str, args: &[&str]) {
@@ -242,7 +242,7 @@ fn battery_line(c: &crate::battery::Charge) -> String {
     } else {
         ""
     };
-    format!("battery {}%{state}", c.percent)
+    format!("Battery {}%{state}", c.percent)
 }
 
 struct Panel {
@@ -328,7 +328,7 @@ impl Panel {
             window.set_keyboard_mode(KeyboardMode::OnDemand);
         }
 
-        let panel = gtk::Box::new(gtk::Orientation::Vertical, 5);
+        let panel = gtk::Box::new(gtk::Orientation::Vertical, 12);
         panel.add_css_class("quick-panel");
         panel.set_size_request(380, -1);
         panel.set_halign(gtk::Align::End);
@@ -337,8 +337,8 @@ impl Panel {
 
         // The toggles: three above, two below, big and flat.
         let grid = gtk::Grid::new();
-        grid.set_row_spacing(5);
-        grid.set_column_spacing(5);
+        grid.set_row_spacing(12);
+        grid.set_column_spacing(12);
         grid.set_column_homogeneous(true);
         let mut tiles = Vec::new();
         for (i, (_, name)) in TILES.iter().enumerate() {
@@ -348,7 +348,7 @@ impl Panel {
             inner.set_valign(gtk::Align::End);
             let n = common::label(name, &["qname"]);
             n.set_wrap(true);
-            let st = common::label("off", &["qstate"]);
+            let st = common::label("Off", &["qstate"]);
             inner.append(&n);
             inner.append(&st);
             b.set_child(Some(&inner));
@@ -360,11 +360,11 @@ impl Panel {
 
         let volume = slider();
         let volume_value = common::label("", &["qvalue"]);
-        let volume_row = slider_row("volume", &volume_value, &volume);
+        let volume_row = slider_row("VOLUME", &volume_value, &volume);
         panel.append(&volume_row);
         let brightness = slider();
         let brightness_value = common::label("", &["qvalue"]);
-        let brightness_row = slider_row("brightness", &brightness_value, &brightness);
+        let brightness_row = slider_row("BRIGHTNESS", &brightness_value, &brightness);
         brightness_row.set_visible(false);
         panel.append(&brightness_row);
         {
@@ -377,11 +377,11 @@ impl Panel {
         panel.append(&battery);
 
         // Settings, lock, power. Power opens a row of its own choices.
-        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 5);
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         actions.set_homogeneous(true);
-        let settings = gtk::Button::with_label("settings");
-        let lock = gtk::Button::with_label("lock");
-        let power = gtk::Button::with_label("power");
+        let settings = gtk::Button::with_label("Settings");
+        let lock = gtk::Button::with_label("Lock");
+        let power = gtk::Button::with_label("Power");
         for (b, extra) in [(&settings, ""), (&lock, ""), (&power, "power")] {
             b.add_css_class("qact");
             if !extra.is_empty() {
@@ -390,7 +390,7 @@ impl Panel {
             actions.append(b);
         }
         panel.append(&actions);
-        let options = gtk::Box::new(gtk::Orientation::Horizontal, 5);
+        let options = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         options.set_homogeneous(true);
         let revealer = gtk::Revealer::new();
         revealer.set_transition_type(gtk::RevealerTransitionType::Crossfade);
@@ -502,9 +502,9 @@ impl Panel {
             u.close();
         });
         for (label, cmd, args) in [
-            ("sleep", "systemctl", &["suspend"][..]),
-            ("restart", "systemctl", &["reboot"][..]),
-            ("shut down", "systemctl", &["poweroff"][..]),
+            ("Sleep", "systemctl", &["suspend"][..]),
+            ("Restart", "systemctl", &["reboot"][..]),
+            ("Shut down", "systemctl", &["poweroff"][..]),
             ("log out", "sh", &["-c", "loginctl terminate-session \"$XDG_SESSION_ID\""][..]),
         ] {
             let b = gtk::Button::with_label(label);
@@ -528,7 +528,7 @@ impl Panel {
         } else {
             b.remove_css_class("on");
         }
-        st.set_text(if on { "on" } else { "off" });
+        st.set_text(if on { "On" } else { "Off" });
     }
 
     /// Reads the real state of everything and shows it.

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// The tile colours, from the design: an app without a brand colour gets one of these.
-pub const PALETTE: [&str; 8] = ["#1f6b45", "#0f7c8c", "#c2502e", "#6b3f8f", "#3a4a5a", "#b8862b", "#2c5aa0", "#3a2a22"];
+pub const PALETTE: [&str; 8] = ["#5aa9e6", "#7b8cff", "#ff8a5a", "#f783ac", "#63e6be", "#ffd43b", "#b197fc", "#45c486"];
 
 /// One app in the catalogue.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

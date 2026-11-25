@@ -1989,3 +1989,16 @@ switch:checked > slider { background: var(--accent-ink); }
 .ask-ok .ok-field text { background: none; color: var(--fg); }
 .ask-ok .ok-field { background: #16181a; }
 .ask-ok .ok-field text > placeholder { color: var(--fg-3); }
+
+/* ---- Dictation pill (BentoAsk 5): rounded pill, orange mic circle, live waveform ---- */
+.osd.dictate {
+    min-width: 0;
+    padding: 12px 20px 12px 12px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-lg);
+}
+.dictate .osd-icon { background: var(--c-orange); color: var(--accent-ink); border-radius: 50%; min-width: 40px; min-height: 40px; font-size: 18px; }
+.dictate .osd-name { font-size: 15px; font-weight: 700; color: var(--fg); }
+.dictate .osd-hint { font-size: 12px; font-weight: 600; color: var(--fg-3); }

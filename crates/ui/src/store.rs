@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use trip::store::{self, App, Catalog, Installed, Progress};
 
-const GRID_COLUMNS: u32 = 6;
+const GRID_COLUMNS: u32 = 5;
 
 enum Msg {
     Catalog(Catalog),
@@ -159,14 +159,14 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
     home.set_vexpand(true);
 
     let search = gtk::Entry::new();
-    search.set_placeholder_text(Some("search apps"));
+    search.set_placeholder_text(Some("Search apps"));
     search.set_width_chars(24);
     search.add_css_class("st-search");
     search.set_valign(gtk::Align::Start);
 
     let mut pivots = Vec::new();
     for (name, id) in
-        [("featured", "featured"), ("categories", "categories"), ("installed", "installed"), ("updates", "updates")]
+        [("Featured", "featured"), ("Categories", "categories"), ("Installed", "installed"), ("Updates", "updates")]
     {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         row.append(&label(name, &["st-pivot-text"]));
@@ -202,7 +202,7 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
     let page = gtk::Box::new(gtk::Orientation::Vertical, 0);
     page.add_css_class("st-page");
     let top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    let hub = flat(&label("STORE", &["st-hub"]), &["st-back"]);
+    let hub = flat(&label("Store", &["st-hub"]), &["st-back"]);
     hub.set_hexpand(true);
     hub.set_halign(gtk::Align::Start);
     {
@@ -212,7 +212,7 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
     top.append(&hub);
     top.append(&search);
     page.append(&top);
-    let piv = gtk::Box::new(gtk::Orientation::Horizontal, 26);
+    let piv = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     piv.add_css_class("st-pivots");
     for (b, id, _) in &ui.pivots {
         piv.append(b);
@@ -273,6 +273,7 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
     placeholder(&ui, "loading the catalogue…");
     select_pivot(&ui, "featured");
     start_loading(&ui);
+    crate::common::snapshot_hook(&window);
     window
 }
 
@@ -355,20 +356,18 @@ fn handle(ui: &Rc<Ui>, m: Msg) {
         Msg::Perms(id, r) => {
             if let Some(p) = ui.page.borrow().as_ref().filter(|p| p.id == id) {
                 clear(&p.perms);
-                p.perms.append(&label("IT CAN USE", &["st-small"]));
                 match r {
                     Ok(lines) => {
-                        for l in &lines {
-                            p.perms.append(&label(l, &["st-line"]));
+                        let accents = ["yellow", "blue"];
+                        for (i, l) in lines.iter().take(2).enumerate() {
+                            p.perms.append(&perm_tile("IT CAN USE", l, accents[i]));
                         }
-                        let rest = if lines.is_empty() {
-                            "nothing · it runs in its own sandbox"
-                        } else {
-                            "nothing else · it runs in its own sandbox"
-                        };
-                        p.perms.append(&label(rest, &["st-line", "st-mute"]));
+                        if lines.is_empty() {
+                            p.perms.append(&perm_tile("IT CAN USE", "nothing outside its sandbox", "yellow"));
+                        }
+                        p.perms.append(&perm_tile("SANDBOXED", "it runs in its own sandbox, nothing else", "green"));
                     }
-                    Err(e) => p.perms.append(&label(&format!("couldn't read it: {e}"), &["st-line", "st-mute"])),
+                    Err(e) => p.perms.append(&perm_tile("IT CAN USE", &format!("couldn't read it: {e}"), "")),
                 }
             }
         }
@@ -476,8 +475,8 @@ fn rebuild_home(ui: &Rc<Ui>) {
     if !updates.is_empty() {
         specs.push(TileSpec {
             id: "#updates".into(),
-            name: "updates".into(),
-            colour: "#2c5aa0".into(),
+            name: "Updates".into(),
+            colour: "#f2b84b".into(),
             icon: None,
             big: Some(updates.len().to_string()),
             sub: "waiting".into(),
@@ -487,7 +486,7 @@ fn rebuild_home(ui: &Rc<Ui>) {
         specs.push(spec_of(&catalog, a));
     }
     let wanted = *ui.current.borrow();
-    replace_page(&ui.home, "featured", &tile_grid(ui, specs));
+    replace_page(&ui.home, "featured", &tile_grid(ui, specs, true));
 
     // categories
     let cats: Vec<TileSpec> = store::CATEGORIES
@@ -505,7 +504,7 @@ fn rebuild_home(ui: &Rc<Ui>) {
             }
         })
         .collect();
-    replace_page(&ui.home, "categories", &tile_grid(ui, cats));
+    replace_page(&ui.home, "categories", &tile_grid(ui, cats, true));
 
     // installed
     let specs: Vec<TileSpec> = installed
@@ -529,7 +528,7 @@ fn rebuild_home(ui: &Rc<Ui>) {
             &label("nothing installed from the store yet", &["st-line", "st-mute", "st-message"]),
         );
     } else {
-        replace_page(&ui.home, "installed", &tile_grid(ui, specs));
+        replace_page(&ui.home, "installed", &tile_grid(ui, specs, false));
     }
 
     replace_page(&ui.home, "updates", &updates_page(ui, &updates, &installed));
@@ -604,7 +603,7 @@ fn show_search(ui: &Rc<Ui>, q: &str) {
     let page: gtk::Widget = if hits.is_empty() {
         label(&format!("nothing found for \"{}\"", q.trim()), &["st-line", "st-mute", "st-message"]).upcast()
     } else {
-        tile_grid(ui, hits.iter().map(|a| spec_of(&catalog, a)).collect()).upcast()
+        tile_grid(ui, hits.iter().map(|a| spec_of(&catalog, a)).collect(), false).upcast()
     };
     let was = ui.home.visible_child_name();
     replace_page(&ui.home, "search", &page);
@@ -638,6 +637,22 @@ fn spec_of(catalog: &Catalog, a: &App) -> TileSpec {
     }
 }
 
+/// A small tile of the app page: a small caps line, then what it says.
+fn perm_tile(k: &str, text: &str, accent: &str) -> gtk::Box {
+    let b = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    b.add_css_class("st-t");
+    let kk = label(k, &["st-k"]);
+    if !accent.is_empty() {
+        kk.add_css_class(accent);
+    }
+    b.append(&kk);
+    let t = label(text, &["st-t-title"]);
+    t.set_wrap(true);
+    t.set_max_width_chars(28);
+    b.append(&t);
+    b
+}
+
 /// Makes `.bg-xxxxxx` mean that background colour, once per colour.
 fn colour_class(ui: &Rc<Ui>, hex: &str) -> String {
     let name = format!("bg-{}", hex.trim_start_matches('#'));
@@ -666,7 +681,10 @@ fn tile(ui: &Rc<Ui>, s: &TileSpec, size: i32, index: usize) -> gtk::Widget {
     name.set_halign(gtk::Align::Start);
     name.set_valign(gtk::Align::End);
     name.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    name.set_max_width_chars(14);
+    name.set_max_width_chars(if size > 200 { 24 } else { 14 });
+    if size > 200 {
+        name.add_css_class("big");
+    }
     overlay.add_overlay(&name);
     if !s.sub.is_empty() {
         let sub = label(&s.sub, &["st-tile-sub"]);
@@ -690,19 +708,32 @@ fn tile(ui: &Rc<Ui>, s: &TileSpec, size: i32, index: usize) -> gtk::Widget {
     cell.upcast()
 }
 
-fn tile_grid(ui: &Rc<Ui>, specs: Vec<TileSpec>) -> gtk::ScrolledWindow {
-    let grid = gtk::FlowBox::new();
-    grid.set_selection_mode(gtk::SelectionMode::None);
-    grid.set_homogeneous(true);
-    grid.set_min_children_per_line(2);
-    grid.set_max_children_per_line(GRID_COLUMNS);
-    grid.set_column_spacing(5);
-    grid.set_row_spacing(5);
+/// The board: with `hero`, the first tile takes a 2 x 2 block and the rest flow round it, so
+/// the sizes are mixed like a bento box; without, every tile is the same size.
+fn tile_grid(ui: &Rc<Ui>, specs: Vec<TileSpec>, hero: bool) -> gtk::ScrolledWindow {
+    const UNIT: i32 = 164;
+    const GAP: i32 = 12;
+    let cols = GRID_COLUMNS as usize;
+    let grid = gtk::Grid::new();
+    grid.set_column_spacing(GAP as u32);
+    grid.set_row_spacing(GAP as u32);
     grid.set_valign(gtk::Align::Start);
     grid.set_halign(gtk::Align::Start);
     grid.add_css_class("st-grid");
     for (i, s) in specs.iter().enumerate() {
-        grid.append(&tile(ui, s, 136, i));
+        let (col, row, span) = if !hero {
+            (i % cols, i / cols, 1)
+        } else if i == 0 {
+            (0, 0, 2)
+        } else if i - 1 < (cols - 2) * 2 {
+            let j = i - 1;
+            (2 + j % (cols - 2), j / (cols - 2), 1)
+        } else {
+            let k = i - 1 - (cols - 2) * 2;
+            (k % cols, 2 + k / cols, 1)
+        };
+        let size = if span == 2 { 2 * UNIT + GAP } else { UNIT };
+        grid.attach(&tile(ui, s, size, i), col as i32, row as i32, span, span);
     }
     scroller(&grid)
 }
@@ -719,12 +750,12 @@ fn push_page(
 ) {
     let page = gtk::Box::new(gtk::Orientation::Vertical, 0);
     page.add_css_class("st-page");
-    let hub = flat(&label("STORE", &["st-hub"]), &["st-back"]);
+    let hub = flat(&label("\u{2190}  Store", &["st-hub"]), &["st-back"]);
     hub.set_halign(gtk::Align::Start);
     let ui2 = ui.clone();
     hub.connect_clicked(move |_| go_home(&ui2));
     page.append(&hub);
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 26);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     row.add_css_class("st-pivots");
     let buttons: Rc<Vec<gtk::Button>> = Rc::new(
         pivots
@@ -762,7 +793,7 @@ fn push_page(
 fn open_category(ui: &Rc<Ui>, id: &str) {
     let catalog = ui.catalog.borrow().clone();
     let title = store::CATEGORIES.iter().find(|(c, _)| *c == id).map_or(id, |(_, n)| *n);
-    let grid = tile_grid(ui, catalog.in_category(id, 60).iter().map(|a| spec_of(&catalog, a)).collect());
+    let grid = tile_grid(ui, catalog.in_category(id, 60).iter().map(|a| spec_of(&catalog, a)).collect(), false);
     push_page(ui, "list", &[(title, true)], |_| {}, &grid);
 }
 
@@ -780,23 +811,32 @@ fn open_app(ui: &Rc<Ui>, id: &str) {
     stack.set_transition_duration(220);
     stack.set_vexpand(true);
 
-    // ---- the app pane
+    // ---- the app pane: a rounded sheet of tiles
     let col = gtk::Box::new(gtk::Orientation::Vertical, 0);
     col.add_css_class("st-appcol");
-    let hero = gtk::Box::new(gtk::Orientation::Horizontal, 30);
+    let sheet = gtk::Grid::new();
+    sheet.add_css_class("st-sheet");
+    sheet.set_column_homogeneous(true);
+    sheet.set_row_spacing(12);
+    sheet.set_column_spacing(12);
+    col.append(&sheet);
+    // The header tile: the icon on its colour, the name, what it is.
+    let hero = gtk::Box::new(gtk::Orientation::Horizontal, 16);
+    hero.add_css_class("st-t");
     let tile = gtk::Overlay::new();
-    tile.set_size_request(200, 200);
+    tile.set_size_request(72, 72);
     tile.set_hexpand(false);
     tile.set_vexpand(false);
-    tile.set_valign(gtk::Align::Start);
+    tile.set_valign(gtk::Align::Center);
     tile.add_css_class("st-hero");
     tile.add_css_class(&colour_class(ui, &app.tile_colour()));
     if let Some(icon) = &icon {
-        tile.set_child(Some(&icon_widget(icon, 120)));
+        tile.set_child(Some(&icon_widget(icon, 44)));
     }
     hero.append(&tile);
-    let info = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    let info = gtk::Box::new(gtk::Orientation::Vertical, 4);
     info.set_hexpand(true);
+    info.set_valign(gtk::Align::Center);
     info.append(&label(&app.name, &["st-app-name"]));
     let mut facts: Vec<String> = Vec::new();
     for f in [&app.summary, &app.licence_words()] {
@@ -810,27 +850,31 @@ fn open_app(ui: &Rc<Ui>, id: &str) {
     let meta = label(&meta_base.replace("{size}", &size), &["st-meta"]);
     meta.set_wrap(true);
     info.append(&meta);
-    let actions = gtk::Box::new(gtk::Orientation::Horizontal, 18);
-    actions.add_css_class("st-actions");
-    info.append(&actions);
     let error = label("", &["st-line", "st-error"]);
     error.set_visible(false);
     info.append(&error);
-    let perms = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    perms.add_css_class("st-perms");
-    perms.append(&label("IT CAN USE", &["st-small"]));
-    perms.append(&label("reading what it needs…", &["st-line", "st-mute"]));
-    info.append(&perms);
     hero.append(&info);
-    col.append(&hero);
+    sheet.attach(&hero, 0, 0, 2, 1);
+    // The action tile: install, open, remove; amber with a big percentage while it works.
+    let actions = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    actions.add_css_class("st-t");
+    actions.add_css_class("st-action");
+    actions.set_valign(gtk::Align::Fill);
+    sheet.attach(&actions, 2, 0, 1, 1);
+    // What it can use: a tile each, and the sandbox.
+    let perms = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    perms.set_homogeneous(true);
+    perms.append(&perm_tile("IT CAN USE", "reading what it needs\u{2026}", ""));
+    sheet.attach(&perms, 0, 1, 3, 1);
 
     if !app.screenshots.is_empty() {
-        let shots = gtk::Box::new(gtk::Orientation::Horizontal, 5);
+        let shots = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         shots.add_css_class("st-shots");
         for url in app.screenshots.iter().take(8) {
             let holder = gtk::Box::new(gtk::Orientation::Horizontal, 0);
             holder.add_css_class("st-shot-holder");
-            holder.set_size_request(356, 200);
+            holder.set_size_request(340, 190);
+            holder.set_overflow(gtk::Overflow::Hidden);
             let pic = gtk::Picture::new();
             pic.set_can_shrink(true);
             pic.set_content_fit(gtk::ContentFit::Cover);
@@ -848,15 +892,19 @@ fn open_app(ui: &Rc<Ui>, id: &str) {
         let sw = gtk::ScrolledWindow::new();
         sw.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Never);
         sw.set_child(Some(&shots));
-        sw.set_margin_top(30);
-        col.append(&sw);
+        let tile = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        tile.add_css_class("st-t");
+        tile.append(&sw);
+        sheet.attach(&tile, 0, 2, 3, 1);
     }
     if !app.description.is_empty() {
         let d = label(&app.description, &["st-desc"]);
         d.set_wrap(true);
         d.set_max_width_chars(90);
-        d.set_margin_top(26);
-        col.append(&d);
+        let tile = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        tile.add_css_class("st-t");
+        tile.append(&d);
+        sheet.attach(&tile, 0, 3, 3, 1);
     }
     stack.add_named(&scroller(&col), Some("app"));
 
@@ -865,12 +913,12 @@ fn open_app(ui: &Rc<Ui>, id: &str) {
     let rel: gtk::Widget = if related.is_empty() {
         label("nothing related", &["st-line", "st-mute", "st-message"]).upcast()
     } else {
-        tile_grid(ui, related.iter().map(|a| spec_of(&catalog, a)).collect()).upcast()
+        tile_grid(ui, related.iter().map(|a| spec_of(&catalog, a)).collect(), false).upcast()
     };
     stack.add_named(&rel, Some("related"));
 
     let st = stack.clone();
-    let title = app.name.to_lowercase();
+    let title = app.name.clone();
     push_page(
         ui,
         "app",
@@ -919,6 +967,8 @@ fn render_actions(ui: &Rc<Ui>) {
     let page = ui.page.borrow();
     let Some(p) = page.as_ref() else { return };
     clear(&p.actions);
+    p.actions.remove_css_class("amber");
+    p.actions.remove_css_class("busy");
     let id = p.id.clone();
     let busy = ui.busy.borrow().get(&id).map(|b| b.0);
     let have = ui.installed.borrow().iter().any(|i| i.id == id);
@@ -931,12 +981,17 @@ fn render_actions(ui: &Rc<Ui>) {
         b
     };
     if let Some(op) = busy {
-        p.actions.append(&button(op.ing(), true));
+        p.actions.add_css_class("amber");
+        p.actions.add_css_class("busy");
         let shown = Rc::new(Cell::new(0.0f64));
-        let pct = label("0%", &["st-meta"]);
+        let pct = label("0%", &["st-pct"]);
+        pct.set_halign(gtk::Align::Center);
         let dots = marching_dots(p.target.clone(), shown, pct.clone());
-        p.actions.append(&dots);
         p.actions.append(&pct);
+        let word = label(op.ing(), &["st-pct-word"]);
+        word.set_halign(gtk::Align::Center);
+        p.actions.append(&word);
+        p.actions.append(&dots);
         p.error.set_visible(false);
         return;
     }
@@ -965,23 +1020,13 @@ fn render_actions(ui: &Rc<Ui>) {
     }
 }
 
-/// Five accent squares with a wave of light marching along them; the percentage beside them
-/// eases towards the real one, so it moves smoothly however flatpak reports.
+/// Drives the big percentage: it eases towards the real one, so it moves smoothly however
+/// flatpak reports. The drawing itself is empty; the area only keeps the frame clock ticking.
 fn marching_dots(target: Rc<Cell<f64>>, shown: Rc<Cell<f64>>, pct: gtk::Label) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
-    area.set_content_width(65);
-    area.set_content_height(5);
-    area.set_valign(gtk::Align::Center);
-    area.set_draw_func(|a, cr, _, _| {
-        let animate = gtk::Settings::default().is_none_or(|s| s.is_gtk_enable_animations());
-        let t = if animate { a.frame_clock().map_or(0.0, |c| c.frame_time() as f64 / 1_000_000.0) } else { 0.0 };
-        for i in 0..5 {
-            let wave = (((t * 1.5 - f64::from(i) * 0.16) * std::f64::consts::TAU).cos() * 0.5 + 0.5).powi(3);
-            cr.set_source_rgba(0.247, 0.682, 0.478, 0.25 + 0.75 * wave);
-            cr.rectangle(f64::from(i) * 15.0, 0.0, 5.0, 5.0);
-            cr.fill().ok();
-        }
-    });
+    area.set_content_width(1);
+    area.set_content_height(1);
+    area.set_draw_func(|_, _, _, _| {});
     let last = Cell::new(0.0f64);
     area.add_tick_callback(move |a, clock| {
         a.queue_draw();
@@ -1055,7 +1100,7 @@ mod tests {
     #[test]
     fn the_stylesheet_names_the_design_tokens() {
         let css = include_str!("store.css");
-        for token in ["#101418", "#1a2025", "#9aa4ab", "#3fae7a", "#4b555c"] {
+        for token in ["#16181a", "#23272a", "#9aa3a8", "#f2b84b", "#1f2225"] {
             assert!(css.contains(token), "missing {token}");
         }
     }
