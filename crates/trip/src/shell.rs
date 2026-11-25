@@ -23,6 +23,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use trip::agent::Ui;
+use trip::follow::{self, Live, Reader};
 use trip::session::{self, Session};
 use trip::term::{self, ACCENT, BOLD, DIM, FOREST, PAPER, RED, RESET};
 use trip::tui::{self, GUTTER, Mode, Terminal};
@@ -390,7 +391,7 @@ pub fn run(resume: Option<&str>) -> Result<()> {
     let info = Arc::new(Mutex::new(info));
     let mut editor = editor(info.clone());
 
-    let mut chat: Option<Session> = resume.and_then(continued);
+    let mut chat: Option<Session> = resume.and_then(|id| continued(id, &cancel));
     loop {
         if let Ok(mut i) = info.lock() {
             i.chat = chat.is_some();
@@ -454,11 +455,11 @@ pub fn run(resume: Option<&str>) -> Result<()> {
                         respond(&mut session, &cancel)
                     }
                 };
-                if let (Some(u), Ok(mut i)) = (usage, info.lock()) {
-                    if u.context > 0 {
-                        i.context = u.context;
-                        i.fill = Some(tui::context_fill(&u));
-                    }
+                if let (Some(u), Ok(mut i)) = (usage, info.lock())
+                    && u.context > 0
+                {
+                    i.context = u.context;
+                    i.fill = Some(tui::context_fill(&u));
                 }
             }
         }
@@ -467,7 +468,10 @@ pub fn run(resume: Option<&str>) -> Result<()> {
 
 /// A session from the history, shown as a recap and kept as a chat so follow-ups know
 /// what happened.
-fn continued(id: &str) -> Option<Session> {
+fn continued(id: &str, cancel: &Arc<AtomicBool>) -> Option<Session> {
+    if Reader::running(&follow::live_path(id)) {
+        return following(id, cancel);
+    }
     let Some(s) = session::load(id) else {
         say("Couldn't find that conversation; starting fresh");
         return None;
@@ -480,14 +484,77 @@ fn continued(id: &str) -> Option<Session> {
 /// Every request in a session with its steps (and how each went) and the answer, laid out like
 /// the conversation was.
 fn recap(s: &Session) {
+    recap_turns(&s.turns);
+}
+
+fn show_request(request: &str, mode: Mode) {
+    if mode.color {
+        println!("\n{DIM}You{RESET}{}{}", " ".repeat(GUTTER - 3), request);
+    } else {
+        println!("\nYou: {request}");
+    }
+    println!();
+}
+
+/// A request the orb is still working on: shows what came before, then follows its live
+/// events drawn like a run started here. Ctrl+C asks the orb to stop it. When it ends, the
+/// saved conversation carries on as a chat.
+fn following(id: &str, cancel: &Arc<AtomicBool>) -> Option<Session> {
     let mode = Mode::detect();
-    for t in &s.turns {
-        if mode.color {
-            println!("\n{DIM}You{RESET}{}{}", " ".repeat(GUTTER - 3), t.request);
-        } else {
-            println!("\nYou: {}", t.request);
+    let mut reader = Reader::new(follow::live_path(id));
+    let mut events = reader.poll();
+    let (request, prior) = match events.first() {
+        Some(Live::Start { request, prior }) => (request.clone(), *prior),
+        _ => (String::new(), usize::MAX),
+    };
+    if let Some(s) = session::load(id) {
+        recap_turns(&s.turns[..prior.min(s.turns.len())]);
+    }
+    show_request(&request, mode);
+    say("Following what it's doing in the orb · Ctrl+C stops it");
+    println!();
+    cancel.store(false, Ordering::Relaxed);
+    let mut ui = Terminal::new(Some(cancel.clone()));
+    let mut asked = false;
+    let mut error = None;
+    loop {
+        for e in events.drain(..) {
+            if let Live::End { error: err } = &e {
+                error.clone_from(err);
+            }
+            follow::replay(&e, &mut ui);
         }
-        println!();
+        if reader.ended || reader.stale() {
+            break;
+        }
+        if cancel.load(Ordering::Relaxed) && !asked {
+            asked = true;
+            follow::request_stop(id);
+        }
+        std::thread::sleep(Duration::from_millis(80));
+        events = reader.poll();
+    }
+    ui.finish(None);
+    match error.as_deref() {
+        Some("stopped") => say("Stopped"),
+        Some(e) => warn(e),
+        None if !reader.ended => warn("The orb stopped responding"),
+        None => {}
+    }
+    println!();
+    cancel.store(false, Ordering::Relaxed);
+    let Some(s) = session::load(id) else {
+        say("Couldn't find that conversation; starting fresh");
+        return None;
+    };
+    say("Continuing · it remembers this until /exit");
+    Some(s)
+}
+
+fn recap_turns(turns: &[session::Turn]) {
+    let mode = Mode::detect();
+    for t in turns {
+        show_request(&t.request, mode);
         let mut ui = Terminal::with_output(Box::new(std::io::stdout()), Mode { live: false, ..mode }, None, None);
         for step in &t.steps {
             ui.step(&step.tool, step.detail.lines().next().unwrap_or(""));

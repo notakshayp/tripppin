@@ -10,7 +10,6 @@
 //! In the terminal each character cell holds two square pixels (upper and lower half
 //! blocks), and each pixel is shaded from 4×4 samples, so edges stay smooth.
 
-use std::f64::consts::PI;
 use std::io::{self, IsTerminal, Write};
 use std::thread::sleep;
 use std::time::Duration;
@@ -85,16 +84,15 @@ fn ease_out(t: f64) -> f64 {
 /// glowing head; then the spark spins in half a turn, settling from just past full size; then it
 /// glints once. From [`INTRO_SECS`] on, the finished mark.
 pub fn intro_pose(t: f64) -> Pose {
-    const RING_END: f64 = 0.55;
-    const SPARK_START: f64 = 0.42;
-    const SPARK_END: f64 = 1.0;
-    let ring = ease_out(t / RING_END);
-    let u = ((t - SPARK_START) / (SPARK_END - SPARK_START)).clamp(0.0, 1.0);
-    let (spark_scale, spark_turn) =
-        if u <= 0.0 { (0.0, 0.0) } else { (ease_out(u) * (1.0 + 0.12 * (PI * u).sin()), -180.0 * (1.0 - ease_out(u))) };
-    let glint =
-        if t > SPARK_END { 0.6 * (1.0 - (t - SPARK_END) / (INTRO_SECS - SPARK_END)).clamp(0.0, 1.0) } else { 0.0 };
-    Pose { ring, head_glow: 1.0 - u, spark_scale, spark_turn, glint }
+    // The spark first, growing into place without turning; then the ring draws itself.
+    const SPARK_END: f64 = 0.35;
+    const RING_START: f64 = 0.3;
+    const RING_END: f64 = 0.95;
+    let spark_scale = ease_out(t / SPARK_END);
+    let u = ((t - RING_START) / (RING_END - RING_START)).clamp(0.0, 1.0);
+    let ring = if u <= 0.0 { 0.0 } else { ease_out(u) };
+    let glint = if t > RING_END { 0.6 * (1.0 - (t - RING_END) / (INTRO_SECS - RING_END)).clamp(0.0, 1.0) } else { 0.0 };
+    Pose { ring, head_glow: if u > 0.0 && u < 1.0 { 1.0 } else { 0.0 }, spark_scale, spark_turn: 0.0, glint }
 }
 
 /// The waiting motion after the intro, `t` seconds after it ended: every 2.4 s the spark makes
@@ -419,10 +417,13 @@ mod tests {
     }
 
     #[test]
-    fn ring_draws_in_order() {
+    fn spark_first_then_the_ring() {
+        // The spark is in place before the ring starts, and the ring only grows after that.
+        assert_eq!(intro_pose(0.3).ring, 0.0);
+        assert!(intro_pose(0.3).spark_scale > 0.9);
         let sizes: Vec<usize> = intro()
             .iter()
-            .take_while(|(p, _)| p.spark_scale == 0.0)
+            .filter(|(p, _)| p.spark_scale >= 1.0)
             .map(|(p, _)| inked(&render(*p, Palette::Plain)))
             .collect();
         assert!(sizes.len() > 8);
@@ -434,8 +435,8 @@ mod tests {
         assert_eq!(intro_pose(0.0).spark_scale, 0.0);
         assert_eq!(intro_pose(INTRO_SECS), Pose::FULL);
         assert_eq!(intro().last().map(|f| f.0), Some(Pose::FULL));
-        // The spark turns in from half a turn away, so it lands upright.
-        assert!(intro_pose(0.45).spark_turn < -150.0);
+        // The spark never turns.
+        assert!(intro().iter().all(|(p, _)| p.spark_turn == 0.0));
     }
 
     #[test]

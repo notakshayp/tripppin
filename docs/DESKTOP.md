@@ -201,7 +201,7 @@ real hardware.
 - [ ] Sounds: a small Tripppin sound set (login, notification, error, screenshot)
 - [ ] Light mode: every component switching together (dark only for now; Appearance says so)
 - [ ] On-screen keyboard for touchscreens
-- [ ] Voice input: hold Super + Space and talk (with a local speech model)
+- [~] Voice dictation: `tripppin-ui dictate` (Super + M): pill with a level meter, whisper.cpp base model on the device, text typed through the RemoteDesktop portal (wtype fallback); stops after 2 s of quiet. Unit-tested; the image build, the portal prompt and real typing are not yet checked in the VM
 - [ ] Ask about the screen or a selected file ("summarise this pdf")
 - [ ] History of past requests in the orb; continue a conversation
 - [ ] Permission prompts before risky steps (M4, with the safety work)
@@ -215,3 +215,16 @@ real hardware.
 - [x] No "scroll" hint on the hero
 - [x] Deployed to Firebase hosting
 - [~] Desktop surface: `tripppin-ui desktop` (background layer, one per screen) shows ~/Desktop as icons and opens a right-click menu (new folder, add app or widget, wallpaper, display settings, terminal); compiles and unit-tested, not yet tried on a real pointer
+
+## Plasma (owner's decision, 2026-11-25: replaces niri)
+
+KDE Plasma 6 on KWin (Wayland), restyled so it reads as Tripppin. Sections above that name niri, waybar, swaync, fuzzel, wlogout or foot describe the previous build; Plasma's own panel, launcher, notifications, lock, power menu, screenshots (Spectacle), clipboard (Klipper) and emoji picker replace them.
+
+- [x] Packages: lean explicit set (plasma-workspace, plasma-desktop, kwin, plasma-nm, plasma-pa, bluedevil, powerdevil, kscreen, kscreenlocker, kde-gtk-config, xdg-desktop-portal-kde, systemsettings, kinfocenter, print-manager, polkit-kde, Dolphin, Konsole, Ark, Gwenview, Okular, Spectacle, kio-extras, Breeze, Discover with Flatpak). Baloo indexing off.
+- [~] Look-and-feel `in.trippp.desktop` (/usr/share/plasma/look-and-feel): colours (`Tripppin.colors`, from style.css tokens), Inter 10 / DM Mono 10 with greyscale AA and hintslight, Plasma style `tripppin` (rounded panel, dialog and tooltip frames from scripts/plasma-theme.py; the rest is Breeze's), Breeze window decoration without side borders, Tripppin icons (Papirus-Dark, green folders), Breeze cursor, floating panel (launcher, icon tasks, tray, clock with date), ink wallpaper, splash (spark fades in first, upright, then the ring draws).
+- [~] Konsole profile "Tripppin" (DM Mono, the foot colours, no menu bar); Konsole is the default terminal (`TerminalApplication=konsole`). A `/usr/bin/foot` shim maps the orb's old `foot --title T -- cmd` call to Konsole until orb.rs is changed.
+- [x] GTK apps keep our theme: kded's `gtkconfig` module is off (`/etc/xdg/kded6rc`).
+- [~] Autostart (/etc/xdg/autostart): orb, widgets, first-boot, welcome. Plasma's own OSD replaces ours.
+- [~] Login: greetd runs `tripppin-ui greeter` on `kwin_wayland --exit-with-session`; the session is `startplasma-wayland`.
+- Settings choice: our hub keeps AI, Apps, Updates, About, Accounts, Date & time, Language, Privacy and Storage. For Wi-Fi, Network, Bluetooth, Sound, Display, Appearance, Power, Notifications, Keyboard, Mouse, Printers and Accessibility the sidebar page is one button, "Open in System Settings", running `systemsettings <kcm>` (least code; no dead buttons). The niri-based page code stays under `#[allow(dead_code)]` until removed (PLAN.md).
+- Shortcuts (/etc/xdg/kglobalshortcutsrc, Meta = Super): Meta+Space orb; Meta+M dictation (`in.trippp.Dictate.desktop`); Meta+A / Meta+D launcher (a Meta tap too); Meta+Return terminal; Meta+Esc logout menu; Meta+L, Ctrl+Meta+L lock; Meta+Q close; Meta+F fullscreen; Meta+T keep above; Meta+Tab overview; Alt+Tab windows; Meta+Left/Right halves; Meta+Up maximise; Meta+Down minimise; Meta+C centre; Meta+Alt+arrows and Ctrl+Alt+U/I/J/K corners; Ctrl+Alt+arrows halves/top/bottom; Meta+1..3 desktops, with Shift moves the window; Meta+V clipboard; Meta+. emoji; Meta+/ cheat sheet (still lists the old keys); Print / Ctrl+Print / Alt+Print / Meta+Shift+S Spectacle; Meta+Shift+R record; Meta+Shift+E log out. Drag to an edge or corner tiles (KWin quick tiling). Meta+N and Ctrl+Alt+BackSpace (restore) have no equivalent.

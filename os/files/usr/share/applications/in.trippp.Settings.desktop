@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Settings
-Comment=Wi-Fi, Bluetooth, sound, display and everything else
+Name=Tripppin settings
+Comment=The AI, apps, updates, accounts and more
 Exec=tripppin-ui settings
 Icon=preferences-system
 Keywords=preferences;control;system;configure;wifi;wi-fi;network;vpn;bluetooth;sound;volume;display;screen;wallpaper;appearance;keyboard;mouse;touchpad;power;battery;printer;scanner;storage;disk;updates;privacy;accounts;language;time;date;notifications;accessibility;ai;model;about;

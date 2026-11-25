@@ -489,17 +489,18 @@ fn inline(text: &str, base: Attr) -> Spans {
             let run = count(&chars, i, c).min(3);
             let opens = chars.get(i + run).is_some_and(|n| !n.is_whitespace());
             let word_before = i > 0 && chars[i - 1].is_alphanumeric();
-            if opens && !(c == '_' && word_before) {
-                if let Some(end) = find_closer(&chars, i + run, c, run) {
-                    push(&mut out, std::mem::take(&mut plain), base);
-                    let inner: String = chars[i + run..end].iter().collect();
-                    let attr = Attr { bold: base.bold || run >= 2, italic: base.italic || run != 2, ..base };
-                    for (t, a) in inline(&inner, attr) {
-                        push(&mut out, t, a);
-                    }
-                    i = end + run;
-                    continue;
+            if opens
+                && !(c == '_' && word_before)
+                && let Some(end) = find_closer(&chars, i + run, c, run)
+            {
+                push(&mut out, std::mem::take(&mut plain), base);
+                let inner: String = chars[i + run..end].iter().collect();
+                let attr = Attr { bold: base.bold || run >= 2, italic: base.italic || run != 2, ..base };
+                for (t, a) in inline(&inner, attr) {
+                    push(&mut out, t, a);
                 }
+                i = end + run;
+                continue;
             }
             plain.extend(&chars[i..i + run]);
             i += run;

@@ -1264,6 +1264,10 @@ button.media-button:hover {
     color: var(--fg);
 }
 
+.dictate {
+    min-width: 280px;
+}
+
 progressbar.osd-bar trough {
     min-height: 6px;
     border-radius: 3px;

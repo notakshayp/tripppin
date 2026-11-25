@@ -10,7 +10,7 @@ monospace-font-name='DM Mono 11'
 font-antialiasing='grayscale'
 font-hinting='slight'
 icon-theme='Tripppin'
-cursor-theme='Adwaita'
+cursor-theme='breeze_cursors'
 clock-format='24h'
 
 [org/gnome/TextEditor]
