@@ -11,5 +11,6 @@ pub mod models;
 pub mod permissions;
 pub mod providers;
 pub mod session;
+pub mod store;
 pub mod term;
 pub mod tui;
