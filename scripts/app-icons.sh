@@ -16,7 +16,7 @@ SVG
 }
 glyph terminal  '#3a4a5a' '<path d="M4 6l5 6-5 6M12 18h8"/>'
 glyph files     '#b8862b' '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
-glyph settings  '#2c5aa0' '<path d="M3 6h11M20 6h1M3 12h5M14 12h7M3 18h13M22 18h-1"/><circle cx="17" cy="6" r="2.5"/><circle cx="11" cy="12" r="2.5"/><circle cx="19" cy="18" r="2.5"/>'
+glyph settings  '#2c5aa0' '<path d="M3 6h11M20 6h1M3 12h5M14 12h7M3 18h13"/><circle cx="17" cy="6" r="2.5"/><circle cx="11" cy="12" r="2.5"/><circle cx="19" cy="18" r="2.5"/>'
 glyph store     '#c2502e' '<path d="M5 8h14l-1 12H6zM9 8a3 3 0 0 1 6 0"/>'
 glyph calendar  '#0f7c8c' '<rect x="4" y="5" width="16" height="15"/><path d="M4 10h16M8 3v4M16 3v4"/>'
 glyph dictate   '#6b3f8f' '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'
