@@ -1,19 +1,22 @@
 import QtQuick
 import org.kde.kwin.decoration
 
-// Tripppin "Tiles" window frame (design mock section 05): square, flat, no border and no
-// shadow. A 36 px strip across the top: accent #1f6b45 with white text while the window is
-// active, raised #1a2025 with muted text when it is not. Flat vector glyph buttons at the
-// right: minimise, maximise, close, all drawn from rectangles so they stay crisp at any
-// scale. Colours fade over 180 ms.
+// Tripppin "Bento" window frame: no border and no outline, a 38 px title strip with 14 px
+// rounded top corners (Fedora has no KWin rounded-corner effect, so the bottom corners of the
+// window stay square). Title bar #1f2225 while active, #1c1f21 when not; Manrope 600 title;
+// three small round glyph buttons at the right (minimise, maximise, close) that turn amber on
+// hover. Everything is drawn as vectors (rectangles and rotated bars), crisp at any scale;
+// colours fade over 180 ms.
 Decoration {
     id: root
-    alpha: false
+    alpha: true
 
-    readonly property int strip: 36
+    readonly property int strip: 38
+    readonly property int radius: 14
     readonly property bool active: decoration.client.active
-    readonly property color fill: active ? "#1f6b45" : "#1a2025"
-    readonly property color ink: active ? "#ffffff" : "#9aa4ab"
+    readonly property color fill: active ? "#1f2225" : "#1c1f21"
+    readonly property color ink: active ? "#f1f3f4" : "#9aa3a8"
+    readonly property color amber: "#f2b84b"
 
     DecorationOptions {
         id: options
@@ -25,23 +28,25 @@ Decoration {
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: root.strip
         color: root.fill
+        topLeftRadius: decoration.client.maximized ? 0 : root.radius
+        topRightRadius: decoration.client.maximized ? 0 : root.radius
         Behavior on color { ColorAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
         Text {
             id: caption
             anchors {
                 left: parent.left
-                leftMargin: 14
+                leftMargin: 16
                 right: buttons.left
-                rightMargin: 14
+                rightMargin: 12
                 verticalCenter: parent.verticalCenter
             }
             text: decoration.client.caption
             textFormat: Text.PlainText
             elide: Text.ElideRight
             color: root.ink
-            font.family: "Inter"
-            font.pixelSize: 14
+            font.family: "Manrope"
+            font.pixelSize: 13
             font.weight: Font.DemiBold
             Behavior on color { ColorAnimation { duration: 180; easing.type: Easing.OutCubic } }
         }
@@ -51,8 +56,8 @@ Decoration {
 
         Row {
             id: buttons
-            anchors { right: parent.right; top: parent.top }
-            height: root.strip
+            anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
+            spacing: 6
             Repeater {
                 model: [
                     { type: DecorationOptions.DecorationButtonMinimize, glyph: "min" },
@@ -62,40 +67,47 @@ Decoration {
                 delegate: DecorationButton {
                     id: btn
                     required property var modelData
+                    readonly property bool lit: btn.hovered || btn.pressed
+                    readonly property color glyphColor: lit ? "#16181a" : root.ink
                     buttonType: modelData.type
-                    width: root.strip
-                    height: root.strip
+                    width: 24
+                    height: 24
                     Rectangle {
-                        anchors.fill: parent
-                        color: btn.modelData.glyph === "close" ? "#c2502e" : "#ffffff"
-                        opacity: btn.pressed ? 0.35 : (btn.hovered ? (btn.modelData.glyph === "close" ? 1 : 0.18) : 0)
-                        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                        anchors.centerIn: parent
+                        width: 22
+                        height: 22
+                        radius: 11
+                        color: btn.lit ? root.amber : (root.active ? "#2e3337" : "#262a2d")
+                        scale: btn.pressed ? 0.9 : 1
+                        Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                        Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
                     }
-                    // Glyphs, 12 px, 1.5 px strokes, centred in the 36 px cell.
+                    // Glyphs, 8 px, 2 px round-capped strokes, centred in the 24 px cell.
                     Item {
                         anchors.centerIn: parent
-                        width: 12
-                        height: 12
-                        Rectangle { visible: btn.modelData.glyph === "min"; x: 0; y: 10; width: 12; height: 1.5; color: root.ink }
+                        width: 8
+                        height: 8
+                        Rectangle { visible: btn.modelData.glyph === "min"; x: 0; y: 3; width: 8; height: 2; radius: 1; color: btn.glyphColor }
                         Rectangle {
                             visible: btn.modelData.glyph === "max"
                             anchors.fill: parent
+                            radius: 2
                             color: "transparent"
-                            border { width: 1.5; color: root.ink }
+                            border { width: 2; color: btn.glyphColor }
                         }
                         Rectangle {
                             visible: btn.modelData.glyph === "close"
                             anchors.centerIn: parent
-                            width: 16.5; height: 1.5
+                            width: 11; height: 2; radius: 1
                             rotation: 45
-                            color: btn.hovered ? "#ffffff" : root.ink
+                            color: btn.glyphColor
                         }
                         Rectangle {
                             visible: btn.modelData.glyph === "close"
                             anchors.centerIn: parent
-                            width: 16.5; height: 1.5
+                            width: 11; height: 2; radius: 1
                             rotation: -45
-                            color: btn.hovered ? "#ffffff" : root.ink
+                            color: btn.glyphColor
                         }
                     }
                 }

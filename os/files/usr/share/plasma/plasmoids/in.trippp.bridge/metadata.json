@@ -4,7 +4,7 @@
         "Authors": [{ "Name": "Tripppin" }],
         "Description": "Opens the bridge",
         "Icon": "tripppin",
-        "Id": "in.trippp.start",
+        "Id": "in.trippp.bridge",
         "License": "Apache-2.0",
         "Name": "Bridge button"
     },

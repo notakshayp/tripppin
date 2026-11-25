@@ -6,12 +6,12 @@
 ColorScheme=Tripppin
 TerminalApplication=konsole
 TerminalService=org.kde.konsole.desktop
-# Inter for the interface, DM Mono for code; greyscale antialiasing, slight hinting (the
+# Manrope (Bento) for the interface, DM Mono for code; greyscale antialiasing, slight hinting (the
 # same as /etc/fonts/local.conf, so every toolkit draws text alike).
-font=
-menuFont=
-toolBarFont=
-smallestReadableFont=Inter,9,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
+font=Manrope,10,-1,5,500,0,0,0,0,0,0,0,0,0,0,1
+menuFont=Manrope,10,-1,5,500,0,0,0,0,0,0,0,0,0,0,1
+toolBarFont=Manrope,10,-1,5,500,0,0,0,0,0,0,0,0,0,0,1
+smallestReadableFont=Manrope,9,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
 fixed=DM Mono,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
 XftAntialias=true
 XftHintStyle=hintslight
@@ -28,7 +28,7 @@ AnimationDurationFactor=0.8
 Theme=TripppinLine
 
 [WM]
-activeFont=
+activeFont=Manrope,10,-1,5,600,0,0,0,0,0,0,0,0,0,0,1
 
 # No KDE jargon: Handbook, bug reports, donations, "About KDE", language and shortcut
 # configuration are removed from every KDE app's hamburger and menus (Files, Terminal, ...).

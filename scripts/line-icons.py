@@ -2,7 +2,7 @@
 """Writes the "Tripppin Line" icon theme (os/files/usr/share/icons/TripppinLine).
 
 Mock section 08: real app icons stay as they are (Papirus, through the Tripppin theme this one
-inherits), while the system and toolbar glyphs are thin white line icons: 24 x 24 box, 1.5
+inherits), while the system and toolbar glyphs are 2 px light line icons (Bento): 24 x 24 box, 2
 stroke, round caps and joins. Plasma and Qt apps use this theme, so the tray, quick actions and pop-ups draw them. Every file is one scalable SVG that
 takes the colour scheme's text colour, so it is crisp at any size and pixel density.
 Run from the repository root: python3 scripts/line-icons.py
@@ -91,8 +91,8 @@ def battery(level, charging):
 def svg(path):
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">'
-        '<style type="text/css" id="current-color-scheme">.ColorScheme-Text{color:#ffffff;}</style>'
-        '<g class="ColorScheme-Text" fill="none" stroke="currentColor" stroke-width="1.5" '
+        '<style type="text/css" id="current-color-scheme">.ColorScheme-Text{color:#f1f3f4;}</style>'
+        '<g class="ColorScheme-Text" fill="none" stroke="currentColor" stroke-width="2" '
         f'stroke-linecap="round" stroke-linejoin="round"><path d="{path}"/></g></svg>\n'
     )
 
@@ -161,7 +161,7 @@ NAMES = {"status": NAMES["status"]}
 
 INDEX = """[Icon Theme]
 Name=Tripppin Line
-Comment=Thin white line glyphs for the system and toolbars; app icons come from Tripppin (Papirus)
+Comment=2 px light line glyphs for the system and toolbars; app icons come from Tripppin (Papirus)
 Inherits=Tripppin,Papirus-Dark,breeze-dark,hicolor
 Example=folder
 Directories={dirs}
