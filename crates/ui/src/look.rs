@@ -66,8 +66,8 @@ impl Corners {
     fn radii(self) -> Radii {
         match self {
             Corners::Sharp => Radii { xs: 2, sm: 3, md: 4, lg: 4, xl: 4, control: 4, window: 0 },
-            Corners::Default => Radii { xs: 4, sm: 6, md: 8, lg: 12, xl: 16, control: 8, window: 10 },
-            Corners::Round => Radii { xs: 6, sm: 10, md: 14, lg: 20, xl: 26, control: 9999, window: 18 },
+            Corners::Default => Radii { xs: 8, sm: 12, md: 14, lg: 20, xl: 26, control: 12, window: 14 },
+            Corners::Round => Radii { xs: 10, sm: 14, md: 18, lg: 26, xl: 32, control: 9999, window: 22 },
         }
     }
 }

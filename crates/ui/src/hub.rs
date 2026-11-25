@@ -1,9 +1,8 @@
-//! The Settings hub, drawn like the Tiles design (mock 04): a small SETTINGS label, big
-//! light lowercase pivots across the top (network, display, sound... scroll sideways, or
-//! arrow / swipe between them) and under them a two-column grid of big rows: a flat coloured
-//! 56 px square with a thin white glyph, a light title, the state written underneath and,
-//! for the few that are plain on/off, a flat switch. A row opens the existing detail page.
-//! Typing in the search box filters rows across every pivot.
+//! The Settings hub, drawn like the Bento design (mock 04): a control board. The common
+//! switches and sliders work right on their tiles (Wi-Fi, Bluetooth, display brightness and
+//! scale, sound volume, appearance colour, dictation); every other setting is a small tile.
+//! Tapping a tile opens its native page as a rounded sheet with a back arrow. Typing in the
+//! search box filters tiles across every group.
 
 use crate::common::label;
 use crate::nm;
@@ -13,7 +12,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 /// The tile palette.
-pub const PALETTE: [&str; 8] = ["#1f6b45", "#0f7c8c", "#c2502e", "#6b3f8f", "#3a4a5a", "#b8862b", "#2c5aa0", "#3a2a22"];
+pub const PALETTE: [&str; 8] =
+    ["#45c486", "#5aa9e6", "#ff8a5a", "#f783ac", "#ffd43b", "#b197fc", "#7b8cff", "#63e6be"];
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Toggle {
@@ -55,9 +55,6 @@ pub struct Row {
     pub live: Option<fn() -> String>,
     pub toggle: Option<Toggle>,
 }
-
-pub const PIVOTS: [&str; 10] =
-    ["network", "display", "sound", "power", "ai", "dictation", "account", "privacy", "apps", "about"];
 
 const WIFI: &str = "M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01";
 const BT: &str = "M7 7l10 10-5 4V3l5 4L7 17";
@@ -173,138 +170,509 @@ pub fn filter<'a>(rows: &'a [Row], query: &str) -> Vec<&'a Row> {
         .collect()
 }
 
-/// The pivot `by` places from `from`, stopping at the ends.
-pub fn step(from: usize, by: i32, len: usize) -> usize {
-    (from as i32 + by).clamp(0, len as i32 - 1) as usize
-}
-
 /// The stylesheet of the hub and of the pages it opens (loaded after the base one).
 pub fn load_css() {
     let Some(display) = gdk::Display::default() else { return };
     let provider = gtk::CssProvider::new();
     let mut css = include_str!("hub.css").to_string();
     for c in PALETTE {
-        css.push_str(&format!(".hub-tile.c{0}, .cal-block.c{0}, .cal-bar.c{0} {{ background: {c}; }}\n", &c[1..]));
+        css.push_str(&format!(".hub-icon.c{0}, .cal-block.c{0}, .cal-bar.c{0} {{ background: {c}; }}\n", &c[1..]));
     }
     for (c, _) in crate::settings::ACCENTS {
-        css.push_str(&format!("button.swatch.c{0} {{ background: {c}; }}\n", &c[1..]));
+        css.push_str(&format!("button.swatch.c{0}, button.dot-swatch.c{0} {{ background: {c}; }}\n", &c[1..]));
     }
     provider.load_from_string(&css);
     gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 2);
 }
 
+
 pub struct Hub {
     pub root: gtk::Box,
     pub search: gtk::SearchEntry,
-    /// Moves to the pivot `by` places along.
-    pub step: Rc<dyn Fn(i32)>,
-    /// The first pivot, which holds the keyboard focus when the window opens.
-    pub first: gtk::Button,
+    /// Holds the keyboard focus when the window opens.
+    pub first: gtk::Widget,
 }
 
-fn grid_of(rows: &[&Row], open: &Rc<dyn Fn(&str)>) -> gtk::Grid {
-    let grid = gtk::Grid::new();
-    grid.add_css_class("hub-grid");
-    grid.set_column_homogeneous(true);
-    grid.set_row_spacing(30);
-    grid.set_column_spacing(60);
-    for (i, r) in rows.iter().enumerate() {
-        grid.attach(&row_widget(r, open), (i % 2) as i32, (i / 2) as i32, 1, 1);
+fn tile_box(small: bool, classes: &[&str]) -> gtk::Box {
+    let b = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    b.add_css_class("hub-tile");
+    b.set_hexpand(true);
+    b.set_size_request(-1, if small { 76 } else { 132 });
+    for c in classes {
+        b.add_css_class(c);
     }
-    if rows.is_empty() {
-        grid.attach(&label("nothing matches", &["hub-empty"]), 0, 0, 2, 1);
-    }
-    grid.set_valign(gtk::Align::Start);
-    crate::common::play(&grid, "rise");
-    grid
+    b
 }
 
-fn row_widget(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
-    let line = gtk::Box::new(gtk::Orientation::Horizontal, 16);
-    let button = gtk::Button::new();
-    button.add_css_class("hub-row");
-    button.set_hexpand(true);
-    let inner = gtk::Box::new(gtk::Orientation::Horizontal, 16);
-    let tile = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    tile.add_css_class("hub-tile");
-    tile.add_css_class(&format!("c{}", &r.color[1..]));
-    tile.set_size_request(56, 56);
-    tile.set_valign(gtk::Align::Center);
-    tile.set_halign(gtk::Align::Start);
-    tile.set_hexpand(false);
-    let g = crate::glyph::widget(r.glyph, 26);
-    g.set_valign(gtk::Align::Center);
-    g.set_halign(gtk::Align::Center);
-    g.set_vexpand(true);
+/// A click anywhere on the tile that no control inside it claimed opens its page.
+fn opens(tile: &gtk::Box, open: &Rc<dyn Fn(&str)>, section: &'static str) {
+    if section.is_empty() {
+        return;
+    }
+    tile.add_css_class("hub-link");
+    let click = gtk::GestureClick::new();
+    let open = open.clone();
+    click.connect_released(move |_, _, _, _| open(section));
+    tile.add_controller(click);
+}
+
+fn glyph_row(glyph: &str, size: i32) -> gtk::Widget {
+    let g = crate::glyph::widget(glyph, size);
+    g.set_halign(gtk::Align::Start);
+    g.upcast()
+}
+
+fn spacer() -> gtk::Box {
+    let s = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    s.set_vexpand(true);
+    s
+}
+
+/// A slider that sends its value no more than every 120 ms.
+fn slider(initial: f64, accent: &str, send: impl Fn(u32) + 'static) -> (gtk::Scale, gtk::Label) {
+    let scale = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 100.0, 1.0);
+    scale.add_css_class("bento-scale");
+    scale.add_css_class(accent);
+    scale.set_hexpand(true);
+    scale.set_draw_value(false);
+    scale.set_value(initial);
+    let value = label(&format!("{initial:.0}%"), &["tile-title"]);
+    let pending = Rc::new(Cell::new(false));
+    let send = Rc::new(send);
+    {
+        let value = value.clone();
+        scale.connect_value_changed(move |s| {
+            let v = s.value().round() as u32;
+            value.set_text(&format!("{v}%"));
+            if pending.replace(true) {
+                return;
+            }
+            let (pending, send, s) = (pending.clone(), send.clone(), s.clone());
+            glib::timeout_add_local_once(std::time::Duration::from_millis(120), move || {
+                pending.set(false);
+                send(s.value().round() as u32);
+            });
+        });
+    }
+    (scale, value)
+}
+
+fn chip(text: &str) -> gtk::Button {
+    let b = gtk::Button::with_label(text);
+    b.add_css_class("hub-chip");
+    b
+}
+
+fn toggle_widget(t: Toggle, state: &gtk::Label, dark: bool) -> gtk::Switch {
+    let sw = gtk::Switch::new();
+    sw.add_css_class("hub-switch");
+    if dark {
+        sw.add_css_class("on-colour");
+    }
+    sw.set_valign(gtk::Align::Start);
+    let loaded = Rc::new(Cell::new(false));
+    {
+        let (sw, loaded) = (sw.clone(), loaded.clone());
+        crate::settings::background(
+            move || t.get(),
+            move |on| {
+                sw.set_active(on);
+                loaded.set(true);
+            },
+        );
+    }
+    let state = state.clone();
+    sw.connect_state_set(move |_, on| {
+        if loaded.get() {
+            let state = state.clone();
+            crate::settings::background(
+                move || {
+                    t.set(on);
+                    t.state()
+                },
+                move |s| state.set_text(&s),
+            );
+        }
+        glib::Propagation::Proceed
+    });
+    sw
+}
+
+/// A tile for a setting that has a switch of its own (Wi-Fi, Bluetooth).
+fn toggle_tile(r: &Row, colour: &str, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    let tile = tile_box(false, &["bento-tile", colour]);
+    let top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    let g = glyph_row(r.glyph, 24);
     g.set_hexpand(true);
-    tile.append(&g);
-    let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    text.set_valign(gtk::Align::Center);
-    let state = label(r.hint, &["hub-state"]);
+    top.append(&g);
+    let state = label(r.hint, &["tile-sub"]);
     state.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    let title = label(r.title, &["hub-title"]);
-    title.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    text.append(&title);
-    text.append(&state);
-    inner.append(&tile);
-    inner.append(&text);
-    button.set_child(Some(&inner));
-    line.append(&button);
-    if r.section.is_empty() {
-        button.set_sensitive(false);
-    } else {
-        let (open, id) = (open.clone(), r.section);
-        button.connect_clicked(move |_| open(id));
+    if let Some(t) = r.toggle {
+        top.append(&toggle_widget(t, &state, true));
     }
+    tile.append(&top);
+    tile.append(&spacer());
+    tile.append(&label(r.title, &["tile-title", "big-title"]));
+    tile.append(&state);
     if let Some(live) = r.live {
         let state = state.clone();
         crate::settings::background(live, move |s| state.set_text(&s));
     }
-    if let Some(t) = r.toggle {
-        let sw = gtk::Switch::new();
-        sw.add_css_class("hub-switch");
-        sw.set_valign(gtk::Align::Center);
-        let loaded = Rc::new(Cell::new(false));
-        {
-            let (sw, loaded) = (sw.clone(), loaded.clone());
+    opens(&tile, open, r.section);
+    tile
+}
+
+fn display_tile(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    let tile = tile_box(false, &[]);
+    tile.append(&label(r.title, &["tile-title", "big-title"]));
+    let line = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    line.set_margin_top(4);
+    line.append(&glyph_row(r.glyph, 20));
+    let (scale, value) = slider(70.0, "amber", |p| {
+        std::thread::spawn(move || crate::display::set_brightness(p));
+    });
+    line.append(&scale);
+    line.append(&value);
+    tile.append(&line);
+    let chips = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    chips.set_margin_top(6);
+    let scales: Vec<(f64, gtk::Button)> =
+        [1.0, 1.25, 1.5].iter().map(|s| (*s, chip(&format!("{:.0}%", s * 100.0)))).collect();
+    for (_, b) in &scales {
+        chips.append(b);
+    }
+    let night = chip("Night light");
+    chips.append(&night);
+    tile.append(&chips);
+    // Load what the screen is doing now; hide the slider when there's no backlight.
+    {
+        let (scale, line, scales, night) = (scale.clone(), line.clone(), scales.clone(), night.clone());
+        crate::settings::background(
+            || {
+                let out = crate::display::outputs().into_iter().find(|o| o.enabled);
+                (crate::display::brightness(), out.map(|o| o.scale), crate::display::night_light())
+            },
+            move |(brightness, current, nl)| {
+                match brightness {
+                    Some(b) => scale.set_value((b * 100.0).round()),
+                    None => line.set_visible(false),
+                }
+                if let Some(c) = current {
+                    for (s, b) in &scales {
+                        if (s - c).abs() < 0.02 {
+                            b.add_css_class("on");
+                        }
+                    }
+                }
+                if nl {
+                    night.add_css_class("on");
+                }
+            },
+        );
+    }
+    for (s, b) in &scales {
+        let (s, all) = (*s, scales.clone());
+        b.connect_clicked(move |_| {
+            for (v, x) in &all {
+                if (v - s).abs() < 0.001 {
+                    x.add_css_class("on");
+                } else {
+                    x.remove_css_class("on");
+                }
+            }
+            std::thread::spawn(move || {
+                if let Some(o) = crate::display::outputs().into_iter().find(|o| o.enabled)
+                    && let Some(m) = o.current.and_then(|i| o.modes.get(i))
+                {
+                    let _ = crate::display::apply(&o, m, s, &o.transform);
+                }
+            });
+        });
+    }
+    night.connect_clicked(move |b| {
+        let on = !b.has_css_class("on");
+        if on {
+            b.add_css_class("on");
+        } else {
+            b.remove_css_class("on");
+        }
+        std::thread::spawn(move || crate::display::set_night_light(on));
+    });
+    opens(&tile, open, r.section);
+    tile
+}
+
+fn sound_tile(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    let tile = tile_box(false, &[]);
+    tile.append(&label(r.title, &["tile-title", "big-title"]));
+    let line = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    line.set_margin_top(4);
+    line.append(&glyph_row(r.glyph, 20));
+    let device: Rc<RefCell<String>> = Rc::default();
+    let dev = device.clone();
+    let (scale, value) = slider(60.0, "pink", move |p| {
+        let name = dev.borrow().clone();
+        if !name.is_empty() {
+            std::thread::spawn(move || crate::snd::set_volume(true, &name, p));
+        }
+    });
+    line.append(&scale);
+    line.append(&value);
+    tile.append(&line);
+    let note = label("Volume, outputs and inputs", &["tile-sub"]);
+    note.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    note.set_margin_top(6);
+    tile.append(&note);
+    {
+        let (scale, note) = (scale.clone(), note.clone());
+        crate::settings::background(
+            || {
+                let (outs, def) = crate::snd::outputs();
+                let (ins, defin) = crate::snd::inputs();
+                let out = outs.into_iter().find(|d| d.name == def);
+                let inp = ins.into_iter().find(|d| d.name == defin);
+                (out, inp.map(|d| d.description))
+            },
+            move |(out, inp)| {
+                let Some(out) = out else { return };
+                *device.borrow_mut() = out.name.clone();
+                scale.set_value(f64::from(out.volume));
+                let mut text = format!("Output: {}", out.description);
+                if let Some(i) = inp {
+                    text.push_str(&format!(" · Input: {i}"));
+                }
+                note.set_text(&text);
+            },
+        );
+    }
+    opens(&tile, open, r.section);
+    tile
+}
+
+fn battery_tile(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    let tile = tile_box(false, &["bento-tile", "mint"]);
+    tile.append(&glyph_row(r.glyph, 24));
+    tile.append(&spacer());
+    let big = label("", &["bento-big", "tile-number"]);
+    let sub = label("", &["tile-sub"]);
+    tile.append(&big);
+    tile.append(&sub);
+    crate::settings::background(crate::power::battery, move |b| match b {
+        Some(b) => {
+            big.set_text(&format!("{}%", b.percent));
+            sub.set_text(&if b.time_left.is_empty() { b.state.replace('-', " ") } else { b.time_left.clone() });
+        }
+        None => {
+            big.set_text("AC");
+            sub.set_text("On mains power");
+        }
+    });
+    opens(&tile, open, r.section);
+    tile
+}
+
+fn appearance_tile(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    let tile = tile_box(false, &[]);
+    let g = glyph_row(r.glyph, 22);
+    g.add_css_class("violet-glyph");
+    tile.append(&g);
+    tile.append(&spacer());
+    tile.append(&label(r.title, &["tile-title"]));
+    let swatches = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let all: Rc<RefCell<Vec<gtk::Button>>> = Rc::default();
+    let picked = crate::settings::accent_now();
+    for (hex, name) in crate::settings::ACCENTS.iter().take(4) {
+        let b = gtk::Button::new();
+        b.add_css_class("dot-swatch");
+        b.add_css_class(&format!("c{}", &hex[1..]));
+        b.set_tooltip_text(Some(name));
+        if *hex == picked {
+            b.add_css_class("selected");
+        }
+        let (all2, hex) = (all.clone(), *hex);
+        b.connect_clicked(move |b| {
+            let (b, all) = (b.clone(), all2.clone());
             crate::settings::background(
-                move || t.get(),
-                move |on| {
-                    sw.set_active(on);
-                    loaded.set(true);
+                move || crate::kde::run("plasma-apply-colorscheme", &["--accent-color", hex]),
+                move |r| {
+                    if r.is_ok() {
+                        for x in all.borrow().iter() {
+                            x.remove_css_class("selected");
+                        }
+                        b.add_css_class("selected");
+                    }
                 },
             );
-        }
-        sw.connect_state_set(move |_, on| {
-            if loaded.get() {
-                let state = state.clone();
-                crate::settings::background(
-                    move || {
-                        t.set(on);
-                        t.state()
-                    },
-                    move |s| state.set_text(&s),
-                );
-            }
-            glib::Propagation::Proceed
         });
-        line.append(&sw);
+        all.borrow_mut().push(b.clone());
+        swatches.append(&b);
     }
-    line
+    tile.append(&swatches);
+    opens(&tile, open, r.section);
+    tile
+}
+
+fn dictation_tile(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    let tile = tile_box(false, &[]);
+    let line = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    line.set_valign(gtk::Align::Center);
+    line.set_vexpand(true);
+    let g = glyph_row(r.glyph, 22);
+    g.add_css_class("orange-glyph");
+    line.append(&g);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    text.set_hexpand(true);
+    text.append(&label(r.title, &["tile-title"]));
+    text.append(&label("Press Super M and speak", &["tile-sub"]));
+    line.append(&text);
+    let sw = gtk::Switch::new();
+    sw.add_css_class("hub-switch");
+    sw.set_valign(gtk::Align::Center);
+    sw.set_active(crate::dictate::enabled());
+    sw.connect_state_set(|_, on| {
+        crate::dictate::set_enabled(on);
+        glib::Propagation::Proceed
+    });
+    line.append(&sw);
+    tile.append(&line);
+    opens(&tile, open, r.section);
+    tile
+}
+
+fn ai_tile(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    let tile = tile_box(false, &[]);
+    let g = glyph_row(r.glyph, 22);
+    g.add_css_class("green-glyph");
+    tile.append(&g);
+    tile.append(&spacer());
+    tile.append(&label(r.title, &["tile-title"]));
+    tile.append(&label("Model, providers, limits", &["tile-sub"]));
+    opens(&tile, open, r.section);
+    tile
+}
+
+/// A small tile for every other setting: filled icon, title, state.
+fn small_tile(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    let tile = tile_box(true, &[]);
+    let line = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    line.set_valign(gtk::Align::Center);
+    line.set_vexpand(true);
+    let chip = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    chip.add_css_class("hub-icon");
+    chip.add_css_class(&format!("c{}", &r.color[1..]));
+    chip.set_valign(gtk::Align::Center);
+    chip.set_halign(gtk::Align::Start);
+    chip.set_hexpand(false);
+    chip.set_size_request(40, 40);
+    let g = crate::glyph::widget(r.glyph, 20);
+    g.set_valign(gtk::Align::Center);
+    g.set_halign(gtk::Align::Center);
+    g.set_vexpand(true);
+    g.set_hexpand(true);
+    chip.append(&g);
+    line.append(&chip);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 1);
+    text.set_valign(gtk::Align::Center);
+    let title = label(r.title, &["tile-title"]);
+    title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    let state = label(r.hint, &["tile-sub"]);
+    state.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    text.append(&title);
+    text.append(&state);
+    line.append(&text);
+    tile.append(&line);
+    if let Some(live) = r.live {
+        let state = state.clone();
+        crate::settings::background(live, move |s| state.set_text(&s));
+    }
+    opens(&tile, open, r.section);
+    tile
+}
+
+/// Where each control tile sits on the board: (section, column, row, width).
+const BOARD: [(&str, i32, i32, i32); 8] = [
+    ("wifi", 0, 0, 1),
+    ("bluetooth", 1, 0, 1),
+    ("display", 2, 0, 2),
+    ("sound", 0, 1, 2),
+    ("power", 2, 1, 1),
+    ("ai", 3, 1, 1),
+    ("appearance", 0, 2, 1),
+    ("dictation", 1, 2, 2),
+];
+
+fn is_control(r: &Row) -> bool {
+    BOARD.iter().any(|b| b.0 == r.section) && !(r.section == "sound" && r.pivot == "dictation")
+}
+
+fn control_tile(r: &Row, open: &Rc<dyn Fn(&str)>) -> gtk::Box {
+    match r.section {
+        "wifi" => toggle_tile(r, "blue", open),
+        "bluetooth" => toggle_tile(r, "indigo", open),
+        "display" => display_tile(r, open),
+        "sound" => sound_tile(r, open),
+        "power" => battery_tile(r, open),
+        "ai" => ai_tile(r, open),
+        "appearance" => appearance_tile(r, open),
+        _ => dictation_tile(r, open),
+    }
+}
+
+fn grid() -> gtk::Grid {
+    let grid = gtk::Grid::new();
+    grid.add_css_class("hub-grid");
+    grid.set_column_homogeneous(true);
+    grid.set_row_spacing(12);
+    grid.set_column_spacing(12);
+    grid.set_valign(gtk::Align::Start);
+    grid
+}
+
+/// The control board, then a grid of small tiles for everything else.
+fn board_of(all: &[Row], open: &Rc<dyn Fn(&str)>) -> gtk::Grid {
+    let grid = grid();
+    for (section, c, r, w) in BOARD {
+        if let Some(row) = all.iter().find(|x| x.section == section && is_control(x)) {
+            grid.attach(&control_tile(row, open), c, r, w, 1);
+        }
+    }
+    let rest: Vec<&Row> = all.iter().filter(|r| !is_control(r)).collect();
+    for (i, r) in rest.iter().enumerate() {
+        // One small tile fills the board's last gap, the rest run two to a row below it.
+        if i == 0 {
+            grid.attach(&small_tile(r, open), 3, 2, 1, 1);
+        } else {
+            grid.attach(&small_tile(r, open), ((i - 1) % 2 * 2) as i32, 3 + ((i - 1) / 2) as i32, 2, 1);
+        }
+    }
+    crate::common::play(&grid, "rise");
+    grid
+}
+
+fn results_of(rows: &[&Row], open: &Rc<dyn Fn(&str)>) -> gtk::Grid {
+    let grid = grid();
+    for (i, r) in rows.iter().enumerate() {
+        grid.attach(&small_tile(r, open), (i % 2 * 2) as i32, (i / 2) as i32, 2, 1);
+    }
+    if rows.is_empty() {
+        grid.attach(&label("nothing matches", &["hub-empty"]), 0, 0, 4, 1);
+    }
+    crate::common::play(&grid, "rise");
+    grid
 }
 
 fn scrolled(grid: &gtk::Grid) -> gtk::ScrolledWindow {
     gtk::ScrolledWindow::builder().child(grid).hscrollbar_policy(gtk::PolicyType::Never).vexpand(true).build()
 }
 
-/// Builds the hub: header, pivots and the stack of their grids.
+/// Builds the hub: the title and search, and the board (or the matches while searching).
 pub fn build(open: Rc<dyn Fn(&str)>) -> Hub {
-    let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let root = gtk::Box::new(gtk::Orientation::Vertical, 12);
     root.add_css_class("hub");
     let all: Rc<Vec<Row>> = Rc::new(rows());
 
     let top = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    let app = label("SETTINGS", &["hub-app"]);
+    let app = label("Settings", &["hub-app"]);
     app.set_hexpand(true);
     let search = gtk::SearchEntry::new();
     search.set_placeholder_text(Some("Search settings"));
@@ -316,131 +684,29 @@ pub fn build(open: Rc<dyn Fn(&str)>) -> Hub {
     root.append(&top);
 
     let stack = gtk::Stack::new();
-    stack.set_transition_type(gtk::StackTransitionType::SlideLeftRight);
-    stack.set_transition_duration(if std::env::var_os("TRIPPPIN_SHOT").is_some() { 0 } else { 220 });
-    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 26);
-    bar.add_css_class("hub-pivots");
-    let buttons: Rc<Vec<gtk::Button>> = Rc::new(
-        PIVOTS
-            .iter()
-            .map(|p| {
-                let b = gtk::Button::new();
-                b.add_css_class("hub-pivot");
-                b.set_child(Some(&label(p, &[])));
-                bar.append(&b);
-                b
-            })
-            .collect(),
-    );
-    let scroll_bar = gtk::ScrolledWindow::builder()
-        .child(&bar)
-        .hscrollbar_policy(gtk::PolicyType::External)
-        .vscrollbar_policy(gtk::PolicyType::Never)
-        .build();
-    scroll_bar.add_css_class("hub-pivot-scroll");
-    root.append(&scroll_bar);
+    stack.set_transition_type(gtk::StackTransitionType::Crossfade);
+    stack.set_transition_duration(if std::env::var_os("TRIPPPIN_SHOT").is_some() { 0 } else { 150 });
+    stack.add_named(&scrolled(&board_of(&all, &open)), Some("board"));
     root.append(&stack);
 
-    let current = Rc::new(Cell::new(0usize));
-    let built: Rc<RefCell<Vec<bool>>> = Rc::new(RefCell::new(vec![false; PIVOTS.len()]));
-    let searching = Rc::new(Cell::new(false));
-    let select: Rc<dyn Fn(usize)> = {
-        let (stack, buttons, current, built, all, open, searching) = (
-            stack.clone(),
-            buttons.clone(),
-            current.clone(),
-            built.clone(),
-            all.clone(),
-            open.clone(),
-            searching.clone(),
-        );
-        let (scroll_bar, bar) = (scroll_bar.clone(), bar.clone());
-        Rc::new(move |i: usize| {
-            let name = PIVOTS[i];
-            if !built.borrow()[i] {
-                built.borrow_mut()[i] = true;
-                let rows: Vec<&Row> = all.iter().filter(|r| r.pivot == name).collect();
-                stack.add_named(&scrolled(&grid_of(&rows, &open)), Some(name));
-            }
-            searching.set(false);
-            stack.set_visible_child_name(name);
-            current.set(i);
-            for (j, b) in buttons.iter().enumerate() {
-                if j == i {
-                    b.add_css_class("on");
-                    // Scroll the pivot row so the open one is in view.
-                    let adj = scroll_bar.hadjustment();
-                    let (b, bar) = (b.clone(), bar.clone());
-                    glib::idle_add_local_once(move || {
-                        let Some(r) = b.compute_bounds(&bar) else { return };
-                        let (x, w) = (f64::from(r.x()), f64::from(r.width()));
-                        if x + w > adj.value() + adj.page_size() {
-                            adj.set_value(x + w - adj.page_size() + 40.0);
-                        } else if x < adj.value() {
-                            adj.set_value((x - 40.0).max(0.0));
-                        }
-                    });
-                } else {
-                    b.remove_css_class("on");
-                }
-            }
-        })
-    };
-    for (i, b) in buttons.iter().enumerate() {
-        let select = select.clone();
-        b.connect_clicked(move |_| select(i));
-    }
-    select(0);
-
     {
-        // Search: one extra page of matches across every pivot.
-        let (stack, buttons, all, open, searching, select, current) = (
-            stack.clone(),
-            buttons.clone(),
-            all.clone(),
-            open.clone(),
-            searching.clone(),
-            select.clone(),
-            current.clone(),
-        );
+        let (stack, all, open) = (stack.clone(), all.clone(), open.clone());
         search.connect_search_changed(move |s| {
             let q = s.text().to_string();
-            if q.trim().is_empty() {
-                if searching.get() {
-                    select(current.get());
-                }
-                return;
-            }
             if let Some(old) = stack.child_by_name("results") {
                 stack.remove(&old);
             }
+            if q.trim().is_empty() {
+                stack.set_visible_child_name("board");
+                return;
+            }
             let rows = filter(&all, &q);
-            stack.add_named(&scrolled(&grid_of(&rows, &open)), Some("results"));
+            stack.add_named(&scrolled(&results_of(&rows, &open)), Some("results"));
             stack.set_visible_child_name("results");
-            searching.set(true);
-            for b in buttons.iter() {
-                b.remove_css_class("on");
-            }
         });
     }
-
-    // Swipe sideways between pivots (touch and trackpad).
-    let swipe = gtk::GestureSwipe::new();
-    {
-        let (select, current) = (select.clone(), current.clone());
-        swipe.connect_swipe(move |_, vx, vy| {
-            if vx.abs() > 400.0 && vx.abs() > vy.abs() * 2.0 {
-                select(step(current.get(), if vx < 0.0 { 1 } else { -1 }, PIVOTS.len()));
-            }
-        });
-    }
-    stack.add_controller(swipe);
-
-    let stepper: Rc<dyn Fn(i32)> = {
-        let (select, current) = (select.clone(), current.clone());
-        Rc::new(move |by| select(step(current.get(), by, PIVOTS.len())))
-    };
-    Hub { root, search, step: stepper, first: buttons[0].clone() }
+    let first = search.clone().upcast();
+    Hub { root, search, first }
 }
 
 #[cfg(test)]
@@ -452,9 +718,6 @@ mod tests {
         let rows = rows();
         for (id, ..) in crate::settings::SECTIONS {
             assert!(rows.iter().any(|r| r.section == id), "no hub row opens {id}");
-        }
-        for r in &rows {
-            assert!(PIVOTS.contains(&r.pivot), "{} is on an unknown pivot", r.title);
         }
     }
 
@@ -470,12 +733,5 @@ mod tests {
         let account = filter(&rows, "account");
         assert!(account.iter().any(|r| r.section == "account"), "pivot name matches its rows");
         assert!(filter(&rows, "password").iter().any(|r| r.section == "account"), "the hint is searched too");
-    }
-
-    #[test]
-    fn pivots_stop_at_the_ends() {
-        assert_eq!(step(0, -1, PIVOTS.len()), 0);
-        assert_eq!(step(PIVOTS.len() - 1, 1, PIVOTS.len()), PIVOTS.len() - 1);
-        assert_eq!(step(3, 1, PIVOTS.len()), 4);
     }
 }

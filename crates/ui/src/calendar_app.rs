@@ -1,6 +1,7 @@
-//! The Calendar app (`tripppin-ui calendar`), drawn like the Tiles design (mock 07): a small
-//! CALENDAR label, big light pivots (day, week, month) and flat coloured event blocks. The
-//! day is a huge light number with the weekday and month beside an hour rail of blocks; a
+//! The Calendar app (`tripppin-ui calendar`), drawn like the Bento design (mock 07): the
+//! month is a tile, with an amber TODAY tile and an UPCOMING tile beside it; day and week are
+//! one tile each, with chips to switch. The day is a huge number with the weekday and month
+//! beside an hour rail of coloured blocks; a
 //! "+ add" field takes plain words ("call mum friday 6pm"). Events are iCalendar files
 //! (see `cal`). Left/Right step through days, weeks or months; d, w, m change the view.
 
@@ -191,7 +192,7 @@ fn add_field(state: &Shared, rebuild: &Rc<dyn Fn()>, note: &gtk::Label) -> gtk::
 
 fn day_view(s: &State, state: &Shared, rebuild: &Rc<dyn Fn()>, note: &gtk::Label) -> gtk::Box {
     let root = gtk::Box::new(gtk::Orientation::Horizontal, 40);
-    root.add_css_class("cal-day");
+    root.add_css_class("cal-tile");
     let d = s.selected;
     let left = gtk::Box::new(gtk::Orientation::Vertical, 0);
     left.set_size_request(220, -1);
@@ -261,7 +262,7 @@ fn week_view(s: &State, state: &Shared, rebuild: &Rc<dyn Fn()>, go_day: &Rc<dyn 
     let grid = gtk::Grid::new();
     grid.add_css_class("cal-week");
     grid.set_column_homogeneous(true);
-    grid.set_column_spacing(5);
+    grid.set_column_spacing(12);
     let today = now().date;
     let start = s.selected.week_start();
     let mut animated: Vec<gtk::Widget> = Vec::new();
@@ -303,8 +304,20 @@ pub fn month_cells(d: Date) -> Vec<Date> {
 }
 
 fn month_view(s: &State, go_day: &Rc<dyn Fn(Date)>) -> gtk::Box {
+    let board = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    root.append(&label(&format!("{} {}", s.selected.month_name(), s.selected.y), &["cal-month-title"]));
+    root.add_css_class("cal-tile");
+    root.set_hexpand(true);
+    board.append(&root);
+    board.append(&side_tiles(s));
+    let title = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let name = s.selected.month_name();
+    title.append(&label(&(name[..1].to_uppercase() + &name[1..]), &["cal-month-title"]));
+    let year = label(&s.selected.y.to_string(), &["cal-year"]);
+    year.set_valign(gtk::Align::End);
+    year.set_margin_bottom(6);
+    title.append(&year);
+    root.append(&title);
     let grid = gtk::Grid::new();
     grid.set_column_homogeneous(true);
     grid.set_row_homogeneous(true);
@@ -338,7 +351,8 @@ fn month_view(s: &State, go_day: &Rc<dyn Fn(Date)>) -> gtk::Box {
             let bar = gtk::Box::new(gtk::Orientation::Vertical, 0);
             bar.add_css_class("cal-bar");
             bar.add_css_class(&format!("c{}", &PALETTE[e.colour()][1..]));
-            bar.set_size_request(-1, 5);
+            bar.set_size_request(8, 8);
+            bar.set_halign(gtk::Align::Start);
             inner.append(&bar);
         }
         if evs.len() > 3 {
@@ -352,7 +366,50 @@ fn month_view(s: &State, go_day: &Rc<dyn Fn(Date)>) -> gtk::Box {
     }
     animate(&animated);
     root.append(&grid);
-    root
+    board
+}
+
+fn short_day(d: Date) -> String {
+    let w = d.weekday_name();
+    format!("{}{}", w[..1].to_uppercase(), &w[1..3])
+}
+
+/// The amber TODAY tile and the UPCOMING tile beside the month.
+fn side_tiles(s: &State) -> gtk::Box {
+    let side = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    side.set_size_request(250, -1);
+    let today = now().date;
+    let tile = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    tile.add_css_class("cal-tile");
+    tile.add_css_class("today");
+    tile.append(&label("TODAY", &["cal-k"]));
+    tile.append(&label(&format!("{} {}", short_day(today), today.d), &["cal-today-num"]));
+    let todays = cal::on(&s.events, today);
+    for e in todays.iter().take(5) {
+        let l = label(&format!("{} {}", cal::clock(e.start.min), e.title), &["cal-line"]);
+        l.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        tile.append(&l);
+    }
+    if todays.is_empty() {
+        tile.append(&label("Nothing planned", &["cal-nothing"]));
+    }
+    side.append(&tile);
+    let up = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    up.add_css_class("cal-tile");
+    up.set_vexpand(true);
+    up.append(&label("UPCOMING", &["cal-k"]));
+    let mut later: Vec<&Event> = s.events.iter().filter(|e| e.start.date.days() > today.days()).collect();
+    later.sort_by_key(|e| e.start);
+    for e in later.iter().take(5) {
+        let l = label(&format!("{}  {} {}", short_day(e.start.date), e.title, cal::clock(e.start.min)), &["cal-line"]);
+        l.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        up.append(&l);
+    }
+    if later.is_empty() {
+        up.append(&label("Nothing coming up", &["cal-nothing"]));
+    }
+    side.append(&up);
+    side
 }
 
 fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
@@ -369,7 +426,7 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
     window.set_size_request(640, 420);
 
     let t = now();
-    let state: Shared = Rc::new(RefCell::new(State { events: cal::load_from(&cal::dir()), selected: t.date, view: 0 }));
+    let state: Shared = Rc::new(RefCell::new(State { events: cal::load_from(&cal::dir()), selected: t.date, view: 2 }));
     let note = label("", &["cal-note"]);
 
     let stack = gtk::Stack::new();
@@ -410,7 +467,7 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
             .iter()
             .map(|v| {
                 let b = gtk::Button::new();
-                b.add_css_class("hub-pivot");
+                b.add_css_class("cal-pivot");
                 b.set_child(Some(&label(v, &[])));
                 b
             })
@@ -456,7 +513,7 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
 
     // Header: the label, and ‹ today › on the right.
     let top = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    let app_label = label("CALENDAR", &["hub-app"]);
+    let app_label = label("Calendar", &["hub-app"]);
     app_label.set_hexpand(true);
     top.append(&app_label);
     let shift: Rc<dyn Fn(i32)> = {
@@ -487,20 +544,20 @@ fn build(app: &gtk::Application) -> gtk::ApplicationWindow {
         });
         top.append(&b);
     }
-    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 26);
-    bar.add_css_class("hub-pivots");
+    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    bar.add_css_class("cal-pivots");
     for b in buttons.iter() {
         bar.append(b);
     }
 
     let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    body.set_margin_start(44);
-    body.set_margin_end(44);
+    body.set_margin_start(28);
+    body.set_margin_end(28);
     body.set_margin_bottom(26);
     body.append(&top);
     body.append(&bar);
     let gap = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    gap.set_size_request(-1, 26);
+    gap.set_size_request(-1, 14);
     body.append(&gap);
     body.append(&stack);
 

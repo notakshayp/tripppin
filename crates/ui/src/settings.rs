@@ -119,7 +119,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
 
     let title = label("", &["hub-detail-title"]);
     title.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    let back = gtk::Button::with_label("\u{2039}");
+    let back = gtk::Button::with_label("\u{2190}");
     back.add_css_class("hub-back");
     back.set_tooltip_text(Some("Back to settings"));
     let head = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -127,7 +127,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
     head.append(&back);
     head.append(&title);
     let detail = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    detail.append(&label("SETTINGS", &["hub-app"]));
+    detail.add_css_class("hub-sheet");
     detail.append(&head);
     detail.append(&stack);
 
@@ -138,7 +138,7 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
             let id = if id == "accounts" { "account" } else { id };
             if let Some(i) = SECTIONS.iter().position(|(sid, ..)| *sid == id) {
                 show_section(&stack, i);
-                title.set_text(&SECTIONS[i].1.to_lowercase());
+                title.set_text(SECTIONS[i].1);
                 view.set_visible_child_name("detail");
             }
         })
@@ -154,17 +154,13 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     {
-        let (view, search, step) = (view.clone(), hub.search.clone(), hub.step.clone());
-        let window = window.clone();
+        let (view, search) = (view.clone(), hub.search.clone());
         keys.connect_key_pressed(move |_, key, _, _| {
             use gtk::gdk::Key;
             let in_hub = view.visible_child_name().as_deref() == Some("hub");
-            let typing = gtk::prelude::GtkWindowExt::focus(&window).is_some_and(|w| w.is::<gtk::Text>());
             match key {
                 Key::Escape if !in_hub => view.set_visible_child_name("hub"),
                 Key::Escape if !search.text().is_empty() => search.set_text(""),
-                Key::Left if in_hub && !typing => step(-1),
-                Key::Right if in_hub && !typing => step(1),
                 _ => return glib::Propagation::Proceed,
             }
             glib::Propagation::Stop
@@ -184,16 +180,12 @@ fn build(app: &gtk::Application) -> (gtk::ApplicationWindow, Open) {
     window.set_titlebar(Some(&handle));
     let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
     body.add_css_class("hub-body");
-    body.set_margin_start(44);
-    body.set_margin_end(44);
+    body.set_margin_start(28);
+    body.set_margin_end(28);
     body.set_margin_bottom(16);
     body.append(&view);
     window.set_child(Some(&body));
     gtk::prelude::GtkWindowExt::set_focus(&window, Some(&hub.first));
-    if let Some(n) = std::env::var("TRIPPPIN_STEP").ok().and_then(|v| v.parse::<i32>().ok()) {
-        let step = hub.step.clone();
-        glib::timeout_add_local_once(std::time::Duration::from_millis(900), move || step(n));
-    }
     crate::common::snapshot_hook(&window);
     (window, open)
 }
@@ -1210,14 +1202,14 @@ fn screen_card(o: &display::Output, anchor: Option<&display::Output>, error: &gt
 
 const WALLPAPERS: [(&str, &str); 4] = [("ink", "Ink"), ("night", "Night"), ("forest", "Forest"), ("paper", "Paper")];
 const TEXT_SIZES: [(&str, f64); 4] = [("Small", 0.9), ("Default", 1.0), ("Large", 1.15), ("Larger", 1.3)];
-/// The colour of buttons, switches and highlights: the tile palette's, green first.
+/// The colour of buttons, switches and highlights: the Bento palette's, amber first.
 pub(crate) const ACCENTS: [(&str, &str); 6] = [
-    ("#3fae7a", "Green"),
-    ("#0f7c8c", "Teal"),
-    ("#2c5aa0", "Blue"),
-    ("#6b3f8f", "Purple"),
-    ("#c2502e", "Orange"),
-    ("#b8862b", "Amber"),
+    ("#f2b84b", "Amber"),
+    ("#45c486", "Green"),
+    ("#5aa9e6", "Blue"),
+    ("#b197fc", "Violet"),
+    ("#ff8a5a", "Orange"),
+    ("#f783ac", "Pink"),
 ];
 
 fn tripppin_config() -> std::path::PathBuf {
@@ -1272,7 +1264,7 @@ pub(crate) fn set_text_scale(factor: f64) {
 }
 
 /// The accent now, as one of ACCENTS' hex codes (the first when none is set).
-fn accent_now() -> &'static str {
+pub(crate) fn accent_now() -> &'static str {
     crate::kde::read("kdeglobals", "General", "AccentColor")
         .and_then(|v| crate::kde::rgb_to_hex(&v))
         .and_then(|hex| ACCENTS.iter().map(|a| a.0).find(|a| a.eq_ignore_ascii_case(&hex)))

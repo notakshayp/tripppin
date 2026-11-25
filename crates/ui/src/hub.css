@@ -1,140 +1,176 @@
-/* The Tiles design for Settings (and the Calendar): flat colour, square edges, Inter in light
-   weights, big lowercase pivots. Loaded after style.css, so it wins.
-   bg #101418, raised #1a2025, muted #9aa4ab, accent #3fae7a. */
+/* The Bento look for Settings and the Calendar: rounded tiles on a graphite board. Tokens come
+   from style.css; this file only places them. Loaded after style.css, so it wins. */
 
 window.settings.hub-window,
 window.calendar-app {
-    background: #101418;
-    color: #fff;
-    font-family: Inter, sans-serif;
-}
-window.settings.hub-window *,
-window.calendar-app * {
-    border-radius: 0;
-    box-shadow: none;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: Manrope, Inter, sans-serif;
 }
 window.hub-window .titlebar-row,
-window.calendar-app .titlebar-row { background: #101418; border: none; min-height: 34px; }
+window.calendar-app .titlebar-row { background: var(--bg); border: none; min-height: 34px; }
 
 .hub-app {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: #fff;
+    font-size: 24pt;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--fg);
 }
-.hub-pivots { padding: 0; }
-button.hub-pivot,
-button.hub-pivot:hover,
-button.hub-pivot:focus {
-    background: none;
-    border: none;
-    box-shadow: none;
-    outline: none;
-    padding: 0;
-    min-height: 0;
-    min-width: 0;
-    font-size: 46px;
-    font-weight: 200;
-    letter-spacing: -0.02em;
-    color: #4b555c;
-    transition: color 200ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-button.hub-pivot:hover { color: #9aa4ab; }
-button.hub-pivot.on { color: #fff; }
-.hub-pivot-scroll { margin-top: 4px; }
 
 .hub-search,
 .hub-search:focus-within {
-    background: #1a2025;
-    color: #fff;
+    background: var(--surface);
+    color: var(--fg);
     border: none;
+    border-radius: var(--r-sm);
     outline: none;
     box-shadow: none;
-    min-height: 34px;
-    font-size: 14px;
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 10.5pt;
 }
-.hub-grid { margin-top: 34px; padding-bottom: 20px; }
-.hub-empty { font-size: 22px; font-weight: 300; color: #9aa4ab; }
+.hub-grid { padding-bottom: 20px; }
+.hub-empty { font-size: 16pt; font-weight: 600; color: var(--fg-3); }
 
-button.hub-row,
-button.hub-row:hover,
-button.hub-row:focus,
-button.hub-row:active {
-    background: none;
+/* ---- Tiles on the control board ---- */
+.hub-tile {
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    padding: 16px;
+    transition: background 160ms cubic-bezier(0.32, 0.72, 0, 1), transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.hub-tile.hub-link:hover { background: #2a2f33; }
+.hub-tile.hub-link:active { transform: scale(0.985); }
+.hub-tile.blue { background: var(--c-blue); color: #0e2233; }
+.hub-tile.indigo { background: var(--c-indigo); color: #141a40; }
+.hub-tile.mint { background: var(--c-mint); color: #06291e; }
+.hub-tile.blue:hover, .hub-tile.indigo:hover, .hub-tile.mint:hover { filter: brightness(1.06); }
+.hub-tile.blue .hub-glyph, .hub-tile.indigo .hub-glyph, .hub-tile.mint .hub-glyph { color: inherit; }
+.hub-tile .hub-glyph { color: var(--fg-3); }
+.hub-tile .green-glyph { color: var(--ok); }
+.hub-tile .violet-glyph { color: var(--c-violet); }
+.hub-tile .orange-glyph { color: var(--c-orange); }
+.tile-title { font-size: 11.5pt; font-weight: 700; }
+.tile-title.big-title { font-size: 13pt; }
+.tile-sub { font-size: 9.5pt; font-weight: 600; color: var(--fg-3); }
+.hub-tile.blue .tile-sub, .hub-tile.indigo .tile-sub, .hub-tile.mint .tile-sub { color: inherit; opacity: 0.8; }
+.tile-number { font-size: 26pt; }
+
+/* the small tile of every other setting */
+.hub-icon { min-width: 40px; min-height: 40px; border-radius: 28%; background: var(--surface-3); }
+.hub-icon .hub-glyph { color: var(--accent-ink); }
+
+/* sliders: thick rounded track, coloured fill, no knob chrome */
+scale.bento-scale trough { min-height: 10px; border-radius: 6px; background: #3a3f43; border: none; }
+scale.bento-scale highlight { border-radius: 6px; background: var(--accent); border: none; }
+scale.bento-scale slider { min-width: 18px; min-height: 18px; margin: 0; border-radius: 50%; background: var(--fg); border: none; box-shadow: var(--shadow-sm); opacity: 0; transition: opacity 150ms; }
+scale.bento-scale:hover slider { opacity: 1; }
+scale.bento-scale.pink highlight { background: var(--c-pink); }
+scale.bento-scale.amber highlight { background: var(--accent); }
+
+button.hub-chip,
+button.hub-chip:focus {
+    background: var(--surface-3);
+    color: var(--fg);
     border: none;
     box-shadow: none;
-    outline: none;
-    padding: 0;
+    border-radius: 999px;
+    padding: 4px 12px;
     min-height: 0;
-    transition: opacity 160ms cubic-bezier(0.32, 0.72, 0, 1);
+    font-size: 9.5pt;
+    font-weight: 600;
 }
-button.hub-row:hover { opacity: 0.85; }
-button.hub-row:active { opacity: 0.7; }
-button.hub-row:focus-visible .hub-tile { outline: 2px solid #3fae7a; outline-offset: 2px; }
-.hub-tile { min-width: 56px; min-height: 56px; background: #3a4a5a; color: #fff; }
-.hub-glyph { color: #fff; }
-.hub-title { font-size: 22px; font-weight: 300; color: #fff; }
-.hub-state { font-size: 14px; color: #9aa4ab; }
+button.hub-chip:hover { background: #3a3f43; }
+button.hub-chip.on { background: var(--accent); color: var(--accent-ink); }
 
-/* The flat switch, as drawn: a 44 x 20 frame with a square knob. */
-switch.hub-switch {
-    min-width: 44px;
-    min-height: 20px;
+button.dot-swatch,
+button.dot-swatch:hover,
+button.dot-swatch:focus {
+    min-width: 18px;
+    min-height: 18px;
     padding: 0;
-    background: transparent;
-    border: 2px solid #fff;
-    outline: none;
-    transition: background 160ms cubic-bezier(0.32, 0.72, 0, 1), border-color 160ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-switch.hub-switch:checked { background: #3fae7a; border-color: #3fae7a; }
-switch.hub-switch slider {
-    min-width: 10px;
-    min-height: 12px;
-    margin: 2px;
-    background: #fff;
+    border-radius: 50%;
     border: none;
-    transition: margin 160ms cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: none;
 }
-switch.hub-switch:checked slider { background: #101418; }
+button.dot-swatch.selected { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--fg); }
+
+/* the switch: pill track, amber when on, dark knob */
+switch.hub-switch { min-width: 40px; min-height: 22px; border-radius: 999px; background: #3a3f43; border: none; }
+switch.hub-switch slider { min-width: 16px; min-height: 16px; margin: 3px; background: var(--fg-3); border: none; }
+switch.hub-switch:checked { background: var(--accent); }
+switch.hub-switch:checked slider { background: var(--accent-ink); }
+switch.hub-switch.on-colour { background: rgba(14, 34, 51, 0.35); }
+switch.hub-switch.on-colour:checked { background: #0e2233; }
+switch.hub-switch.on-colour:checked slider { background: #f1f3f4; }
 switch.hub-switch image { opacity: 0; }
 
-/* Detail pages: the hub's back arrow and big title over the existing page. */
+/* ---- A page opened from a tile: a rounded sheet with a back arrow ---- */
+.hub-sheet {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 18px 22px 8px 22px;
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 6px;
+}
 .hub-detail-head { padding-bottom: 6px; }
 button.hub-back,
-button.hub-back:hover {
-    background: none;
+button.hub-back:focus {
+    background: var(--surface-3);
     border: none;
     box-shadow: none;
-    padding: 0 18px 0 0;
-    min-height: 0;
-    min-width: 0;
-    color: #9aa4ab;
-    font-size: 46px;
-    font-weight: 200;
+    border-radius: 14px;
+    padding: 0;
+    min-height: 40px;
+    min-width: 40px;
+    margin-right: 14px;
+    color: var(--fg);
+    font-size: 16pt;
+    font-weight: 700;
 }
-button.hub-back:hover { color: #fff; }
-.hub-detail-title { font-size: 46px; font-weight: 200; letter-spacing: -0.02em; color: #fff; }
+button.hub-back:hover { background: #3a3f43; }
+.hub-detail-title { font-size: 20pt; font-weight: 800; letter-spacing: -0.03em; color: var(--fg); }
 
 window.hub-window .page { padding: 12px 0 24px 0; }
-window.hub-window .list-card { background: #1a2025; border: none; }
+window.hub-window .list-card { background: var(--surface); border: none; border-radius: var(--r-lg); }
 window.hub-window .list-card row,
-window.hub-window .list-card row:hover { background: transparent; border-color: #2a3238; }
-window.hub-window .page-sub { color: #9aa4ab; }
-window.hub-window entry,
-window.hub-window dropdown button,
-window.hub-window button.suggested-action { border-radius: 0; }
-window.hub-window button.suggested-action { background: #3fae7a; color: #101418; font-weight: 600; }
-window.hub-window scale highlight { background: #3fae7a; }
-window.hub-window switch:checked { background: #3fae7a; }
+window.hub-window .list-card row:hover { background: transparent; border-color: var(--line); }
+window.hub-window .page-sub { color: var(--fg-3); }
+window.hub-window button.suggested-action { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+window.hub-window scale highlight { background: var(--accent); }
 
 /* ---- Calendar (mock 07) ---- */
-.cal-daynum { font-size: 120px; font-weight: 200; letter-spacing: -0.02em; color: #fff; }
-.cal-weekday { font-size: 26px; font-weight: 300; color: #fff; }
-.cal-month { font-size: 16px; color: #9aa4ab; margin-top: 4px; }
-.cal-time { font-size: 14px; color: #9aa4ab; padding-top: 10px; }
-.cal-rule { border-top: 1px solid #2a3238; min-height: 1px; }
-.cal-empty { font-size: 22px; font-weight: 300; color: #4b555c; padding: 10px 0; }
-.cal-note { font-size: 14px; color: #9aa4ab; margin-top: 4px; }
+.cal-pivots { margin: 0; }
+button.cal-pivot,
+button.cal-pivot:focus {
+    background: var(--surface-3);
+    color: var(--fg);
+    border: none;
+    box-shadow: none;
+    border-radius: 999px;
+    padding: 6px 14px;
+    min-height: 0;
+    font-size: 10pt;
+    font-weight: 600;
+}
+button.cal-pivot:hover { background: #3a3f43; }
+button.cal-pivot.on { background: var(--accent); color: var(--accent-ink); }
+.cal-tile { background: var(--surface); border-radius: var(--r-lg); padding: 18px; }
+.cal-tile.today { background: var(--accent); color: var(--accent-ink); }
+.cal-k { font-size: 9.5pt; font-weight: 700; letter-spacing: 0.06em; color: var(--fg-3); }
+.cal-tile.today .cal-k { color: var(--accent-ink); }
+.cal-today-num { font-size: 18pt; font-weight: 800; letter-spacing: -0.03em; }
+.cal-line { font-size: 10pt; font-weight: 700; }
+.cal-line .when { font-weight: 800; }
+.cal-nothing { font-size: 10pt; font-weight: 600; opacity: 0.7; }
+.cal-daynum { font-size: 80pt; font-weight: 800; letter-spacing: -0.03em; color: var(--fg); }
+.cal-weekday { font-size: 18pt; font-weight: 700; color: var(--fg); }
+.cal-month { font-size: 12pt; font-weight: 600; color: var(--fg-3); margin-top: 4px; }
+.cal-time { font-size: 10pt; font-weight: 600; color: var(--fg-3); padding-top: 10px; }
+.cal-rule { border-top: 1px solid var(--line); min-height: 1px; }
+.cal-empty { font-size: 14pt; font-weight: 600; color: var(--fg-4); padding: 10px 0; }
+.cal-note { font-size: 10pt; color: var(--fg-3); margin-top: 4px; }
 button.cal-block,
 button.cal-block:hover,
 button.cal-block:focus,
@@ -142,80 +178,88 @@ button.cal-block:active {
     border: none;
     box-shadow: none;
     outline: none;
+    border-radius: 14px;
     padding: 10px 14px;
     min-height: 0;
-    color: #fff;
-    transition: opacity 160ms cubic-bezier(0.32, 0.72, 0, 1);
+    color: var(--accent-ink);
+    transition: filter 160ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-button.cal-block:hover { opacity: 0.88; }
-.cal-title { font-size: 19px; font-weight: 300; color: #fff; }
-.cal-sub { font-size: 13px; color: #fff; opacity: 0.8; }
-.cal-title-s { font-size: 15px; font-weight: 300; color: #fff; }
-.cal-sub-s { font-size: 12px; color: #fff; opacity: 0.8; }
+button.cal-block:hover { filter: brightness(1.07); }
+.cal-title { font-size: 12pt; font-weight: 700; color: var(--accent-ink); }
+.cal-sub { font-size: 10pt; font-weight: 600; color: var(--accent-ink); opacity: 0.75; }
+.cal-title-s { font-size: 10.5pt; font-weight: 700; color: var(--accent-ink); }
+.cal-sub-s { font-size: 9.5pt; font-weight: 600; color: var(--accent-ink); opacity: 0.75; }
 entry.cal-add,
 entry.cal-add:focus-within {
-    background: transparent;
-    border: 2px solid #3a444b;
+    background: var(--bg);
+    border: none;
+    border-radius: 14px;
     outline: none;
     box-shadow: none;
-    padding: 9px 14px;
+    padding: 10px 14px;
     min-height: 0;
-    font-size: 15px;
-    color: #fff;
+    font-size: 10.5pt;
+    color: var(--fg);
 }
-entry.cal-add:focus-within { border-color: #3fae7a; }
-entry.cal-add text placeholder { color: #9aa4ab; }
-popover.cal-pop contents { background: #1a2025; border: none; padding: 4px; }
-button.cal-delete { background: #c2502e; color: #fff; border: none; padding: 6px 16px; }
+entry.cal-add:focus-within { box-shadow: inset 0 0 0 2px var(--accent-line); }
+entry.cal-add text placeholder { color: var(--fg-3); }
+popover.cal-pop contents { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+button.cal-delete { background: var(--danger); color: var(--accent-ink); border: none; border-radius: 10px; padding: 6px 16px; font-weight: 700; }
 button.cal-nav,
 button.cal-nav:hover,
 button.cal-nav:focus {
-    background: none;
+    background: var(--surface-3);
     border: none;
     box-shadow: none;
     outline: none;
-    color: #9aa4ab;
-    font-size: 16px;
-    font-weight: 300;
-    padding: 4px 10px;
+    border-radius: 999px;
+    color: var(--fg);
+    font-size: 10pt;
+    font-weight: 600;
+    padding: 6px 14px;
     min-height: 0;
 }
-button.cal-nav:hover { color: #fff; }
+button.cal-nav:hover { background: #3a3f43; }
 button.cal-head,
 button.cal-head:hover,
 button.cal-head:focus {
-    background: #1a2025;
+    background: var(--surface);
     border: none;
+    border-radius: 14px;
     box-shadow: none;
     outline: none;
     padding: 8px 12px;
     min-height: 0;
 }
-button.cal-head.today { background: #1f6b45; }
-.cal-head-day { font-size: 13px; color: #9aa4ab; }
-button.cal-head.today .cal-head-day { color: #fff; opacity: 0.85; }
-.cal-head-num { font-size: 30px; font-weight: 200; color: #fff; }
-.cal-month-title { font-size: 22px; font-weight: 300; color: #fff; }
-.cal-dow { font-size: 13px; color: #9aa4ab; padding-left: 4px; }
+button.cal-head.today { background: var(--accent); }
+.cal-head-day { font-size: 10pt; font-weight: 600; color: var(--fg-3); }
+button.cal-head.today .cal-head-day,
+button.cal-head.today .cal-head-num { color: var(--accent-ink); }
+.cal-head-num { font-size: 18pt; font-weight: 800; letter-spacing: -0.03em; color: var(--fg); }
+.cal-month-title { font-size: 24pt; font-weight: 800; letter-spacing: -0.03em; color: var(--fg); }
+.cal-year { font-size: 14pt; font-weight: 700; color: var(--fg-3); }
+.cal-dow { font-size: 9.5pt; font-weight: 700; color: var(--fg-3); padding-left: 6px; }
 button.cal-cell,
 button.cal-cell:hover,
 button.cal-cell:focus {
-    background: #1a2025;
+    background: #2a2e31;
     border: none;
+    border-radius: 12px;
     box-shadow: none;
     outline: none;
     padding: 6px 8px;
     min-height: 0;
     transition: background 160ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-button.cal-cell:hover { background: #222a30; }
-button.cal-cell.other { background: #14191d; }
-button.cal-cell.other .cal-cell-num { color: #4b555c; }
-button.cal-cell.today { background: #1f6b45; }
-button.cal-cell.picked { box-shadow: inset 0 0 0 2px #3fae7a; }
-.cal-cell-num { font-size: 16px; font-weight: 300; color: #fff; }
-.cal-bar { min-height: 5px; }
-.cal-more { font-size: 11px; color: #9aa4ab; }
+button.cal-cell:hover { background: #343a3e; }
+button.cal-cell.other { background: transparent; }
+button.cal-cell.other .cal-cell-num { color: var(--fg-4); }
+button.cal-cell.today { background: var(--accent); }
+button.cal-cell.today .cal-cell-num { color: var(--accent-ink); }
+button.cal-cell.picked { box-shadow: inset 0 0 0 2px var(--fg); }
+.cal-cell-num { font-size: 10.5pt; font-weight: 700; color: var(--fg); }
+.cal-bar { min-height: 8px; min-width: 8px; border-radius: 50%; }
+.cal-more { font-size: 8.5pt; color: var(--fg-3); }
 
 /* Things arriving: slide in from the side and fade, one after another. */
 @keyframes ev-in {
@@ -232,20 +276,14 @@ button.cal-cell.picked { box-shadow: inset 0 0 0 2px #3fae7a; }
 .ev-in.d7 { animation-delay: 210ms; }
 .ev-in.d8 { animation-delay: 240ms; }
 
-/* Accent choices in Appearance: flat squares in the tile colours; the chosen one has a white edge. */
+/* Accent choices in Appearance: round colour dots; the chosen one has a ring. */
 button.swatch {
     min-width: 40px;
     min-height: 40px;
     padding: 0;
-    border-radius: 0;
-    border: 2px solid transparent;
+    border-radius: 50%;
+    border: none;
     box-shadow: none;
 }
-
-button.swatch.selected {
-    border-color: #fff;
-}
-
-button.swatch:hover {
-    border-color: rgba(255, 255, 255, 0.5);
-}
+button.swatch.selected { box-shadow: 0 0 0 3px var(--surface-2), 0 0 0 5px var(--fg); }
+button.swatch:hover { box-shadow: 0 0 0 3px var(--surface-2), 0 0 0 5px var(--fg-3); }

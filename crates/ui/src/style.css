@@ -12,38 +12,50 @@
    - Motion: one curve, cubic-bezier(0.32, 0.72, 0, 1), 160-360 ms; nothing waits on motion. */
 
 :root {
-    /* surfaces, darkest to lightest */
-    --bg-sunken: #0a0e0d;
-    --bg: #0e1312;
-    --surface: #141a18;
-    --surface-2: #1a2220;
-    --surface-3: #222b28;
-    /* hairlines: neutral, never green */
-    --line: rgba(242, 245, 239, 0.07);
-    --line-strong: rgba(242, 245, 239, 0.13);
+    /* surfaces: the board, a tile, a raised sheet */
+    --bg-sunken: #101214;
+    --bg: #16181a;
+    --surface: #23272a;
+    --surface-2: #1f2225;
+    --surface-3: #2e3337;
+    --rail: #1c1f21;
+    /* hairlines */
+    --line: #2e3337;
+    --line-strong: #3a3f43;
     /* text */
-    --fg: #eef2ee;
-    --fg-2: #c3cdc8;
-    --fg-3: #94a29c;
-    --fg-4: #6a7873;
-    /* accent: the brand green, used sparingly */
-    --accent: #57d99a;
-    --accent-ink: #0b1210;
-    --accent-soft: rgba(87, 217, 154, 0.12);
-    --accent-faint: rgba(87, 217, 154, 0.06);
-    --accent-line: rgba(87, 217, 154, 0.55);
-    --forest: #1f6b45;
-    --forest-soft: rgba(31, 107, 69, 0.45);
+    --fg: #f1f3f4;
+    --fg-2: #cfd5d8;
+    --fg-3: #9aa3a8;
+    --fg-4: #6f777c;
+    /* the action colour is amber; success is green, never a frame */
+    --accent: #f2b84b;
+    --accent-ink: #16181a;
+    --accent-soft: rgba(242, 184, 75, 0.14);
+    --accent-faint: rgba(242, 184, 75, 0.07);
+    --accent-line: rgba(242, 184, 75, 0.6);
+    --forest: #f2b84b;
+    --forest-soft: rgba(242, 184, 75, 0.18);
+    --ok: #45c486;
+    --ok-tile: #2b3a33;
+    --run-tile: #3a3222;
+    /* the colour tiles */
+    --c-blue: #5aa9e6;
+    --c-indigo: #7b8cff;
+    --c-orange: #ff8a5a;
+    --c-pink: #f783ac;
+    --c-mint: #63e6be;
+    --c-yellow: #ffd43b;
+    --c-violet: #b197fc;
     /* states */
-    --hover: rgba(242, 245, 239, 0.05);
-    --pressed: rgba(242, 245, 239, 0.08);
-    --danger: #f08a7a;
-    --danger-soft: rgba(240, 138, 122, 0.12);
-    --warning: #e8c26e;
-    /* shadows: neutral, soft */
+    --hover: rgba(241, 243, 244, 0.06);
+    --pressed: rgba(241, 243, 244, 0.1);
+    --danger: #ff7a6b;
+    --danger-soft: rgba(255, 122, 107, 0.14);
+    --warning: #f2b84b;
+    /* shadows: soft and deep, on floating surfaces only */
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.40);
+    --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.55);
     /* type (points scale with the text-size setting) */
     --t-caption: 10pt;
     --t-small: 10pt;
@@ -52,7 +64,7 @@
     --t-title-3: 13.5pt;
     --t-title-2: 16.5pt;
     --t-title-1: 19.5pt;
-    /* space */
+    /* space: 12 px between tiles */
     --s-1: 4px;
     --s-2: 8px;
     --s-3: 12px;
@@ -60,27 +72,26 @@
     --s-5: 20px;
     --s-6: 24px;
     --s-7: 32px;
-    /* corners: Default (common::corners_css overrides these for Sharp and Round) */
-    --r-xs: 4px;
-    --r-sm: 6px;
-    --r-md: 8px;
-    --r-lg: 12px;
-    --r-xl: 16px;
-    --r-control: 8px;
-    /* GTK's own widgets (entries, check buttons, focus rings) take our accent, not blue */
-    --accent-color: #57d99a;
-    --accent-bg-color: #1f6b45;
-    --accent-fg-color: #eef2ee;
+    /* corners: tiles 20, boards 24-28, buttons 12-16, pills 999 (look.rs overrides these) */
+    --r-xs: 8px;
+    --r-sm: 12px;
+    --r-md: 14px;
+    --r-lg: 20px;
+    --r-xl: 26px;
+    --r-control: 12px;
+    --accent-color: #f2b84b;
+    --accent-bg-color: #f2b84b;
+    --accent-fg-color: #16181a;
 }
 
-@define-color accent_color #57d99a;
-@define-color accent_bg_color #1f6b45;
-@define-color accent_fg_color #eef2ee;
-@define-color theme_selected_bg_color #1f6b45;
+@define-color accent_color #f2b84b;
+@define-color accent_bg_color #f2b84b;
+@define-color accent_fg_color #16181a;
+@define-color theme_selected_bg_color #f2b84b;
 
 window.tripppin,
 .tripppin {
-    font-family: Inter, sans-serif;
+    font-family: Manrope, Inter, sans-serif;
     font-size: var(--t-body);
     color: var(--fg);
 }
@@ -123,7 +134,7 @@ searchentry:focus-within {
 
 selection,
 text selection {
-    background: rgba(87, 217, 154, 0.30);
+    background: rgba(242, 184, 75, 0.30);
     color: var(--fg);
 }
 
@@ -143,7 +154,7 @@ button.orb {
 
 button.orb:hover {
     transform: scale(1.06);
-    border-color: rgba(87, 217, 154, 0.35);
+    border-color: rgba(242, 184, 75, 0.35);
 }
 
 button.orb:active {
@@ -175,8 +186,8 @@ button.orb.working {
 }
 
 @keyframes breathe {
-    from { border-color: rgba(87, 217, 154, 0.35); }
-    to { border-color: rgba(87, 217, 154, 0.8); }
+    from { border-color: rgba(242, 184, 75, 0.35); }
+    to { border-color: rgba(242, 184, 75, 0.8); }
 }
 
 .orb-hint {
@@ -504,7 +515,7 @@ menubutton.status popover > contents {
     border: 1px solid var(--line-strong);
     box-shadow: var(--shadow-md);
     color: var(--fg);
-    font-family: Inter, sans-serif;
+    font-family: Manrope, Inter, sans-serif;
 }
 
 .error {
@@ -764,7 +775,7 @@ button.link.accent {
 }
 
 button.link.accent:hover {
-    color: #7fe6b5;
+    color: #f7cc77;
 }
 
 .ask-password {
@@ -805,7 +816,7 @@ button.pill {
 }
 
 button.pill:hover {
-    background: #6fe0aa;
+    background: #f7cc77;
 }
 
 button.small-card {
@@ -1716,8 +1727,8 @@ button.menu-item:hover {
 /* Where a window dragged against an edge will go. */
 .snap-preview {
     border-radius: 16px;
-    background: rgba(87, 217, 154, 0.12);
-    border: 2px solid rgba(87, 217, 154, 0.55);
+    background: rgba(242, 184, 75, 0.12);
+    border: 2px solid rgba(242, 184, 75, 0.55);
 }
 
 /* A desktop widget: a calm card under the windows, no glow. */
@@ -1738,11 +1749,11 @@ button.menu-item:hover {
     min-width: 8px;
     min-height: 8px;
     border-radius: 9999px;
-    background: #57d99a;
+    background: #f2b84b;
 }
 
 .widget-dot.warn {
-    background: #e8b65a;
+    background: #f2b84b;
 }
 
 .widget-dot.error {
@@ -1761,7 +1772,7 @@ button.menu-item:hover {
 }
 
 .widget-value.warn {
-    color: #e8b65a;
+    color: #f2b84b;
 }
 
 .widget-value.error {
@@ -1777,7 +1788,7 @@ progressbar.widget-bar progress {
 }
 
 progressbar.widget-bar.warn progress {
-    background: #e8b65a;
+    background: #f2b84b;
 }
 
 progressbar.widget-bar.error progress {
@@ -1936,3 +1947,45 @@ list.list-card > row:selected .ai-model .row-title {
     color: #ffffff;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
+
+/* ---- Bento shared classes: one place for every screen ---- */
+.bento-tile { background: var(--surface); border-radius: var(--r-lg); padding: 16px; }
+.bento-tile.ok { background: var(--ok-tile); }
+.bento-tile.run { background: var(--run-tile); }
+.bento-tile.amber { background: var(--accent); color: var(--accent-ink); }
+.bento-tile.blue { background: var(--c-blue); color: #0e2233; }
+.bento-tile.indigo { background: var(--c-indigo); color: #141a40; }
+.bento-tile.mint { background: var(--c-mint); color: #06291e; }
+.bento-tile.orange { background: var(--c-orange); color: #2b1206; }
+.bento-tile.pink { background: var(--c-pink); color: #3a0f20; }
+.bento-tile.raised { background: var(--surface-2); border: 1px solid var(--line); }
+.bento-board { background: var(--surface-2); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow-lg); }
+.bento-k { font-size: 8.5pt; font-weight: 700; letter-spacing: 0.06em; }
+.bento-big { font-weight: 800; letter-spacing: -0.03em; }
+.bento-mute { color: var(--fg-3); }
+.tile-title { font-weight: 700; font-size: 11pt; }
+.tile-sub { color: var(--fg-3); font-size: 9.5pt; font-weight: 600; }
+.bento-tile.blue .tile-sub, .bento-tile.indigo .tile-sub, .bento-tile.mint .tile-sub,
+.bento-tile.orange .tile-sub, .bento-tile.pink .tile-sub, .bento-tile.amber .tile-sub { color: inherit; opacity: 0.75; }
+.amber-fill { background: var(--accent); color: var(--accent-ink); }
+.avatar, .dev-icon.on, calendar.month > grid > label.day-number:selected, .askpass-icon { color: var(--accent-ink); }
+.tick { background: var(--ok); color: var(--accent-ink); }
+switch:checked > slider { background: var(--accent-ink); }
+
+/* ---- Needs your OK (the askpass pop-up): a big amber tile, after BentoAsk ---- */
+.ask-ok { background: var(--accent); color: var(--accent-ink); border-radius: 28px; padding: 22px; box-shadow: var(--shadow-lg); font-family: Manrope, Inter, sans-serif; }
+.ask-ok .k { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+.ask-ok .ok-title { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+.ask-ok .ok-command { font-family: "DM Mono", monospace; font-size: 12px; background: rgba(22, 24, 26, 0.12); border-radius: 14px; padding: 10px 12px; }
+.ask-ok .ok-body { font-size: 14px; font-weight: 500; }
+.ask-ok .ok-fact { background: rgba(22, 24, 26, 0.12); border-radius: 14px; padding: 10px; }
+.ask-ok .ok-fact-k { opacity: 0.7; }
+.ask-ok .ok-fact-v { font-size: 14px; font-weight: 700; }
+.ask-ok .ok-field, .ask-ok .ok-field:focus-within { background: #16181a; color: var(--fg); border: none; border-radius: 14px; min-height: 44px; padding: 0 14px; caret-color: var(--accent); box-shadow: none; outline: none; }
+.ask-ok button.ok-allow { background: var(--accent-ink); color: var(--accent); border: none; border-radius: 14px; padding: 14px; font-weight: 800; box-shadow: none; }
+.ask-ok button.ok-allow:hover { background: #000; }
+.ask-ok button.ok-cancel { background: transparent; color: var(--accent-ink); border: 2px solid var(--accent-ink); border-radius: 14px; padding: 12px; font-weight: 800; box-shadow: none; }
+.ask-ok button.ok-cancel:hover { background: rgba(22, 24, 26, 0.12); }
+.ask-ok .ok-field text { background: none; color: var(--fg); }
+.ask-ok .ok-field { background: #16181a; }
+.ask-ok .ok-field text > placeholder { color: var(--fg-3); }

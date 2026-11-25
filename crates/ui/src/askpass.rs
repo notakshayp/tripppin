@@ -5,7 +5,7 @@
 //! named by `TRIPPPIN_SUDO_MARK`, for the activity list in Settings → AI, and warns when the
 //! command is a risky one (see `trip::permissions::is_risky`).
 
-use crate::common::{self, icons, label};
+use crate::common::{self, label};
 use gtk::prelude::*;
 use gtk::{gdk, gio, glib};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
@@ -55,57 +55,76 @@ fn build(app: &gtk::Application, allowed: Rc<Cell<bool>>) {
 
     let shade = gtk::Box::new(gtk::Orientation::Vertical, 0);
     shade.add_css_class("backdrop");
-    let card = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    card.add_css_class("card");
-    card.add_css_class("askpass");
+    // The risky-action stop of the orb, as Bento draws it: one big amber tile with the facts
+    // and two buttons. Nothing happens until you choose.
+    let card = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    card.add_css_class("ask-ok");
     card.set_halign(gtk::Align::Center);
     card.set_valign(gtk::Align::Center);
     card.set_vexpand(true);
-    card.set_size_request(420, -1);
-    let head = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    head.append(&common::icon(icons::KEY, &["askpass-icon"]));
-    let title = label("The AI wants to run this as administrator", &["asked"]);
+    card.set_size_request(480, -1);
+    card.append(&label("WAITING FOR YOU", &["k"]));
+    let command = std::env::var("TRIPPPIN_SUDO_FOR").unwrap_or_default();
+    let risky = trip::permissions::is_risky(&command);
+    let title = label(
+        if risky { "Run this risky command as administrator?" } else { "Run this as administrator?" },
+        &["ok-title"],
+    );
     title.set_wrap(true);
     title.set_xalign(0.0);
-    head.append(&title);
-    card.append(&head);
-    let command = std::env::var("TRIPPPIN_SUDO_FOR").unwrap_or_default();
+    card.append(&title);
     let shown: String = command.trim().chars().take(COMMAND_CHARS).collect();
-    let more = if command.trim().chars().count() > COMMAND_CHARS { "…" } else { "" };
+    let more = if command.trim().chars().count() > COMMAND_CHARS { "\u{2026}" } else { "" };
     if !shown.is_empty() {
-        let cmd = label(&format!("{shown}{more}"), &["step-command"]);
+        let cmd = label(&format!("{shown}{more}"), &["ok-command"]);
         cmd.set_wrap(true);
         cmd.set_wrap_mode(gtk::pango::WrapMode::WordChar);
         cmd.set_xalign(0.0);
         card.append(&cmd);
     }
-    if trip::permissions::is_risky(&command) {
-        let warn = label(
-            "This can delete data, change accounts or turn off protection. Allow it only if you asked for this.",
-            &["error"],
-        );
-        warn.set_wrap(true);
-        warn.set_xalign(0.0);
-        card.append(&warn);
-    }
     let why = label(
-        "Type your password to allow it. Settings → AI → Permissions can let some commands run without asking.",
-        &["row-sub"],
+        if risky {
+            "This can delete data, change accounts or turn off protection. Allow it only if you asked for this."
+        } else {
+            "The AI needs your password for this. Settings \u{2192} AI \u{2192} Permissions can let some commands run without asking."
+        },
+        &["ok-body"],
     );
     why.set_wrap(true);
     why.set_xalign(0.0);
     card.append(&why);
+    let facts = gtk::Grid::new();
+    facts.set_column_homogeneous(true);
+    facts.set_column_spacing(8);
+    let first = command.split_whitespace().next().unwrap_or("command");
+    let first = first.rsplit('/').next().unwrap_or(first);
+    for (i, (k, v)) in [
+        ("RUNS AS", "administrator".to_string()),
+        ("RISK", if risky { "can't be undone" } else { "ordinary" }.to_string()),
+        ("COMMAND", first.chars().take(14).collect()),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let fact = gtk::Box::new(gtk::Orientation::Vertical, 1);
+        fact.add_css_class("ok-fact");
+        fact.append(&label(k, &["k", "ok-fact-k"]));
+        fact.append(&label(v, &["ok-fact-v"]));
+        facts.attach(&fact, i as i32, 0, 1, 1);
+    }
+    card.append(&facts);
     let entry = gtk::PasswordEntry::builder().placeholder_text("Your password").build();
-    entry.add_css_class("field");
+    entry.add_css_class("ok-field");
+    entry.set_margin_top(4);
     card.append(&entry);
-    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    buttons.set_halign(gtk::Align::End);
-    let cancel = gtk::Button::with_label("Cancel");
-    cancel.add_css_class("link");
+    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    buttons.set_homogeneous(true);
     let allow = gtk::Button::with_label("Allow");
-    allow.add_css_class("pill");
-    buttons.append(&cancel);
+    allow.add_css_class("ok-allow");
+    let cancel = gtk::Button::with_label("Keep it blocked");
+    cancel.add_css_class("ok-cancel");
     buttons.append(&allow);
+    buttons.append(&cancel);
     card.append(&buttons);
     shade.append(&card);
     window.set_child(Some(&shade));
@@ -144,5 +163,6 @@ fn build(app: &gtk::Application, allowed: Rc<Cell<bool>>) {
     window.add_controller(keys);
     window.present();
     common::play(&card, "pop");
+    common::snapshot_hook(&card);
     entry.grab_focus();
 }
