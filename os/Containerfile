@@ -27,6 +27,19 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NAT
       -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_BUILD_HTML=OFF \
     && cmake --build build --target llama-server -j"$(nproc)"
 
+# ---- whisper.cpp ----------------------------------------------------------
+# Dictation's speech to text. Fedora's whisper-cpp package ships only the libraries, no
+# whisper-cli, so build the pinned release (CPU only; the base model is fast enough there).
+FROM quay.io/fedora/fedora:45@sha256:db14be5698ea04f1f9a4f4fb31945205a696a01f1466cf4a7e5f5a77ca3c7a82 AS whisper
+ARG WHISPER_CPP_TAG=v1.8.7
+RUN dnf -y install --setopt=install_weak_deps=False git cmake gcc-c++ && dnf clean all
+RUN git clone --depth 1 --branch "$WHISPER_CPP_TAG" https://github.com/ggml-org/whisper.cpp /src/whisper.cpp
+WORKDIR /src/whisper.cpp
+RUN if [ "$(uname -m)" = x86_64 ]; then X86="-DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON"; fi; \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF $X86 \
+      -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DWHISPER_BUILD_EXAMPLES=ON \
+    && cmake --build build --target whisper-cli -j"$(nproc)"
+
 # ---- The OS -----------------------------------------------------------------
 FROM quay.io/fedora/fedora-bootc:45@sha256:d440aea898005f376bbf0bbe06c216abdba68dcdb6dfa5cb0fa246cd03fa8d8a
 
@@ -52,6 +65,12 @@ COPY --from=build /src/target/release/trip /usr/bin/trip
 COPY --from=build /src/target/release/tripppin-ui /usr/bin/tripppin-ui
 COPY --from=llama /src/llama.cpp/build/bin/llama-server /usr/bin/llama-server
 COPY --from=llama /src/llama.cpp/LICENSE /usr/share/licenses/llama.cpp/LICENSE
+COPY --from=whisper /src/whisper.cpp/build/bin/whisper-cli /usr/bin/whisper-cli
+COPY --from=whisper /src/whisper.cpp/LICENSE /usr/share/licenses/whisper.cpp/LICENSE
+# Dictation's speech model: multilingual base, 5-bit (MIT, ggerganov/whisper.cpp), pinned to a revision and checked.
+ARG WHISPER_MODEL_REV=5359861c739e955e79d9a303bcbc70fb988958b1
+ARG WHISPER_MODEL_SHA256=422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898
+ADD --checksum=sha256:${WHISPER_MODEL_SHA256} https://huggingface.co/ggerganov/whisper.cpp/resolve/${WHISPER_MODEL_REV}/ggml-base-q5_1.bin /usr/share/tripppin/whisper/ggml-base-q5_1.bin
 
 # What llama.cpp needs at runtime: the Vulkan loader and Mesa's GPU drivers.
 RUN dnf -y install --setopt=install_weak_deps=False vulkan-loader mesa-vulkan-drivers libgomp && dnf clean all
@@ -101,7 +120,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       kdegraphics-thumbnailers ffmpegthumbs breeze-icon-theme breeze-gtk plasma-breeze breeze-cursor-theme \
       plasma-discover plasma-discover-flatpak \
       greetd gtk4 gtk4-layer-shell libadwaita adwaita-icon-theme \
-      rsms-inter-fonts mesa-dri-drivers pipewire wireplumber pipewire-pulseaudio pipewire-alsa \
+      rsms-inter-fonts mesa-dri-drivers pipewire pipewire-utils wireplumber pipewire-pulseaudio pipewire-alsa \
       mesa-libEGL mesa-libGL libglvnd-egl libglvnd-gles libglvnd-opengl libglvnd-glx \
       xdg-desktop-portal xdg-desktop-portal-gtk xdg-user-dirs \
       dconf polkit libnotify wl-clipboard brightnessctl playerctl \
