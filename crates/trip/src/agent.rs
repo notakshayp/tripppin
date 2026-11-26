@@ -51,6 +51,14 @@ const TRIMMED: &str = "[earlier output removed to save space; run the command ag
 
 /// The tools the model can call, as JSON schemas.
 pub fn tools() -> Value {
+    let mut all = base_tools();
+    if let Some(a) = all.as_array_mut() {
+        a.extend(crate::tools::schemas());
+    }
+    all
+}
+
+fn base_tools() -> Value {
     let job_id = json!({ "type": "integer", "description": "The job number exec gave you." });
     json!([
         {
@@ -217,23 +225,56 @@ pub fn tools() -> Value {
     ])
 }
 
-const TOOL_NAMES: &str =
-    "exec, job_wait, job_output, job_stop, plan, done, note, store_search, store_install, read_file and write_file";
+const TOOL_NAMES: &str = "exec, job_wait, job_output, job_stop, plan, done, note, store_search, store_install, \
+read_file, write_file, web_search, web_read, pkg_search, pkg_add, pkg_remove, sys_info, list_files, service, \
+widget_create, widget_remove, calendar_add, setting and model_switch";
 
 /// A tool call that passed the checks.
 #[derive(Debug, PartialEq)]
 pub enum Action {
-    Exec { command: String, wait_secs: u64, background: bool },
-    JobWait { job: usize, wait_secs: u64 },
-    JobOutput { job: usize },
-    JobStop { job: usize },
-    Plan { steps: Vec<String> },
-    Done { step: usize, check: String },
-    Note { text: String },
-    StoreSearch { query: String },
-    StoreInstall { id: String },
-    ReadFile { path: String },
-    WriteFile { path: String, content: String },
+    Exec {
+        command: String,
+        wait_secs: u64,
+        background: bool,
+    },
+    JobWait {
+        job: usize,
+        wait_secs: u64,
+    },
+    JobOutput {
+        job: usize,
+    },
+    JobStop {
+        job: usize,
+    },
+    Plan {
+        steps: Vec<String>,
+    },
+    Done {
+        step: usize,
+        check: String,
+    },
+    Note {
+        text: String,
+    },
+    StoreSearch {
+        query: String,
+    },
+    StoreInstall {
+        id: String,
+    },
+    ReadFile {
+        path: String,
+    },
+    WriteFile {
+        path: String,
+        content: String,
+    },
+    /// One of the everyday tools in `tools.rs`, its arguments already checked.
+    Ext {
+        name: String,
+        args: Value,
+    },
 }
 
 /// Plan steps as a small model may send them: a list, or one string with a step per line
@@ -375,6 +416,7 @@ pub fn verify(call: &ToolCall) -> Result<Action, String> {
         }
         "read_file" => Ok(Action::ReadFile { path: text("path", false)? }),
         "write_file" => Ok(Action::WriteFile { path: text("path", false)?, content: text("content", true)? }),
+        n if crate::tools::is_ext(n) => Ok(Action::Ext { name: n.to_string(), args: crate::tools::check(n, args)? }),
         "" => Err(format!("The tool call has no tool name. The tools are {TOOL_NAMES}.")),
         other => Err(format!("There's no tool called \"{other}\". The tools are {TOOL_NAMES}.")),
     }
@@ -386,6 +428,7 @@ fn example(tool: &str) -> &'static str {
         "store_install" => r#"{"id": "org.videolan.VLC"}"#,
         "read_file" => r#"{"path": "~/notes.txt"}"#,
         "write_file" => r#"{"path": "~/notes.txt", "content": "hello"}"#,
+        n if crate::tools::is_ext(n) => crate::tools::example(n),
         "job_wait" | "job_output" | "job_stop" => r#"{"job": 1}"#,
         "note" => r#"{"text": "the theme is set in ~/.config/gtk-4.0/settings.ini"}"#,
         "plan" => r#"{"steps": ["find the package", "install it", "check it runs"]}"#,
@@ -435,6 +478,15 @@ pub trait Ui {
     fn usage(&mut self, _usage: &crate::model::Usage) {}
     /// The task plan changed: the steps and which are done.
     fn plan(&mut self, _steps: &[crate::model::PlanStep]) {}
+    /// A risky call is about to run: ask the person. The default allows it (the terminal and
+    /// the orb rely on sudo's own prompt); the full-screen interface shows a box.
+    fn confirm(&mut self, _label: &str, _detail: &str, _req: &crate::tools::Confirm) -> crate::tools::Decision {
+        crate::tools::Decision::Allow
+    }
+    /// What the step that just ran returned, in full (what the model was told).
+    fn result(&mut self, _text: &str) {}
+    /// The next step's command, query or path in full (`step` gets it cut to one line).
+    fn full_detail(&mut self, _full: &str) {}
 }
 
 /// How a task ended.
@@ -601,9 +653,14 @@ with {n}.",
                 }
                 Ok(action) => {
                     let (label, detail) = describe_action(&action);
+                    ui.full_detail(&detail);
                     session.step_started(&label, &detail);
                     session.save();
-                    let result = perform(&action, cancel, ui);
+                    let result = match approval(&action, &label, &detail, ui) {
+                        Some(no) => no,
+                        None => perform(&action, cancel, ui),
+                    };
+                    ui.result(&result);
                     let ok = outcome(&result);
                     if let Some(ok) = ok {
                         ui.step_done(ok);
@@ -1059,6 +1116,31 @@ fn describe_action(action: &Action) -> (String, String) {
         Action::StoreInstall { id } => ("store install".into(), id.clone()),
         Action::ReadFile { path } => ("read".into(), path.clone()),
         Action::WriteFile { path, .. } => ("write".into(), path.clone()),
+        Action::Ext { name, args } => crate::tools::describe(name, args),
+    }
+}
+
+/// Asks the person first when the call is risky. `Some` is the result to give the model when
+/// they said no; `None` means go ahead.
+fn approval(action: &Action, label: &str, detail: &str, ui: &mut dyn Ui) -> Option<String> {
+    let req = match action {
+        Action::Exec { command, .. } => crate::tools::needs_ok_exec(command),
+        Action::WriteFile { path, .. } => crate::tools::needs_ok_write(path),
+        Action::Ext { name, args } => crate::tools::needs_ok(name, args),
+        _ => None,
+    }?;
+    use crate::tools::Decision;
+    match ui.confirm(label, detail, &req) {
+        Decision::Deny => Some(
+            "Error: not run. The person said no. Don't try the same thing again; tell them what you wanted to do \
+and ask what they'd like instead."
+                .to_string(),
+        ),
+        Decision::AllowAlways => {
+            crate::tools::allow_always(req.kind);
+            None
+        }
+        Decision::Allow => None,
     }
 }
 
@@ -1110,6 +1192,15 @@ fn perform(action: &Action, cancel: &AtomicBool, ui: &mut dyn Ui) -> String {
         Action::WriteFile { path, content } => {
             show_step(ui, "write", path);
             write_file(path, content)
+        }
+        Action::Ext { name, args } => {
+            if let Some(command) = crate::tools::to_exec(name, args) {
+                return perform(&Action::Exec { command, wait_secs: 300, background: false }, cancel, ui);
+            }
+            let (label, detail) = crate::tools::describe(name, args);
+            show_step(ui, &label, &detail);
+            ui.waiting(&format!("{label} {}", one_line(&detail)));
+            crate::tools::run(name, args, cancel, ui)
         }
     }
 }

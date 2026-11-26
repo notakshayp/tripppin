@@ -24,6 +24,7 @@ nu-ansi-term.workspace = true
 unicode-width.workspace = true
 quick-xml.workspace = true
 flate2.workspace = true
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 
 [lints]
 workspace = true

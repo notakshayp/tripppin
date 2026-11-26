@@ -315,14 +315,35 @@ pub fn restart_service() -> Result<()> {
 }
 
 fn systemctl(verb: &str) -> Result<()> {
-    let out = std::process::Command::new("systemctl")
-        .args([verb, SERVICE])
+    // systemd where there is one; OpenRC (Alpine) otherwise.
+    let (program, args): (&str, Vec<&str>) = if std::path::Path::new("/run/systemd/system").exists() {
+        ("systemctl", vec![verb, SERVICE])
+    } else {
+        ("rc-service", vec![SERVICE.trim_end_matches(".service"), verb])
+    };
+    let out = std::process::Command::new(program)
+        .args(&args)
         .output()
         .with_context(|| format!("couldn't {verb} the model service"))?;
     if out.status.success() {
         Ok(())
     } else {
         bail!("Couldn't {verb} the model service: {}", String::from_utf8_lossy(&out.stderr).trim())
+    }
+}
+
+/// Which model answers right now, in a few words, and whether it runs on this computer:
+/// ("qwen3.5 4b", true), ("claude sonnet", false) or ("no model", true).
+pub fn model_label() -> (String, bool) {
+    if let Some(e) = model::endpoint() {
+        let p = crate::providers::for_url(&e.url);
+        let name = if e.model.is_empty() { p.name.to_lowercase() } else { e.model.clone() };
+        return (name.to_lowercase(), false);
+    }
+    let Ok(catalog) = Catalog::builtin() else { return ("no model".into(), true) };
+    match model::active_tier(&catalog, &model::models_dir()) {
+        Some(t) => (t.model.to_lowercase(), true),
+        None => ("no model".into(), true),
     }
 }
 
