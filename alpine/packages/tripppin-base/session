@@ -13,5 +13,10 @@ export EDITOR="${EDITOR:-vi}"
 [ -d "$XDG_RUNTIME_DIR" ] || { echo "tripppin: $XDG_RUNTIME_DIR missing (is trip-runtime up?)"; exit 1; }
 cfg=/etc/tripppin/sway.conf
 [ -f "$HOME/.config/tripppin/sway.conf" ] && cfg="$HOME/.config/tripppin/sway.conf"
-dbus-run-session sway -c "$cfg" 2>"$XDG_RUNTIME_DIR/sway.log"
-echo "tripppin: compositor exited (log: $XDG_RUNTIME_DIR/sway.log)"
+# Vulkan renderer on real GPUs; if the compositor dies at once (no Vulkan, e.g. a VM), use pixman.
+for r in vulkan pixman; do
+    start=$(date +%s)
+    WLR_RENDERER=$r dbus-run-session sway -c "$cfg" 2>"$XDG_RUNTIME_DIR/sway-$r.log"
+    [ $(( $(date +%s) - start )) -gt 5 ] && break
+done
+echo "tripppin: compositor exited (logs: $XDG_RUNTIME_DIR/sway-*.log)"

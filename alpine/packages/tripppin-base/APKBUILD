@@ -17,11 +17,9 @@ depends="
 	font-jetbrains-mono
 	font-dejavu
 	fontconfig
-	mesa-dri-gallium
 	mesa-egl
 	mesa-gles
 	mesa-gbm
-	mesa-vulkan-swrast
 	vulkan-loader
 	iwd
 	dhcpcd
@@ -41,6 +39,8 @@ depends="
 	curl
 	btrfs-progs
 	"
+# No mesa-dri-gallium/lavapipe: they pull in llvm (65 MB). wlroots renders with Vulkan (anv, radv)
+# and falls back to pixman, which is what virtual machines get.
 # Hardware-specific Vulkan drivers (mesa-vulkan-intel, mesa-vulkan-ati, mesa-vulkan-virtio)
 # are pulled in per architecture by the image profile.
 install="$pkgname.post-install"

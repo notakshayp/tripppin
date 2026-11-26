@@ -24,10 +24,7 @@ case $arch in
 	aarch64) grubtarget=arm64-efi; extra="" ;;
 	*) echo "unsupported arch $arch"; exit 1 ;;
 esac
-fw="linux-firmware-amdgpu linux-firmware-i915 linux-firmware-xe linux-firmware-intel
-	linux-firmware-ath10k linux-firmware-ath11k linux-firmware-ath12k
-	linux-firmware-rtlwifi linux-firmware-rtw88 linux-firmware-rtw89 linux-firmware-rtl_bt
-	linux-firmware-mediatek linux-firmware-brcm linux-firmware-qca linux-firmware-none wireless-regdb"
+fw="tripppin-firmware"
 
 printf 'This ERASES %s. Type the disk name to continue: ' "$disk"
 [ "${TRIPPPIN_YES:-}" = "$disk" ] && echo "$disk (from TRIPPPIN_YES)" && ans=$disk || read -r ans

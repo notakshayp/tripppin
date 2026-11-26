@@ -4,14 +4,8 @@
 # Base set only. The kernel is linux-lts, firmware is a subset of linux-firmware, and the
 # model files are not baked in (trip downloads them on first boot).
 
-# Firmware subsets: GPU, Wi-Fi, Bluetooth, Intel SOF audio. Not the whole linux-firmware.
-tripppin_firmware="
-	linux-firmware-amdgpu linux-firmware-i915 linux-firmware-xe linux-firmware-intel
-	linux-firmware-ath10k linux-firmware-ath11k linux-firmware-ath12k
-	linux-firmware-rtlwifi linux-firmware-rtw88 linux-firmware-rtw89 linux-firmware-rtl_bt
-	linux-firmware-mediatek linux-firmware-brcm linux-firmware-qca
-	linux-firmware-none wireless-regdb
-	"
+# Firmware subset lives in the tripppin-firmware meta package (packages/tripppin-firmware).
+tripppin_firmware="tripppin-firmware"
 
 # Same subset for the kernel (modloop) section, replacing the stock "linux-firmware".
 section_kernels() {

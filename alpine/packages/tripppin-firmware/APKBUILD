@@ -1,0 +1,40 @@
+# Maintainer: Tripppin <hello@trippp.in>
+# A trimmed repack of linux-firmware: only what laptops and mini PCs need for display,
+# Wi-Fi, Bluetooth and audio. The stock subpackages are 300+ MB; this is a fraction.
+pkgname=tripppin-firmware
+pkgver=20260519
+pkgrel=0
+pkgdesc="Trimmed firmware: AMD/Intel GPU, Wi-Fi (iwlwifi, ath, rtw, mt76, brcm), Bluetooth, Intel SOF audio"
+url="https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
+arch="noarch"
+license="custom"
+depends="wireless-regdb"
+makedepends="
+	linux-firmware-amdgpu linux-firmware-i915 linux-firmware-xe linux-firmware-intel
+	linux-firmware-ath10k linux-firmware-ath11k linux-firmware-ath12k
+	linux-firmware-rtlwifi linux-firmware-rtw88 linux-firmware-rtw89 linux-firmware-rtl_bt
+	linux-firmware-mediatek linux-firmware-brcm linux-firmware-qca linux-firmware-cypress
+	"
+provides="linux-firmware-any"
+options="!check !tracedeps !strip"
+source=""
+builddir="$srcdir"
+build() { :; }
+
+package() {
+	fw=/lib/firmware
+	mkdir -p "$pkgdir$fw"
+	cd "$fw"
+	for pat in \
+		'amdgpu' 'i915' 'xe' \
+		'iwlwifi-*' 'intel/sof*' 'intel/ibt-*' \
+		'ath10k/QCA*' 'ath11k/WCN6855' 'ath11k/QCA6390' 'ath12k/WCN7850' \
+		'rtlwifi' 'rtw88' 'rtw89' 'rtl_bt' \
+		'mediatek/mt76*' 'mediatek/mt792*' 'mediatek/BT_RAM_CODE_MT79*' \
+		'brcm/brcmfmac*' 'qca'; do
+		for f in $pat; do
+			[ -e "$f" ] && cp -a --parents "$f" "$pkgdir$fw/"
+		done
+	done
+	true
+}

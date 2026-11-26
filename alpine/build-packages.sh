@@ -14,7 +14,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 arch=${1:-$(uname -m | sed 's/arm64/aarch64/')}
 [ $# -gt 0 ] && shift
-pkgs=${*:-"tripppin-base trip llama-cpp-vulkan whisper-cpp"}
+pkgs=${*:-"tripppin-base tripppin-firmware trip llama-cpp-vulkan whisper-cpp"}
 conn=${PODMAN_CONNECTION:-tripppin-build-root}
 pm="podman --connection $conn"
 case $arch in
@@ -68,7 +68,7 @@ for p in $PKGS; do
 	cp -r /work/packages/$p /work/aport/tripppin/$p
 	cd /work/aport/tripppin/$p
 	abuild checksum
-	flags=""; [ $p = tripppin-base ] && flags=-d
+	flags=""; case $p in tripppin-base) flags=-d;; esac
 	abuild $flags -r -P /work/repo
 	cd /work
 done
