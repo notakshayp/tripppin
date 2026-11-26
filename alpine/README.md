@@ -23,7 +23,7 @@ Priorities, in order: speed on low-power devices, small image, a strong AI harne
 
 Session: autologin on tty1 (busybox `getty -l`) logs in the user `trip`; `/etc/profile.d/tripppin.sh` starts `sway`; sway starts the audio stack and `foot --app-id trip-home` running `trip home`. If `trip` exits you land in a shell inside the same terminal.
 
-Keys: `Super+Tab` next app, `Super+Shift+Tab` previous, `Super+Esc` home, `Super+Q` close the focused app (never home). Every window is forced full screen. Brightness and volume keys work. Local sway overrides go in `/etc/tripppin/sway.d/*.conf` (HiDPI scale, keyboard layout).
+Keys: `Super+Tab` next app, `Super+Shift+Tab` previous, `Super+Esc` home, `Super+Q` close the focused app (never home), `Super+Enter` a plain shell. Every window is forced full screen. Brightness and volume keys work. Local sway overrides go in `/etc/tripppin/sway.d/*.conf` (HiDPI scale, keyboard layout).
 
 Default login: user `trip`, password `tripppin` (live ISO, and the installer asks for a new one). `doas` asks for that password.
 
