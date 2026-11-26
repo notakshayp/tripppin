@@ -16,6 +16,7 @@ makedepends="
 	linux-firmware-mediatek linux-firmware-brcm linux-firmware-qca linux-firmware-cypress
 	"
 provides="linux-firmware-any"
+provider_priority=1000
 options="!check !tracedeps !strip"
 source=""
 builddir="$srcdir"
