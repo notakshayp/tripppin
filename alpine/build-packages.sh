@@ -68,7 +68,7 @@ for p in $PKGS; do
 	cp -r /work/packages/$p /work/aport/tripppin/$p
 	cd /work/aport/tripppin/$p
 	abuild checksum
-	flags=""; case $p in tripppin-base) flags=-d;; esac
+	flags="-f"; case $p in tripppin-base) flags="-f -d";; esac
 	abuild $flags -r -P /work/repo
 	cd /work
 done
