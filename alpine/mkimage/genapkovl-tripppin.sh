@@ -29,6 +29,10 @@ btrfs-progs
 dosfstools
 efibootmgr
 grub-efi
+sfdisk
+mesa-vulkan-ati
+mesa-vulkan-virtio
+vulkan-tools
 EOF
 
 # Console: autologin the primary user on tty1 and run the compositor from its profile.

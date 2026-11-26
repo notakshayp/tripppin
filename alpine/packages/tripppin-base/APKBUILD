@@ -1,7 +1,7 @@
 # Maintainer: Tripppin <hello@trippp.in>
 pkgname=tripppin-base
 pkgver=0.1.0
-pkgrel=0
+pkgrel=1
 pkgdesc="Tripppin base system: invisible sway compositor, foot, autologin, fonts, tuning"
 url="https://trippp.in"
 arch="noarch"
@@ -58,6 +58,7 @@ source="
 	audio
 	autologin
 	setup-user
+	install.sh
 	profile.sh
 	trip-runtime.initd
 	"
@@ -76,6 +77,9 @@ package() {
 	install -Dm755 "$srcdir"/audio "$pkgdir"/usr/libexec/tripppin/audio
 	install -Dm755 "$srcdir"/autologin "$pkgdir"/usr/libexec/tripppin/autologin
 	install -Dm755 "$srcdir"/setup-user "$pkgdir"/usr/libexec/tripppin/setup-user
+	install -Dm755 "$srcdir"/install.sh "$pkgdir"/usr/share/tripppin/install.sh
+	install -dm755 "$pkgdir"/usr/bin
+	ln -s /usr/share/tripppin/install.sh "$pkgdir"/usr/bin/trip-install
 	install -Dm644 "$srcdir"/profile.sh "$pkgdir"/etc/profile.d/tripppin.sh
 	install -Dm755 "$srcdir"/trip-runtime.initd "$pkgdir"/etc/init.d/trip-runtime
 }
