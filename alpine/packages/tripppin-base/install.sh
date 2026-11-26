@@ -60,7 +60,11 @@ echo "==> packages"
 mkdir -p /mnt/etc/apk/keys /mnt/etc/mkinitfs
 cp /etc/apk/keys/* /mnt/etc/apk/keys/
 echo "features=\"ata base ext4 btrfs mmc nvme scsi usb virtio\"" > /mnt/etc/mkinitfs/mkinitfs.conf
-apk add --root /mnt --initdb --no-network --keys-dir /etc/apk/keys --repository "$repo" \
+# The kernel is not on the ISO (the live system already carries its modules), so it comes from the
+# network; everything of ours comes from the ISO.
+apk add --root /mnt --initdb --keys-dir /etc/apk/keys --repository "$repo" \
+	--repository https://dl-cdn.alpinelinux.org/alpine/v3.24/main \
+	--repository https://dl-cdn.alpinelinux.org/alpine/v3.24/community \
 	alpine-base alpine-conf linux-lts mkinitfs grub-efi efibootmgr btrfs-progs \
 	mesa-vulkan-ati mesa-vulkan-virtio \
 	tripppin-base trip llama-cpp-vulkan whisper-cpp $fw $extra
@@ -73,6 +77,7 @@ EOF
 
 echo "==> system config"
 echo "$host" > /mnt/etc/hostname
+printf "vfat\nnls_cp437\nnls_iso8859-1\n" >> /mnt/etc/modules   # the EFI partition is vfat
 ruuid=$(blkid -s UUID -o value "$root"); euuid=$(blkid -s UUID -o value "$esp")
 cat > /mnt/etc/fstab <<EOF
 UUID=$ruuid / btrfs $opts,subvol=@ 0 0

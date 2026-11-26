@@ -1,6 +1,12 @@
 #!/bin/sh
-# Runs inside the home terminal. If trip exits, fall back to a shell.
-trip home
-code=$?
+# Runs inside the home terminal: the trip TUI. A clean exit starts it again; a failure
+# (or a crash loop) drops to a shell in the same terminal.
+while :; do
+    start=$(date +%s)
+    trip home
+    code=$?
+    [ "$code" -ne 0 ] && break
+    [ $(( $(date +%s) - start )) -lt 3 ] && break
+done
 printf '\ntrip exited (%s). This is a shell; run "trip home" to go back.\n' "$code"
 exec ash -l

@@ -35,7 +35,7 @@ profile_tripppin() {
 
 	apks="alpine-base alpine-conf busybox openrc mkinitfs
 		e2fsprogs btrfs-progs dosfstools sfdisk util-linux-misc efibootmgr grub-efi
-		linux-lts $tripppin_firmware
+		$tripppin_firmware
 		mesa-vulkan-ati mesa-vulkan-virtio vulkan-tools
 		tripppin-base trip llama-cpp-vulkan whisper-cpp"
 	case "$ARCH" in

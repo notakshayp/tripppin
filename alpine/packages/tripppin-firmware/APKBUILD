@@ -3,7 +3,7 @@
 # Wi-Fi, Bluetooth and audio. The stock subpackages are 300+ MB; this is a fraction.
 pkgname=tripppin-firmware
 pkgver=20260519
-pkgrel=3
+pkgrel=4
 pkgdesc="Trimmed firmware: AMD/Intel GPU, Wi-Fi (iwlwifi, ath, rtw, mt76, brcm), Bluetooth, Intel SOF audio"
 url="https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git"
 arch="noarch"
@@ -29,10 +29,10 @@ package() {
 	for pat in \
 		'amdgpu' 'i915' 'xe' \
 		'iwlwifi-*' 'intel/sof*' 'intel/ibt-*' \
-		'ath10k/QCA*' 'ath11k/WCN6855' 'ath11k/QCA6390' 'ath12k/WCN7850' \
+		'ath11k/WCN6855' 'ath11k/QCA6390' 'ath12k/WCN7850' \
 		'rtlwifi' 'rtw88' 'rtw89' 'rtl_bt' \
 		'mediatek/mt76*' 'mediatek/mt792*' 'mediatek/BT_RAM_CODE_MT79*' \
-		'brcm/brcmfmac*' 'brcm/*.hcd*' 'qca'; do
+		'brcm/*.hcd*' 'qca'; do
 		for f in $pat; do
 			[ -e "$f" ] \
 				&& cp -a --parents "$f" "$pkgdir$fw/" 2>/dev/null || true
