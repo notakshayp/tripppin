@@ -1,7 +1,7 @@
 # Maintainer: Tripppin <hello@trippp.in>
 pkgname=tripppin-base
 pkgver=0.1.0
-pkgrel=1
+pkgrel=4
 pkgdesc="Tripppin base system: invisible sway compositor, foot, autologin, fonts, tuning"
 url="https://trippp.in"
 arch="noarch"
@@ -52,7 +52,6 @@ source="
 	sysctl.conf
 	doas.conf
 	iwd.conf
-	dhcpcd.conf
 	session
 	home
 	audio
@@ -70,8 +69,7 @@ package() {
 	install -Dm644 "$srcdir"/fonts-tripppin.conf "$pkgdir"/etc/fonts/conf.d/60-tripppin.conf
 	install -Dm644 "$srcdir"/sysctl.conf "$pkgdir"/etc/sysctl.d/90-tripppin.conf
 	install -Dm600 "$srcdir"/doas.conf "$pkgdir"/etc/doas.d/tripppin.conf
-	install -Dm644 "$srcdir"/iwd.conf "$pkgdir"/etc/iwd/main.conf
-	install -Dm644 "$srcdir"/dhcpcd.conf "$pkgdir"/etc/dhcpcd.conf.tripppin
+	install -Dm644 "$srcdir"/iwd.conf "$pkgdir"/usr/share/tripppin/iwd-main.conf
 	install -Dm755 "$srcdir"/session "$pkgdir"/usr/libexec/tripppin/session
 	install -Dm755 "$srcdir"/home "$pkgdir"/usr/libexec/tripppin/home
 	install -Dm755 "$srcdir"/audio "$pkgdir"/usr/libexec/tripppin/audio

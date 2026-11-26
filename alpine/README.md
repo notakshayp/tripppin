@@ -62,6 +62,19 @@ doas sh /usr/share/tripppin/install.sh /dev/vda
 
 It erases the disk, makes an EFI partition and a btrfs partition with subvolumes `@` (root, including `/boot`) and `@snapshots` (mounted at `/.snapshots`), installs the packages from the ISO, and sets up GRUB (UEFI, removable path). `trip update` will snapshot `@` into `@snapshots` before `apk upgrade`; booting an older snapshot is the rollback (not implemented yet).
 
+## Measured (aarch64, QEMU with HVF, 4 GB RAM, 4 cores)
+
+| What | Result |
+|---|---|
+| ISO size | 604 MiB (target was about 500). About 265 MB of it is the kernel modloop, 128 MB the `linux-lts` apk the installer needs, 91 MB the trimmed firmware, 24 MB llama.cpp. Next cuts: drop firmware families, ship the kernel once. |
+| Installed size | 601 MB used on btrfs with zstd compression (746 MiB of packages, 238 packages) |
+| Boot to the home terminal | about 14 s from QEMU start on the live ISO (including about 3 s of UEFI), about 12 s from the installed disk |
+| RAM at the home terminal | 88 MB used of 3.9 GB (sway, foot, seatd, dbus, iwd, bluez, dhcpcd, chrony) |
+
+Checked on screen (screenshots in the build notes): UEFI boot, OpenRC services, autologin on tty1, sway starts, foot full screen in JetBrains Mono, `trip` falls back to a shell (`trip home` does not exist yet), a second window opens full screen, Super+Tab and Super+Esc switch, `llama-server --version` runs with runtime CPU variants and the Vulkan backend library present, `iwctl`, `bluetoothctl`, pipewire present, `trip-install` installs to a blank disk and the installed system boots to the same terminal. Vulkan shows no device in QEMU (no llvmpipe on purpose, see below); wlroots falls back to pixman there.
+
+Notes: no `mesa-dri-gallium` or lavapipe (they pull in llvm, 65 MB); wlroots uses Vulkan (anv, radv) on real GPUs and pixman in VMs. A full-screen window blocks sway focus changes, so the bindings drop full screen, move focus, and restore it. `/boot/efi` is in fstab but vfat is not loaded early on the installed system, so the mount can be skipped; load `vfat` in `/etc/modules`.
+
 ## Layout
 
 ```

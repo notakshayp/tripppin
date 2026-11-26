@@ -33,6 +33,7 @@ printf 'This ERASES %s. Type the disk name to continue: ' "$disk"
 part() { case $disk in *[0-9]) echo "${disk}p$1" ;; *) echo "${disk}$1" ;; esac; }
 esp=$(part 1); root=$(part 2)
 
+modprobe vfat; modprobe btrfs
 echo "==> partition"
 printf 'label: gpt\n,512M,U\n,,L\n' | sfdisk --quiet "$disk"
 mdev -s 2>/dev/null || true
@@ -41,15 +42,15 @@ echo "==> filesystems"
 mkfs.vfat -F32 -n TRIPESP "$esp" >/dev/null
 mkfs.btrfs -q -f -L tripppin "$root"
 mkdir -p /mnt
-mount "$root" /mnt
+mount -t btrfs "$root" /mnt
 btrfs subvolume create /mnt/@ >/dev/null
 btrfs subvolume create /mnt/@snapshots >/dev/null
 umount /mnt
 opts=noatime,compress=zstd:1,ssd_spread
-mount -o "$opts,subvol=@" "$root" /mnt
+mount -t btrfs -o "$opts,subvol=@" "$root" /mnt
 mkdir -p /mnt/.snapshots /mnt/boot/efi /mnt/dev /mnt/proc /mnt/sys
-mount -o "$opts,subvol=@snapshots" "$root" /mnt/.snapshots
-mount "$esp" /mnt/boot/efi
+mount -t btrfs -o "$opts,subvol=@snapshots" "$root" /mnt/.snapshots
+mount -t vfat "$esp" /mnt/boot/efi
 mount --bind /dev /mnt/dev
 mount -t proc proc /mnt/proc
 mount -t sysfs sys /mnt/sys
@@ -97,5 +98,6 @@ echo "Set the password for the 'trip' user (also used by doas):"
 chroot /mnt passwd trip || echo "left at the default password: tripppin (change it with: passwd)"
 
 sync
-umount -R /mnt
+for m in sys/firmware/efi/efivars sys proc dev boot/efi .snapshots; do umount "/mnt/$m" 2>/dev/null || true; done
+umount /mnt
 echo "Done. Remove the ISO and reboot."

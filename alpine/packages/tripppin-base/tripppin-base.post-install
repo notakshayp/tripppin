@@ -1,6 +1,7 @@
 #!/bin/sh
 # Primary user, console autologin and services. Safe to run again.
 /usr/libexec/tripppin/setup-user
+mkdir -p /etc/iwd && cp /usr/share/tripppin/iwd-main.conf /etc/iwd/main.conf
 [ -f /etc/hostname ] || echo tripppin > /etc/hostname
 if [ -f /etc/inittab ] && ! grep -q tripppin /etc/inittab; then
     sed -i 's|^tty1::.*|tty1::respawn:/sbin/getty -n -l /usr/libexec/tripppin/autologin 38400 tty1 # tripppin|' /etc/inittab

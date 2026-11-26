@@ -35,6 +35,14 @@ mesa-vulkan-virtio
 vulkan-tools
 EOF
 
+mkdir -p "$tmp"/etc/iwd
+cat > "$tmp"/etc/iwd/main.conf <<'EOF'
+[General]
+EnableNetworkConfiguration=false
+[Network]
+NameResolvingService=resolvconf
+EOF
+
 # Console: autologin the primary user on tty1 and run the compositor from its profile.
 cat > "$tmp"/etc/inittab <<'EOF'
 ::sysinit:/sbin/openrc sysinit
