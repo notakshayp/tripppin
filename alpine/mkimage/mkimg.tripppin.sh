@@ -11,7 +11,7 @@ tripppin_firmware="tripppin-firmware"
 section_kernels() {
 	local _f _pkgs
 	for _f in $kernel_flavors; do
-		_pkgs="linux-$_f $tripppin_firmware"
+		_pkgs="$tripppin_firmware linux-$_f"
 		local id=$( (echo "$initfs_features::$_hostkeys" ; apk fetch --root "$APKROOT" --simulate alpine-base $_pkgs | sort) | checksum)
 		build_section kernel $ARCH $_f $id $_pkgs
 	done

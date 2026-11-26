@@ -27,7 +27,7 @@ $pm volume exists "$vol" || $pm volume create "$vol" >/dev/null
 # Stage the signed repository, public key and profile into the volume.
 tar --no-xattrs -C "$here/out" -cf - repo/$arch keys/tripppin.rsa.pub -C "$here" mkimage | \
 	$pm run --rm -i --platform "$platform" -v "$vol":/work "$img" \
-	sh -c 'rm -rf /work/repo /work/mkimage /work/iso && tar -C /work -xf - && mkdir -p /work/repo-root/tripppin && rm -rf /work/repo-root/tripppin/'"$arch"' && mv /work/repo/'"$arch"' /work/repo-root/tripppin/'"$arch"' && chown -R builder:abuild /work'
+	sh -c 'rm -rf /work/repo /work/mkimage /work/iso /work/tmp && tar -C /work -xf - && mkdir -p /work/repo-root/tripppin && rm -rf /work/repo-root/tripppin/'"$arch"' && mv /work/repo/'"$arch"' /work/repo-root/tripppin/'"$arch"' && chown -R builder:abuild /work'
 if [ -n "${ABUILD_PRIVKEY:-}" ]; then
 	$pm run --rm -i --platform "$platform" -v "$vol":/work "$img" \
 		sh -c 'cat > /work/keys/tripppin.rsa && chown builder:abuild /work/keys/tripppin.rsa && chmod 600 /work/keys/tripppin.rsa' < "$ABUILD_PRIVKEY"
@@ -44,6 +44,9 @@ printf 'PACKAGER_PRIVKEY=/work/keys/tripppin.rsa\nPACKAGER=\"Tripppin <hello@tri
 cp /work/mkimage/* ~/.mkimage/
 sudo cp /work/keys/tripppin.rsa.pub /etc/apk/keys/
 sudo apk update -q
+# update-kernel always adds the whole linux-firmware to the modloop; use only our subset.
+sudo sed -i 's/PACKAGES=\"\$PACKAGES linux-\$FLAVOR linux-firmware\"/PACKAGES=\"\$PACKAGES linux-\$FLAVOR\"/' /usr/sbin/update-kernel
+grep -q 'linux-firmware\"' /usr/sbin/update-kernel && { echo 'update-kernel patch failed' >&2; exit 1; }
 cd ~/aports/scripts
 mkdir -p /work/iso /work/tmp
 sh mkimage.sh --tag $tag --outdir /work/iso --workdir /work/tmp --arch $arch --hostkeys \
