@@ -201,14 +201,12 @@ impl App {
         if self.pkgs.searching {
             p.text(inner.x + inner.width - 12, inner.y, &format!("{} searching", spinner(ms)), fg(AMBER));
         }
-        let rows = (inner.height.saturating_sub(5) / 1) as usize;
+        let rows = (inner.height.saturating_sub(5)) as usize;
         let list_y = inner.y + 2;
         p.scroll_area(Rect::new(inner.x, list_y, inner.width, rows as u16), ScrollId::Packages);
         let off = self.pkgs.selected.saturating_sub(rows.saturating_sub(1));
         let desc_w = inner.width.saturating_sub(2 + 22 + 8 + 14) as usize;
-        for (row, (i, pk)) in
-            self.pkgs.results.iter().enumerate().skip(off).take(rows).enumerate().map(|(r, (i, pk))| (r, (i, pk)))
-        {
+        for (row, (i, pk)) in self.pkgs.results.iter().enumerate().skip(off).take(rows).enumerate() {
             let y = list_y + row as u16;
             p.row(Rect::new(inner.x, y, inner.width, 1), Act::PkgRow(i), i == self.pkgs.selected);
             p.text(inner.x, y, if pk.gui { "▣" } else { " " }, fg(BLUE));
@@ -262,7 +260,7 @@ impl App {
                     .collect()
             })
             .unwrap_or_default();
-        rows.sort_by(|a, b| (!a.1, a.0.to_lowercase()).cmp(&(!b.1, b.0.to_lowercase())));
+        rows.sort_by_key(|a| (!a.1, a.0.to_lowercase()));
         self.files.entries = rows;
         self.files.selected = 0;
         self.files_preview();
@@ -322,9 +320,7 @@ impl App {
             let rows = inner.height.saturating_sub(1) as usize;
             p.scroll_area(Rect::new(inner.x, inner.y + 1, inner.width, rows as u16), ScrollId::Files);
             let off = self.files.selected.saturating_sub(rows.saturating_sub(1));
-            for (r, (i, (name, dir, size))) in
-                self.files.entries.iter().enumerate().skip(off).take(rows).enumerate().map(|(r, e)| (r, e))
-            {
+            for (r, (i, (name, dir, size))) in self.files.entries.iter().enumerate().skip(off).take(rows).enumerate() {
                 let y = inner.y + 1 + r as u16;
                 p.row(Rect::new(inner.x, y, inner.width, 1), Act::FileRow(i), i == self.files.selected);
                 p.text(

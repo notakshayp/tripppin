@@ -7,7 +7,7 @@
 //! threads. They all talk to the main loop through one channel.
 
 mod ask;
-mod home;
+mod dash;
 mod input;
 mod models;
 mod packages;
@@ -78,7 +78,7 @@ pub struct App {
     pub playing_at: Instant,
     pub widgets: Vec<Widget>,
     pub runner: widgets::Runner,
-    pub home: home::HomeState,
+    pub home: dash::HomeState,
     pub ask: ask::AskState,
     pub models: models::ModelsState,
     pub settings: settings::SettingsState,
@@ -122,7 +122,7 @@ impl App {
             playing_at: Instant::now(),
             widgets: Vec::new(),
             runner: widgets::Runner::default(),
-            home: home::HomeState::default(),
+            home: dash::HomeState::default(),
             ask: ask::AskState::default(),
             models: models::ModelsState::default(),
             settings: settings::SettingsState::default(),
@@ -642,7 +642,7 @@ impl App {
         if self.is_focused() {
             let due = self.runner.due(&self.widgets, Instant::now());
             for w in due {
-                home::run_widget(self.tx.clone(), w, n.hhmm());
+                dash::run_widget(self.tx.clone(), w, n.hhmm());
             }
         }
     }
@@ -948,9 +948,8 @@ fn poller(tx: Sender<Msg>, focused: Arc<AtomicBool>, wake: Receiver<()>, view_ho
             (true, true) => Duration::from_secs(1),
             (true, false) => Duration::from_secs(10),
         };
-        match wake.recv_timeout(wait) {
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
-            _ => {}
+        if let Err(std::sync::mpsc::RecvTimeoutError::Disconnected) = wake.recv_timeout(wait) {
+            return;
         }
     }
 }

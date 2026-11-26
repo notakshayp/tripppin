@@ -507,7 +507,7 @@ fn list_files(path: &str) -> String {
             )
         })
         .collect();
-    rows.sort_by(|a, b| (!a.0, a.1.to_lowercase()).cmp(&(!b.0, b.1.to_lowercase())));
+    rows.sort_by_key(|a| (!a.0, a.1.to_lowercase()));
     let total = rows.len();
     let mut out: Vec<String> = rows
         .iter()

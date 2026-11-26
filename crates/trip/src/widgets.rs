@@ -158,10 +158,10 @@ impl Runner {
     pub fn next_due(&self, widgets: &[Widget], now: Instant) -> Option<Duration> {
         widgets
             .iter()
-            .filter_map(|w| {
+            .map(|w| {
                 let st = self.states.get(&w.name);
                 let at = st.and_then(|s| s.last_start).map(|t| t + Duration::from_secs(w.every_secs));
-                Some(at.map_or(Duration::ZERO, |a| a.saturating_duration_since(now)))
+                at.map_or(Duration::ZERO, |a| a.saturating_duration_since(now))
             })
             .min()
     }

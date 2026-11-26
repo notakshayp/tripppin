@@ -238,10 +238,10 @@ pub fn listen<T: Send + 'static>(focused: std::sync::Arc<AtomicBool>, tx: Sender
                 continue;
             }
             for line in lines.map_while(Result::ok) {
-                if let Some(p) = Pill::from_line(&line) {
-                    if tx.send(wrap(p)).is_err() {
-                        return;
-                    }
+                if let Some(p) = Pill::from_line(&line)
+                    && tx.send(wrap(p)).is_err()
+                {
+                    return;
                 }
             }
         }
@@ -358,7 +358,7 @@ fn record(sink: &mut dyn Sink) -> anyhow::Result<Vec<i16>> {
     let mut end = Endpointer::default();
     let mut buf = vec![0u8; CHUNK * 2];
     while out.read_exact(&mut buf).is_ok() {
-        let chunk: Vec<i16> = buf.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect();
+        let chunk: Vec<i16> = buf.as_chunks::<2>().0.iter().map(|b| i16::from_le_bytes([b[0], b[1]])).collect();
         let level = rms(&chunk);
         sink.pill(&Pill::Listening(level));
         samples.extend_from_slice(&chunk);

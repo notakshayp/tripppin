@@ -145,7 +145,7 @@ pub fn search(query: &str) -> Vec<Pkg> {
     pkgs.truncate(40);
     let have = installed_names();
     for p in &mut pkgs {
-        p.installed = have.iter().any(|h| *h == p.name);
+        p.installed = have.contains(&p.name);
     }
     pkgs
 }

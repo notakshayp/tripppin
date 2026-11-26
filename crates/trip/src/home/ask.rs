@@ -270,11 +270,11 @@ impl App {
                 }));
             }
             Ev::Output(line) => {
-                if let Some(Item::Tool(t)) = a.items.iter_mut().rev().find(|i| matches!(i, Item::Tool(_))) {
-                    if t.output.len() < 20_000 {
-                        t.output.push_str(&line);
-                        t.output.push('\n');
-                    }
+                if let Some(Item::Tool(t)) = a.items.iter_mut().rev().find(|i| matches!(i, Item::Tool(_)))
+                    && t.output.len() < 20_000
+                {
+                    t.output.push_str(&line);
+                    t.output.push('\n');
                 }
             }
             Ev::Note(text) => a.items.push(Item::Note(text)),

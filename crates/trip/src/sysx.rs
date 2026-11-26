@@ -39,7 +39,7 @@ pub fn parse_cpu(stat: &str) -> Option<CpuCounters> {
 
 pub fn cpu_percent(prev: CpuCounters, now: CpuCounters) -> u8 {
     let d = now.total.saturating_sub(prev.total);
-    if d == 0 { 0 } else { (now.busy.saturating_sub(prev.busy) * 100 / d).min(100) as u8 }
+    (now.busy.saturating_sub(prev.busy) * 100).checked_div(d).map_or(0, |v| v.min(100) as u8)
 }
 
 /// (used, total) in KiB from /proc/meminfo; used excludes reclaimable cache.
