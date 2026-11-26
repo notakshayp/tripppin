@@ -1,6 +1,8 @@
-//! The AI's plan as flat coloured rows in a right-hand column beside the shell (Tiles mock
-//! 05): done steps are solid green blocks, the running one is amber with marching dots,
-//! the next ones are dim, and the token line sits at the bottom. Only when the terminal is
+//! The AI's plan as blocks in a right-hand column beside the shell (Bento mock 05): done
+//! steps are green-tinted blocks with a green STEP n . DONE line, the running one is a
+//! warm amber-tinted block with marching amber dots, the next ones are graphite and dim, and
+//! the token line sits at the bottom. A terminal can't round corners, so the colours and the
+//! spacing carry the tile look. Only when the terminal is
 //! wide enough; narrower ones keep the inline checklist.
 
 use crate::model::PlanStep;
@@ -11,12 +13,13 @@ pub const MIN_WIDTH: usize = 100;
 /// Columns between the shell text and the column.
 pub const GAP: usize = 2;
 
-const WHITE: &str = "\x1b[38;2;255;255;255m";
-const MUTED: &str = "\x1b[38;2;154;164;171m";
-const FAINT: &str = "\x1b[38;2;230;236;232m";
-const DONE_BG: &str = "\x1b[48;2;31;107;69m";
-const RUN_BG: &str = "\x1b[48;2;184;134;43m";
-const NEXT_BG: &str = "\x1b[48;2;29;36;41m";
+const WHITE: &str = "\x1b[38;2;241;243;244m";
+const MUTED: &str = "\x1b[38;2;154;163;168m";
+const GREEN: &str = "\x1b[38;2;69;196;134m";
+const AMBER: &str = "\x1b[38;2;242;184;75m";
+const DONE_BG: &str = "\x1b[48;2;43;58;51m";
+const RUN_BG: &str = "\x1b[48;2;58;50;34m";
+const NEXT_BG: &str = "\x1b[48;2;35;39;42m";
 
 /// How wide the column is on a terminal `width` columns wide; `None` below `MIN_WIDTH`,
 /// where the steps stay inline.
@@ -40,13 +43,13 @@ fn cell(bg: &str, fg: &str, text: &str, col: usize, color: bool) -> String {
 }
 
 fn dots(tick: usize, unicode: bool, bg: &str, color: bool, col: usize) -> String {
-    let (on, off) = if unicode { ("▪", "▪") } else { ("*", ".") };
+    let (on, off) = if unicode { ("\u{25cf}", "\u{25cf}") } else { ("*", ".") };
     let mut row = String::from(" ");
     for i in 0..5 {
         let lit = (i + 5 - tick % 5) % 5 < 3;
         let glyph = if lit { on } else { off };
         if color {
-            row += &format!("{}{glyph} ", if lit { WHITE } else { "\x1b[38;2;214;178;108m" });
+            row += &format!("{}{glyph} ", if lit { AMBER } else { "\x1b[38;2;108;92;58m" });
         } else {
             row += &format!("{glyph} ");
         }
@@ -91,19 +94,19 @@ pub fn blocks(
     }
     let mut rows = Vec::new();
     if first > 0 {
-        rows.push(cell(DONE_BG, WHITE, &format!("{first} done"), col, color));
+        rows.push(cell(DONE_BG, GREEN, &format!("{first} DONE"), col, color));
     }
     for (i, s) in plan.iter().enumerate().skip(first) {
         let st = state(i);
         let (bg, small, big) = match st {
-            State::Done => (DONE_BG, FAINT, WHITE),
-            State::Running => (RUN_BG, FAINT, WHITE),
+            State::Done => (DONE_BG, GREEN, WHITE),
+            State::Running => (RUN_BG, AMBER, WHITE),
             State::Next => (NEXT_BG, MUTED, MUTED),
         };
         let label = match st {
-            State::Done => "done".to_string(),
-            State::Running => format!("step {} of {}", i + 1, plan.len()),
-            State::Next => "next".to_string(),
+            State::Done => format!("STEP {} \u{b7} DONE", i + 1),
+            State::Running => format!("STEP {} OF {}", i + 1, plan.len()),
+            State::Next => format!("STEP {} \u{b7} NEXT", i + 1),
         };
         rows.push(cell(bg, small, &label, col, color));
         rows.push(cell(bg, big, &s.text, col, color));
@@ -179,15 +182,15 @@ mod tests {
             .map(|r| r.trim_end().to_string())
             .collect();
         let text = rows.join("\n");
-        assert!(text.contains(" done\n Step number 1"), "{text}");
-        assert!(text.contains(" step 2 of 3\n Step number 2\n ▪ ▪ ▪ ▪ ▪"), "{text}");
-        assert!(text.contains(" next\n Step number 3"), "{text}");
+        assert!(text.contains(" STEP 1 \u{b7} DONE\n Step number 1"), "{text}");
+        assert!(text.contains(" STEP 2 OF 3\n Step number 2\n \u{25cf} \u{25cf} \u{25cf} \u{25cf} \u{25cf}"), "{text}");
+        assert!(text.contains(" STEP 3 \u{b7} NEXT\n Step number 3"), "{text}");
         assert_eq!(rows.last().map(String::as_str), Some(" 2.1k tokens"));
         // colours: green, amber, dim
         let coloured = blocks(&plan(1, 3), 0, 30, 40, "", true, true).join("\n");
-        assert!(coloured.contains("48;2;31;107;69"));
-        assert!(coloured.contains("48;2;184;134;43"));
-        assert!(coloured.contains("48;2;29;36;41"));
+        assert!(coloured.contains("48;2;43;58;51"));
+        assert!(coloured.contains("48;2;58;50;34"));
+        assert!(coloured.contains("48;2;35;39;42"));
     }
 
     #[test]
@@ -203,8 +206,8 @@ mod tests {
     fn a_long_plan_folds_to_fit() {
         let rows = blocks(&plan(8, 12), 0, 30, 14, "tokens", false, true);
         assert!(rows.len() <= 14, "{} rows", rows.len());
-        assert!(strip_ansi(&rows[0]).contains("done"));
-        assert!(rows.iter().any(|r| r.contains("step 9 of 12")), "the running step stays");
+        assert!(strip_ansi(&rows[0]).contains("DONE"));
+        assert!(rows.iter().any(|r| r.contains("STEP 9 OF 12")), "the running step stays");
         assert!(rows.iter().any(|r| r.contains("tokens")));
     }
 

@@ -2319,7 +2319,11 @@ impl Orb {
         self.status.set_tooltip_text(Some(&phase));
         // The bottom bar: tokens so far, and the clock.
         let (total, _) = req.total.borrow().clone();
-        self.total.set_text(&if total.is_empty() { req.elapsed() } else { format!("{total} \u{b7} {}", req.elapsed()) });
+        self.total.set_text(&if total.is_empty() {
+            req.elapsed()
+        } else {
+            format!("{total} \u{b7} {}", req.elapsed())
+        });
         self.total.set_visible(true);
     }
 
@@ -2729,6 +2733,7 @@ mod tests {
             icon: String::new(),
             flatpak: false,
             mime: Vec::new(),
+            categories: Vec::new(),
         };
         let apps = [app("Firefox"), app("Text Editor"), app("Files"), app("System Monitor")];
         let names = |t: &str| app_matches(&apps, t).into_iter().map(|a| a.name).collect::<Vec<_>>();

@@ -14,6 +14,8 @@ pub struct App {
     pub flatpak: bool,
     /// The file types it says it can open.
     pub mime: Vec<String>,
+    /// The menu categories it says it belongs to (Network, Graphics, Office...).
+    pub categories: Vec<String>,
 }
 
 /// Reads the [Desktop Entry] group of a .desktop file; `None` for hidden entries.
@@ -21,6 +23,7 @@ pub fn parse_desktop(id: &str, text: &str, flatpak: bool) -> Option<App> {
     let (mut name, mut icon, mut in_entry, mut hidden, mut is_app) =
         (String::new(), String::new(), false, false, false);
     let mut mime = Vec::new();
+    let mut categories = Vec::new();
     for line in text.lines().map(str::trim) {
         if line.starts_with('[') {
             in_entry = line == "[Desktop Entry]";
@@ -34,12 +37,15 @@ pub fn parse_desktop(id: &str, text: &str, flatpak: bool) -> Option<App> {
             "Name" => name = v.trim().to_string(),
             "Icon" => icon = v.trim().to_string(),
             "MimeType" => mime = v.split(';').map(str::trim).filter(|m| !m.is_empty()).map(str::to_string).collect(),
+            "Categories" => {
+                categories = v.split(';').map(str::trim).filter(|c| !c.is_empty()).map(str::to_string).collect();
+            }
             "Type" => is_app = v.trim() == "Application",
             "NoDisplay" | "Hidden" if v.trim() == "true" => hidden = true,
             _ => {}
         }
     }
-    (is_app && !hidden && !name.is_empty()).then(|| App { id: id.to_string(), name, icon, flatpak, mime })
+    (is_app && !hidden && !name.is_empty()).then(|| App { id: id.to_string(), name, icon, flatpak, mime, categories })
 }
 
 fn data_home() -> PathBuf {
@@ -408,7 +414,8 @@ mod tests {
                 name: "Firefox".into(),
                 icon: "firefox".into(),
                 flatpak: false,
-                mime: Vec::new()
+                mime: Vec::new(),
+                categories: Vec::new()
             })
         );
         assert!(parse_desktop("x", "[Desktop Entry]\nType=Application\nName=X\nNoDisplay=true\n", false).is_none());

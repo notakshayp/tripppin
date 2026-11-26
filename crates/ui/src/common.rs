@@ -253,7 +253,6 @@ pub mod icons {
     pub const CHEVRON_RIGHT: char = '\u{e06f}';
     pub const TERMINAL: char = '\u{e181}';
     pub const NEW: char = '\u{e172}';
-    pub const KEY: char = '\u{e4a3}';
     pub const EXTERNAL: char = '\u{e0b9}';
     pub const CLOUD: char = '\u{e088}';
     pub const CPU: char = '\u{e0a9}';

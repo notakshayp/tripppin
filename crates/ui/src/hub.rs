@@ -12,8 +12,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 /// The tile palette.
-pub const PALETTE: [&str; 8] =
-    ["#45c486", "#5aa9e6", "#ff8a5a", "#f783ac", "#ffd43b", "#b197fc", "#7b8cff", "#63e6be"];
+pub const PALETTE: [&str; 8] = ["#45c486", "#5aa9e6", "#ff8a5a", "#f783ac", "#ffd43b", "#b197fc", "#7b8cff", "#63e6be"];
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Toggle {
@@ -184,7 +183,6 @@ pub fn load_css() {
     provider.load_from_string(&css);
     gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 2);
 }
-
 
 pub struct Hub {
     pub root: gtk::Box,

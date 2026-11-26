@@ -5,10 +5,10 @@ use crate::apps::App;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// The tile colours from the design, in the order the hash picks from.
-pub const PALETTE: [&str; 8] = ["#1f6b45", "#0f7c8c", "#c2502e", "#6b3f8f", "#3a4a5a", "#b8862b", "#2c5aa0", "#3a2a22"];
-/// Two darker colours the design uses (Files, Terminal); chosen by hand, never by the hash.
-pub const EXTRA: [&str; 2] = ["#2a3640", "#182423"];
+/// The tile colours, in the order the hash picks from: the colour tiles of the Bento design.
+pub const PALETTE: [&str; 8] = ["#5aa9e6", "#ff8a5a", "#f783ac", "#63e6be", "#ffd43b", "#b197fc", "#7b8cff", "#f1f3f4"];
+/// Three more the design uses (graphite, the green and amber tiles); chosen by hand, never by the hash.
+pub const EXTRA: [&str; 3] = ["#23272a", "#2b3a33", "#f2b84b"];
 pub const COLOURS: usize = PALETTE.len() + EXTRA.len();
 pub const COLUMNS: u32 = 4;
 
@@ -256,53 +256,75 @@ pub fn default_layout(apps: &[App]) -> Layout {
         find_app(apps, words).map(|a| Tile { key: format!("app:{}", a.id), size, colour: Some(colour) })
     };
     let own = |key: &str, size: Size, colour: Option<usize>| Tile { key: key.to_string(), size, colour };
-    let mut everyday = vec![own("calendar", Size::Medium, Some(0))];
+    let mut everyday = vec![own("calendar", Size::Medium, Some(9))];
     let mut work = Vec::new();
     everyday.extend(app(&["thunderbird", "geary", "evolution", "kmail"], Size::Medium, 6));
     everyday.push(own("playing", Size::Wide, None));
-    everyday.extend(app(&["firefox"], Size::Medium, 2));
-    everyday.extend(app(&["chrome", "chromium"], Size::Small, 4));
-    everyday.extend(app(&["obsidian"], Size::Small, 3));
-    everyday.extend(app(&["slack"], Size::Small, 1));
+    everyday.extend(app(&["firefox"], Size::Medium, 1));
+    everyday.extend(app(&["chrome", "chromium"], Size::Small, 3));
+    everyday.extend(app(&["obsidian"], Size::Small, 4));
+    everyday.extend(app(&["slack"], Size::Small, 2));
     everyday.extend(app(&["bitwarden"], Size::Small, 5));
-    work.extend(app(&["visualstudio.code", "vscode", "code-oss"], Size::Medium, 1));
-    work.extend(app(&["claude"], Size::Medium, 7));
-    work.extend(app(&["dolphin", "nautilus", "thunar", "files"], Size::Medium, 8));
-    work.extend(app(&["konsole", "foot", "terminal", "alacritty"], Size::Medium, 9));
-    work.push(own("ask", Size::Wide, Some(0)));
+    work.extend(app(&["visualstudio.code", "vscode", "code-oss"], Size::Medium, 0));
+    work.extend(app(&["claude"], Size::Medium, 4));
+    work.extend(app(&["dolphin", "nautilus", "thunar", "files"], Size::Medium, 0));
+    work.extend(app(&["konsole", "foot", "terminal", "alacritty"], Size::Medium, 7));
+    work.push(own("ask", Size::Wide, Some(10)));
     Layout {
         groups: vec![Group { name: "everyday".into(), tiles: everyday }, Group { name: "work".into(), tiles: work }],
     }
 }
 
-/// The letter an app is filed under in the all-apps list: a-z, or `#` for anything else.
-pub fn letter_of(name: &str) -> char {
-    name.chars().next().and_then(|c| c.to_lowercase().next()).filter(char::is_ascii_lowercase).unwrap_or('#')
+/// The names of the category tiles on the all-apps board, in the order ties are laid out.
+pub const CATEGORY_NAMES: [&str; 6] = ["Internet", "Create", "Work", "Play", "System", "Other"];
+
+/// Which category tile an app belongs to, from its .desktop `Categories`.
+pub fn category_of(categories: &[String]) -> &'static str {
+    let has = |words: &[&str]| categories.iter().any(|c| words.contains(&c.as_str()));
+    if has(&["Network", "WebBrowser", "Email", "InstantMessaging", "Chat"]) {
+        "Internet"
+    } else if has(&["Graphics", "AudioVideo", "Audio", "Video", "Photography", "Music"]) {
+        "Create"
+    } else if has(&["Office", "Development", "Education", "Science", "Finance", "ProjectManagement"]) {
+        "Work"
+    } else if has(&["Game"]) {
+        "Play"
+    } else if has(&["System", "Settings", "Utility", "Accessibility", "Core", "TerminalEmulator", "FileManager"]) {
+        "System"
+    } else {
+        "Other"
+    }
 }
 
-/// Apps (given sorted by name) as (letter, indexes) sections, `#` first.
-pub fn by_letter(names: &[&str]) -> Vec<(char, Vec<usize>)> {
-    let mut out: Vec<(char, Vec<usize>)> = Vec::new();
-    for (i, n) in names.iter().enumerate() {
-        let l = letter_of(n);
-        match out.iter_mut().find(|(c, _)| *c == l) {
-            Some((_, v)) => v.push(i),
-            None => out.push((l, vec![i])),
+/// The category tiles for these apps: (name, indexes into `apps`), the fullest first, empty ones left out.
+pub fn category_tiles(apps: &[App]) -> Vec<(&'static str, Vec<usize>)> {
+    let mut out: Vec<(&'static str, Vec<usize>)> = CATEGORY_NAMES.iter().map(|n| (*n, Vec::new())).collect();
+    for (i, a) in apps.iter().enumerate() {
+        let name = category_of(&a.categories);
+        if let Some(t) = out.iter_mut().find(|t| t.0 == name) {
+            t.1.push(i);
         }
     }
-    out.sort_by_key(|(c, _)| (*c != '#', *c));
+    out.retain(|t| !t.1.is_empty());
+    out.sort_by_key(|t| std::cmp::Reverse(t.1.len()));
     out
 }
 
-/// The cells of the jump grid, as the design lists them.
-pub const JUMP: &str = "#abcdefghijklmnopqrstuvwxyz…";
+/// How many cells (columns, rows) a category tile takes: the ones you use most grow bigger.
+pub fn category_span(rank: usize, count: usize) -> (u32, u32) {
+    match (rank, count) {
+        (0, n) if n >= 6 => (2, 2),
+        (_, n) if n >= 5 => (2, 1),
+        _ => (1, 1),
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn app(id: &str, name: &str) -> App {
-        App { id: id.into(), name: name.into(), icon: String::new(), flatpak: false, mime: vec![] }
+        App { id: id.into(), name: name.into(), icon: String::new(), flatpak: false, mime: vec![], categories: vec![] }
     }
 
     #[test]
@@ -389,13 +411,22 @@ mod tests {
     }
 
     #[test]
-    fn letters_group_and_sort() {
-        let names = ["1Password", "Bitwarden", "Blender", "Chrome", "Émile", "firefox"];
-        let g = by_letter(&names);
-        let letters: Vec<char> = g.iter().map(|(c, _)| *c).collect();
-        assert_eq!(letters, vec!['#', 'b', 'c', 'f']);
-        assert_eq!(g[1].1, vec![1, 2]);
-        assert_eq!(g[0].1, vec![0, 4]);
-        assert_eq!(letter_of("Zed"), 'z');
+    fn apps_fall_into_category_tiles() {
+        let with =
+            |id: &str, cats: &[&str]| App { categories: cats.iter().map(|c| c.to_string()).collect(), ..app(id, id) };
+        let apps = [
+            with("a", &["Network", "WebBrowser"]),
+            with("b", &["Graphics"]),
+            with("c", &["Graphics", "Photography"]),
+            with("d", &["Game"]),
+            with("e", &[]),
+        ];
+        assert_eq!(category_of(&apps[0].categories), "Internet");
+        assert_eq!(category_of(&apps[4].categories), "Other");
+        let tiles = category_tiles(&apps);
+        assert_eq!(tiles[0], ("Create", vec![1, 2]), "the fullest comes first");
+        assert_eq!(category_span(0, 7), (2, 2));
+        assert_eq!(category_span(1, 5), (2, 1));
+        assert_eq!(category_span(2, 2), (1, 1));
     }
 }

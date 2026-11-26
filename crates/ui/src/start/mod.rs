@@ -14,11 +14,10 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use live::Live;
 use model::{Layout, Size, Tile};
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 const UNIT: i32 = 72;
-const GAP: i32 = 5;
+const GAP: i32 = 12;
 
 fn px(cells: u32) -> i32 {
     cells as i32 * UNIT + (cells as i32 - 1) * GAP
@@ -66,13 +65,10 @@ struct Ui {
     groups_box: gtk::Box,
     list_scroll: gtk::ScrolledWindow,
     list: gtk::Box,
-    jump: gtk::Box,
-    jump_buttons: Vec<(char, gtk::Button)>,
     layout: RefCell<Layout>,
     apps: RefCell<Vec<App>>,
     live: RefCell<Live>,
     updaters: RefCell<Vec<Updater>>,
-    anchors: RefCell<HashMap<char, gtk::Widget>>,
     animate_in: Cell<bool>,
     closing: Cell<bool>,
     save: async_channel::Sender<String>,
@@ -123,7 +119,7 @@ impl Ui {
         header.set_margin_start(36);
         header.set_margin_end(30);
         header.set_margin_top(26);
-        let title = lbl("bridge", &["hub"]);
+        let title = lbl("Bridge", &["hub"]);
         title.set_valign(gtk::Align::Start);
         header.append(&title);
         let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -131,7 +127,7 @@ impl Ui {
         header.append(&spacer);
         let search = gtk::Entry::new();
         search.add_css_class("search");
-        search.set_placeholder_text(Some("search apps"));
+        search.set_placeholder_text(Some("Search apps"));
         search.set_valign(gtk::Align::Start);
         search.set_margin_top(4);
         search.set_visible(false);
@@ -171,7 +167,7 @@ impl Ui {
         scroller.set_child(Some(&groups_box));
         let start_page = gtk::Overlay::new();
         start_page.set_child(Some(&scroller));
-        let all = gtk::Button::with_label("all apps \u{203a}");
+        let all = gtk::Button::with_label("All apps \u{203a}");
         all.add_css_class("plain");
         all.add_css_class("link");
         all.set_halign(gtk::Align::Start);
@@ -188,15 +184,15 @@ impl Ui {
         list_scroll.set_margin_bottom(64);
         list_scroll.set_hexpand(true);
         list_scroll.set_vexpand(true);
-        let list = gtk::Box::new(gtk::Orientation::Vertical, 6);
-        list.set_halign(gtk::Align::Start);
-        list.set_width_request(380);
+        let list = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        list.set_hexpand(true);
         list.set_margin_start(36);
+        list.set_margin_end(36);
         list.set_margin_bottom(8);
         list_scroll.set_child(Some(&list));
         let apps_page = gtk::Overlay::new();
         apps_page.set_child(Some(&list_scroll));
-        let back = gtk::Button::with_label("\u{2039} start");
+        let back = gtk::Button::with_label("\u{2039} Bridge");
         back.add_css_class("plain");
         back.add_css_class("link");
         back.set_halign(gtk::Align::Start);
@@ -204,32 +200,6 @@ impl Ui {
         back.set_margin_start(36);
         back.set_margin_bottom(30);
         apps_page.add_overlay(&back);
-        let jump = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        jump.add_css_class("jump");
-        jump.set_margin_start(470);
-        jump.set_margin_end(36);
-        jump.set_margin_top(96);
-        jump.set_margin_bottom(36);
-        jump.set_visible(false);
-        let grid = gtk::Grid::new();
-        grid.set_row_spacing(6);
-        grid.set_column_spacing(6);
-        grid.set_row_homogeneous(true);
-        grid.set_column_homogeneous(true);
-        grid.set_vexpand(true);
-        grid.set_hexpand(true);
-        let mut jump_buttons = Vec::new();
-        for (i, ch) in model::JUMP.chars().enumerate() {
-            let b = gtk::Button::new();
-            b.add_css_class("plain");
-            let l = lbl(&ch.to_string(), &[]);
-            l.set_valign(gtk::Align::End);
-            b.set_child(Some(&l));
-            grid.attach(&b, (i % 4) as i32, (i / 4) as i32, 1, 1);
-            jump_buttons.push((ch, b));
-        }
-        jump.append(&grid);
-        apps_page.add_overlay(&jump);
         stack.add_named(&apps_page, Some("apps"));
         window.set_child(Some(&root));
 
@@ -250,19 +220,17 @@ impl Ui {
             groups_box,
             list_scroll,
             list,
-            jump,
-            jump_buttons,
             layout: RefCell::new(Layout::default()),
             apps: RefCell::new(Vec::new()),
             live: RefCell::new(Live::default()),
             updaters: RefCell::new(Vec::new()),
-            anchors: RefCell::new(HashMap::new()),
             animate_in: Cell::new(true),
             closing: Cell::new(false),
             save,
         });
         ui.wire(&all, &back, &me);
         window.present();
+        common::snapshot_hook(&window);
 
         // Reading the .desktop files and the saved layout happens off the UI thread.
         let (tx, rx) = async_channel::bounded(1);
@@ -318,7 +286,7 @@ impl Ui {
                 if cur.is::<gtk::Button>()
                     || cur.is::<gtk::Editable>()
                     || cur.has_css_class("tile")
-                    || cur.has_css_class("jump")
+                    || cur.has_css_class("cat")
                     || cur.has_css_class("row")
                     || cur.has_css_class("groupname")
                     || cur.has_css_class("hub")
@@ -347,11 +315,6 @@ impl Ui {
                 u.launch(&app.id);
             }
         });
-        for (ch, b) in &self.jump_buttons {
-            let (u, ch) = (Rc::clone(self), *ch);
-            b.connect_clicked(move |_| u.jump_to(ch));
-        }
-
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let u = Rc::clone(self);
@@ -383,9 +346,8 @@ impl Ui {
 
     fn show_page(&self, name: &str) {
         self.stack.set_visible_child_name(name);
-        self.title.set_text(if name == "start" { "bridge" } else { name });
+        self.title.set_text(if name == "start" { "Bridge" } else { "All apps" });
         self.search.set_visible(name == "apps");
-        self.jump.set_visible(false);
         if name == "apps" {
             self.list_scroll.vadjustment().set_value(0.0);
         }
@@ -397,9 +359,7 @@ impl Ui {
 
     fn key(self: &Rc<Self>, key: gdk::Key, state: gdk::ModifierType) -> glib::Propagation {
         if key == gdk::Key::Escape {
-            if self.jump.is_visible() {
-                self.jump.set_visible(false);
-            } else if !self.search.text().is_empty() {
+            if !self.search.text().is_empty() {
                 self.search.set_text("");
             } else {
                 self.close();
@@ -596,14 +556,17 @@ impl Ui {
         let apps = self.apps.borrow();
         let Some(app) = t.app_id().and_then(|id| apps.iter().find(|a| a.id == id)) else { return };
         let size = match t.size {
-            Size::Small => 34,
-            Size::Large => 72,
-            _ => 56,
+            Size::Small => 30,
+            Size::Large => 64,
+            _ => 44,
         };
         let icon = self.icon_widget(&app.icon, size, &app.name);
-        icon.set_halign(gtk::Align::Center);
-        icon.set_valign(gtk::Align::Center);
-        ov.set_child(Some(&icon));
+        let chip = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        chip.add_css_class("icon-chip");
+        chip.set_halign(gtk::Align::Center);
+        chip.set_valign(gtk::Align::Center);
+        chip.append(&icon);
+        ov.set_child(Some(&chip));
         if t.size != Size::Small {
             let nm = lbl(&app.name, &["nm"]);
             nm.set_halign(gtk::Align::Start);
@@ -679,7 +642,7 @@ impl Ui {
         row.append(&art);
         let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
         text.set_valign(gtk::Align::Center);
-        let (head, ttl, artist) = (lbl("now playing", &["when"]), lbl("", &["ttl"]), lbl("", &["sub", "mute"]));
+        let (head, ttl, artist) = (lbl("Now playing", &["when"]), lbl("", &["ttl"]), lbl("", &["sub", "mute"]));
         for l in [&ttl, &artist] {
             l.set_ellipsize(gtk::pango::EllipsizeMode::End);
             l.set_width_chars(1);
@@ -700,7 +663,7 @@ impl Ui {
         ov.add_overlay(&badge);
         let update = move |live: &Live| match &live.playing {
             Some(p) => {
-                head.set_text(if p.playing { "now playing" } else { "paused" });
+                head.set_text(if p.playing { "Now playing" } else { "Paused" });
                 ttl.set_text(&p.title);
                 ttl.remove_css_class("mute");
                 artist.set_text(&p.artist);
@@ -714,10 +677,10 @@ impl Ui {
                 }
             }
             None => {
-                head.set_text("now playing");
-                ttl.set_text("nothing playing");
-                ttl.add_css_class("mute");
-                artist.set_text("");
+                head.set_text("");
+                ttl.set_text("Music");
+                ttl.remove_css_class("mute");
+                artist.set_text("Nothing playing");
                 pic.set_visible(false);
                 badge.set_visible(false);
             }
@@ -949,6 +912,12 @@ impl Ui {
         nm.set_ellipsize(gtk::pango::EllipsizeMode::End);
         row.append(&nm);
         b.set_child(Some(&row));
+        self.wire_app(&b, app);
+        b
+    }
+
+    /// Click launches; right-click or long-press offers to pin it.
+    fn wire_app(self: &Rc<Self>, b: &gtk::Button, app: &App) {
         let (u, id) = (Rc::clone(self), app.id.clone());
         b.connect_clicked(move |_| u.launch(&id));
         let right = gtk::GestureClick::new();
@@ -967,6 +936,27 @@ impl Ui {
             u.app_menu(&anchor, &a);
         });
         b.add_controller(long);
+    }
+
+    /// One app inside a category tile: its icon on a graphite chip, its name under it.
+    fn app_cell(self: &Rc<Self>, app: &App) -> gtk::Button {
+        let b = gtk::Button::new();
+        b.add_css_class("plain");
+        b.add_css_class("app-cell");
+        let col = gtk::Box::new(gtk::Orientation::Vertical, 5);
+        col.set_size_request(62, -1);
+        let chip = gtk::CenterBox::new();
+        chip.add_css_class("app-chip-icon");
+        chip.set_halign(gtk::Align::Center);
+        chip.set_center_widget(Some(&self.icon_widget(&app.icon, 32, &app.name)));
+        col.append(&chip);
+        let nm = lbl(&app.name, &["nm"]);
+        nm.set_xalign(0.5);
+        nm.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        nm.set_max_width_chars(9);
+        col.append(&nm);
+        b.set_child(Some(&col));
+        self.wire_app(&b, app);
         b
     }
 
@@ -974,66 +964,55 @@ impl Ui {
         while let Some(c) = self.list.first_child() {
             self.list.remove(&c);
         }
-        self.anchors.borrow_mut().clear();
         let q = self.search.text().to_lowercase();
         let hits = self.matches(&q);
-        let mut have: Vec<char> = Vec::new();
-        if q.is_empty() {
-            let names: Vec<&str> = hits.iter().map(|a| a.name.as_str()).collect();
-            for (letter, idxs) in model::by_letter(&names) {
-                have.push(letter);
-                let tile = gtk::Button::new();
-                tile.add_css_class("plain");
-                tile.add_css_class("letter-tile");
-                tile.set_focusable(false);
-                let l = lbl(&letter.to_string(), &[]);
-                l.set_valign(gtk::Align::End);
-                tile.set_child(Some(&l));
-                tile.set_halign(gtk::Align::Start);
-                let u = Rc::clone(self);
-                tile.connect_clicked(move |_| u.jump.set_visible(!u.jump.is_visible()));
-                self.anchors.borrow_mut().insert(letter, tile.clone().upcast());
-                self.list.append(&tile);
-                for i in idxs {
-                    self.list.append(&self.app_row(&hits[i]));
-                }
+        if !q.is_empty() {
+            if hits.is_empty() {
+                self.list.append(&lbl("no apps match", &["empty"]));
             }
-        } else if hits.is_empty() {
-            self.list.append(&lbl("no apps match", &["empty"]));
-        } else {
             for a in &hits {
                 self.list.append(&self.app_row(a));
             }
+        } else {
+            // Categories are tiles of different sizes; the fullest grows biggest.
+            let tiles = model::category_tiles(&hits);
+            let spans: Vec<(u32, u32)> =
+                tiles.iter().enumerate().map(|(i, t)| model::category_span(i, t.1.len())).collect();
+            let (at, _) = model::place(&spans);
+            let grid = gtk::Grid::new();
+            grid.set_column_homogeneous(true);
+            grid.set_row_spacing(GAP as u32);
+            grid.set_column_spacing(GAP as u32);
+            grid.set_valign(gtk::Align::Start);
+            for (i, ((name, idxs), (c, r))) in tiles.iter().zip(at).enumerate() {
+                let tile = gtk::Box::new(gtk::Orientation::Vertical, 8);
+                tile.add_css_class("cat");
+                if i == 0 {
+                    tile.add_css_class("first");
+                }
+                let head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                let n = lbl(name, &["cat-name"]);
+                n.set_hexpand(true);
+                head.append(&n);
+                head.append(&lbl(&idxs.len().to_string(), &["cat-count"]));
+                tile.append(&head);
+                let flow = gtk::FlowBox::new();
+                flow.set_selection_mode(gtk::SelectionMode::None);
+                flow.set_homogeneous(true);
+                flow.set_max_children_per_line(if spans[i].0 == 2 { 8 } else { 4 });
+                flow.set_column_spacing(4);
+                flow.set_row_spacing(4);
+                flow.set_valign(gtk::Align::Start);
+                for &k in idxs {
+                    flow.append(&self.app_cell(&hits[k]));
+                }
+                tile.append(&flow);
+                grid.attach(&tile, c as i32, r as i32, spans[i].0 as i32, spans[i].1 as i32);
+            }
+            self.list.append(&grid);
         }
         let adj = self.list_scroll.vadjustment();
         adj.set_value(0.0);
         glib::idle_add_local_once(move || adj.set_value(0.0));
-        for (ch, b) in &self.jump_buttons {
-            b.set_sensitive(true);
-            if have.contains(ch) {
-                b.remove_css_class("dim");
-            } else {
-                b.add_css_class("dim");
-            }
-        }
-    }
-
-    fn jump_to(&self, letter: char) {
-        let Some(target) = self.anchors.borrow().get(&letter).cloned() else { return };
-        self.jump.set_visible(false);
-        let Some(bounds) = target.compute_bounds(&self.list) else { return };
-        let adj = self.list_scroll.vadjustment();
-        let to = f64::from(bounds.y());
-        let from = adj.value();
-        let to = to.clamp(adj.lower(), (adj.upper() - adj.page_size()).max(adj.lower()));
-        let began = Cell::new(None::<i64>);
-        self.list_scroll.add_tick_callback(move |_, clock| {
-            let now = clock.frame_time();
-            let start = began.get().unwrap_or(now);
-            began.set(Some(start));
-            let t = ((now - start) as f64 / 220_000.0).min(1.0);
-            adj.set_value(from + (to - from) * common::ease_out(t));
-            if t >= 1.0 { glib::ControlFlow::Break } else { glib::ControlFlow::Continue }
-        });
     }
 }

@@ -1072,13 +1072,13 @@ mod tests {
         {
             let frame: Vec<String> = t.screen().live().iter().map(|r| strip_ansi(r)).collect();
             println!("{}", frame.join("\n"));
-            assert!(frame.iter().any(|r| r.contains("step 2 of 3")));
+            assert!(frame.iter().any(|r| r.contains("STEP 2 OF 3")));
             assert!(frame.iter().all(|r| crate::term::width(r) <= 120 - GUTTER), "{frame:?}");
         }
         t.finish(None);
         drop(t);
         let out = strip_ansi(&buf.text());
-        assert!(out.contains("step 2 of 3"), "{out}");
+        assert!(out.contains("STEP 2 OF 3"), "{out}");
         assert!(out.contains("Plan · 1 of 3 done"), "the checklist stays behind: {out}");
     }
 
@@ -1091,7 +1091,7 @@ mod tests {
         t.finish(None);
         drop(t);
         let out = strip_ansi(&buf.text());
-        assert!(!out.contains("step 2 of 3"), "{out}");
+        assert!(!out.contains("STEP 2 OF 3"), "{out}");
         assert_eq!(out.matches("Plan · 1 of 3 done").count(), 1, "{out}");
     }
 
