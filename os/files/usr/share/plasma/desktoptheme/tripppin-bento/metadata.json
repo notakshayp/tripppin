@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "Plasma/Theme",
+    "KPlugin": {
+        "Authors": [{ "Name": "Tripppin Bento" }],
+        "Description": "Rounded tiles on a graphite board: the Bento look",
+        "Id": "tripppin-bento",
+        "License": "Apache-2.0",
+        "Name": "Tripppin Bento",
+        "Version": "1.0",
+        "Website": "https://trippp.in"
+    }
+}

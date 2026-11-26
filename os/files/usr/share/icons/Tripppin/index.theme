@@ -1,6 +1,6 @@
 [Icon Theme]
 Name=Tripppin
-Comment=Tripppin app icons (flat tiles, thin white glyphs) over Breeze Dark's line icons
+Comment=Tripppin app icons (Bento: filled rounded squares, bold dark glyphs) over Breeze Dark's line icons
 Inherits=breeze-dark,breeze,hicolor
 Directories=scalable/apps
 

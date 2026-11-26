@@ -1,11 +1,10 @@
-//! Corners: one choice (Sharp, Default or Round) in Settings → Appearance, applied to every
-//! part of the desktop that draws a rounded corner.
+//! Corners: one choice (Sharp, Default or Round), set with `tripppin-ui corners`, applied to
+//! our own screens and the pre-Plasma bar files. (Settings no longer offers it: the Tiles
+//! design is square.)
 //!
 //! - Our screens: style.css reads its radii from `--r-*` variables; `css` gives the values
 //!   for the choice, and `common::load_css` reloads them in every running screen when the
 //!   choice changes (it watches the file).
-//! - niri: a `window-rule` in ~/.config/niri/tripppin-corners.kdl, included like the other
-//!   settings; niri reloads its config by itself.
 //! - The bar, quick settings, the power menu: a small stylesheet in ~/.config/<app>/ that
 //!   imports the system one and changes only the radii; the bar and quick settings reload.
 //! - The launcher: ~/.config/fuzzel/fuzzel.ini includes the system file and sets the radius.
@@ -24,6 +23,7 @@ pub enum Corners {
 }
 
 /// Every choice, in the order Settings shows them: (choice, its word, a short description).
+#[allow(dead_code)] // Settings no longer lists the choices; kept for the CLI and the AI
 pub const ALL: [(Corners, &str, &str); 3] = [
     (Corners::Sharp, "Sharp", "Crisp, nearly square"),
     (Corners::Default, "Default", "Softly rounded"),
@@ -42,7 +42,7 @@ struct Radii {
     xl: u32,
     /// Buttons, fields and chips; Round makes them pills.
     control: u32,
-    /// niri's windows.
+    /// Windows (GTK apps' own frames).
     window: u32,
 }
 
@@ -66,8 +66,8 @@ impl Corners {
     fn radii(self) -> Radii {
         match self {
             Corners::Sharp => Radii { xs: 2, sm: 3, md: 4, lg: 4, xl: 4, control: 4, window: 0 },
-            Corners::Default => Radii { xs: 4, sm: 6, md: 8, lg: 12, xl: 16, control: 8, window: 10 },
-            Corners::Round => Radii { xs: 6, sm: 10, md: 14, lg: 20, xl: 26, control: 9999, window: 18 },
+            Corners::Default => Radii { xs: 8, sm: 12, md: 14, lg: 20, xl: 26, control: 12, window: 14 },
+            Corners::Round => Radii { xs: 10, sm: 14, md: 18, lg: 26, xl: 32, control: 9999, window: 22 },
         }
     }
 }
@@ -95,10 +95,6 @@ pub fn css(c: Corners) -> String {
         ":root {{ --r-xs: {}px; --r-sm: {}px; --r-md: {}px; --r-lg: {}px; --r-xl: {}px; --r-control: {}px; }}",
         r.xs, r.sm, r.md, r.lg, r.xl, r.control
     )
-}
-
-fn niri_kdl(c: Corners) -> String {
-    format!("// {MARK} → Appearance.\nwindow-rule {{\n    geometry-corner-radius {}\n}}\n", c.radii().window)
 }
 
 fn waybar_css(c: Corners) -> String {
@@ -206,10 +202,6 @@ pub fn set(c: Corners) -> std::io::Result<()> {
     std::fs::create_dir_all(home.join("tripppin"))?;
     // Our screens watch this file and restyle themselves.
     std::fs::write(file(), c.id())?;
-    // niri: an include that's always there, so the choice can change back and forth.
-    std::fs::create_dir_all(home.join("niri"))?;
-    std::fs::write(home.join("niri").join("tripppin-corners.kdl"), niri_kdl(c))?;
-    crate::display::include_in_niri("tripppin-corners.kdl")?;
     let default = c == Corners::Default;
     write_ours(&home.join("waybar/style.css"), (!default).then(|| waybar_css(c)))?;
     write_ours(&home.join("swaync/style.css"), (!default).then(|| swaync_css(c)))?;
@@ -268,7 +260,6 @@ mod tests {
         assert!(waybar_css(Corners::Round).contains("@import url(\"file:///etc/xdg/waybar/style.css\")"));
         assert!(swaync_css(Corners::Sharp).contains("/etc/xdg/swaync/style.css"));
         assert!(fuzzel_ini(Corners::Sharp).contains("include=/etc/xdg/fuzzel/fuzzel.ini"));
-        assert!(niri_kdl(Corners::Round).contains("geometry-corner-radius 18"));
     }
 
     #[test]

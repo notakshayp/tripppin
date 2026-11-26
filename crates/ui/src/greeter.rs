@@ -1,7 +1,10 @@
 //! The login screen, run by greetd inside a minimal KWin session. It matches the lock screen
-//! (the "Tiles" design, mock section 01): flat teal with a darkening towards the bottom, the
-//! big light time bottom-left with the date, who you are and the password under them, Wi-Fi
-//! and battery top-right, power bottom-right.
+//! (the "Bento" design, mock section 01): a board of rounded tiles on #16181a, the big time
+//! tile (Manrope 800, 120 px) with the date over the amber sign-in tile (avatar circle, name,
+//! the password field, an arrow), and on the right the battery and connection when there is
+//! something to say, and the power menu. No curtain: typing goes straight into the field.
+//! (The next event, what is playing and the unread count belong to the person, so only the
+//! lock screen, which runs as them, shows those.)
 
 use crate::common::{self, label};
 use crate::greetd::{Greetd, Outcome};
@@ -13,58 +16,63 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 /// niri-session (os/files/usr/libexec/tripppin-session).
 const SESSION: &str = "/usr/libexec/tripppin-session";
 
-/// The Tiles look for the login screen, on top of the shared stylesheet so it needs no change
-/// there: teal #0f3d3a darkening towards the bottom, the time in Inter 200 at 140 px, square
-/// everything, the password box in the lock screen's style (raised, 2 px outline, accent
-/// when focused).
-const TILES_CSS: &str = r#"
-window.tiles-greeter.screen { background: #101418; color: #ffffff; }
-window.tiles-greeter .tiles-curtain {
-  background-color: #0f3d3a;
-  background-image: linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.45));
+/// The Bento look for the login screen, on top of the shared stylesheet so it needs no change
+/// there: #16181a, 20 px tiles 12 px apart, the time in Manrope 800 at 120 px, the amber
+/// sign-in tile with a darker pill for the password.
+const BENTO_CSS: &str = r#"
+window.bento.screen { background: #16181a; color: #f1f3f4; font-family: Manrope; }
+window.bento .tile { background: #23272a; border-radius: 20px; padding: 16px; }
+window.bento .tile-time { background: #2b3a33; }
+window.bento .tile-label { font-family: Manrope; font-weight: 800; font-size: 13px; color: #9aa3a8; }
+window.bento .tile-big { font-family: Manrope; font-weight: 800; font-size: 40px; letter-spacing: -1.2px; color: #f1f3f4; }
+window.bento .clock-big {
+  font-family: Manrope; font-weight: 800; font-size: 120px; letter-spacing: -3.6px;
+  color: #f1f3f4; margin: 0; padding: 0; line-height: 1;
 }
-window.tiles-greeter .tiles-stage2 { background: #101418; }
-window.tiles-greeter .tiles-big {
-  min-width: 120px; min-height: 120px; font-family: Inter; font-weight: 300; font-size: 64px;
-  background: #1f6b45; color: #ffffff; border-radius: 0;
+window.bento .date { font-family: Manrope; font-weight: 600; font-size: 18px; color: #9aa3a8; margin-top: 6px; }
+window.bento .tile-signin { background: #f2b84b; color: #16181a; }
+window.bento .bento-avatar {
+  min-width: 52px; min-height: 52px; border-radius: 999px; background: #16181a; color: #f2b84b;
+  font-family: Manrope; font-weight: 800; font-size: 20px;
 }
-window.tiles-greeter .tiles-name { font-family: Inter; font-weight: 300; font-size: 30px; color: #ffffff; }
-window.tiles-greeter .clock-big {
-  font-family: Inter; font-weight: 200; font-size: 140px; letter-spacing: -2.8px;
-  color: #ffffff; margin: 0; padding: 0; line-height: 1;
+window.bento .bento-name { font-family: Manrope; font-weight: 800; font-size: 16px; color: #16181a; }
+window.bento .pw-pill {
+  background: rgba(22,24,26,0.12); border: none; border-radius: 999px; box-shadow: none;
+  padding: 0; min-height: 32px;
 }
-window.tiles-greeter .date {
-  font-family: Inter; font-weight: 300; font-size: 30px; color: #ffffff; margin-top: 4px;
+window.bento .pw-pill:focus-within { background: rgba(22,24,26,0.2); }
+window.bento .pw-pill entry, window.bento .pw-pill text {
+  font-family: Manrope; font-weight: 600; font-size: 14px; color: #16181a; background: none;
+  border: none; box-shadow: none; outline: none; border-radius: 0; padding: 0 14px; min-height: 32px;
 }
-window.tiles-greeter .tiles-top { font-size: 13px; color: #ffffff; }
-window.tiles-greeter .pw-pill {
-  background: #1a2025; border: 2px solid #3a444b; border-radius: 0; box-shadow: none;
-  padding: 0; min-height: 52px;
+window.bento .pw-pill text placeholder, window.bento .pw-pill entry placeholder { color: rgba(22,24,26,0.7); }
+window.bento button.go {
+  background: #16181a; border-radius: 999px; border: none; box-shadow: none;
+  min-width: 40px; min-height: 40px; margin: 0; padding: 0; transition: transform 150ms ease-out;
 }
-window.tiles-greeter .pw-pill:focus-within { border-color: #3fae7a; }
-window.tiles-greeter .pw-pill entry, window.tiles-greeter .pw-pill text {
-  font-family: Inter; font-weight: 300; font-size: 20px; color: #ffffff; background: none;
-  border: none; box-shadow: none; outline: none; border-radius: 0; padding-left: 14px;
+window.bento button.go:hover { transform: scale(1.06); }
+window.bento button.go:active { transform: scale(0.94); }
+window.bento .status { color: #9aa3a8; font-family: Manrope; font-size: 13px; }
+window.bento .tile-signin .status { color: rgba(22,24,26,0.7); }
+window.bento button.power-tile {
+  background: #23272a; color: #f1f3f4; border: none; border-radius: 20px; box-shadow: none;
+  font-family: Manrope; font-weight: 800; font-size: 14px; padding: 14px 20px;
 }
-window.tiles-greeter button.go {
-  background: #1f6b45; color: #ffffff; border-radius: 0; border: none; box-shadow: none;
-  min-width: 52px; min-height: 52px; margin: -2px; padding: 0;
+window.bento button.power-tile:hover { background: #2e3337; }
+window.bento button.person {
+  background: rgba(22,24,26,0.12); color: #16181a; border: none; border-radius: 999px; box-shadow: none;
+  font-family: Manrope; font-weight: 700; padding: 2px 10px;
 }
-window.tiles-greeter button.go:hover { background: #2a7b54; }
-window.tiles-greeter .avatar { border-radius: 0; color: #ffffff; }
-window.tiles-greeter .who { font-family: Inter; font-weight: 300; font-size: 20px; color: #ffffff; }
-window.tiles-greeter .status { color: #9aa4ab; font-family: Inter; font-size: 13px; }
-window.tiles-greeter .tiles-top.status { color: #ffffff; }
-window.tiles-greeter button, window.tiles-greeter popover contents { border-radius: 0; }
-window.tiles-greeter button.person { border-radius: 0; background: rgba(16,20,24,0.5); border: 2px solid #3a444b; box-shadow: none; }
-window.tiles-greeter button.person.selected { border-color: #3fae7a; }
-window.tiles-greeter .error { color: #e8825c; }
+window.bento button.person.selected { background: #16181a; color: #f2b84b; }
+window.bento button.link { color: #16181a; font-family: Manrope; font-weight: 600; }
+window.bento .caps-warning, window.bento .error { color: #7a1f12; font-family: Manrope; font-weight: 700; font-size: 13px; }
+window.bento button, window.bento popover contents { border-radius: 12px; }
 "#;
 
-fn load_tiles_css() {
+fn load_bento_css() {
     let Some(display) = gtk::gdk::Display::default() else { return };
     let provider = gtk::CssProvider::new();
-    provider.load_from_string(TILES_CSS);
+    provider.load_from_string(BENTO_CSS);
     // Above the shared stylesheet and the corner style (which sit at APPLICATION and +1).
     gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 5);
 }
@@ -100,13 +108,44 @@ pub fn run() -> glib::ExitCode {
     app.run_with_args(&[] as &[&str])
 }
 
+fn tile(classes: &[&str]) -> gtk::Box {
+    let b = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    b.add_css_class("tile");
+    for c in classes {
+        b.add_css_class(c);
+    }
+    b
+}
+
+/// The sign-in tile's arrow: an amber 2.2 px line arrow on the dark circle, drawn as a vector.
+fn amber_arrow() -> gtk::DrawingArea {
+    let area = gtk::DrawingArea::new();
+    area.set_content_width(22);
+    area.set_content_height(22);
+    area.set_can_target(false);
+    area.set_draw_func(|_, cr, w, h| {
+        let k = f64::from(w.min(h)) / 24.0;
+        cr.set_source_rgb(0.949, 0.722, 0.294);
+        cr.set_line_width(2.2 * k);
+        cr.set_line_cap(gtk::cairo::LineCap::Round);
+        cr.set_line_join(gtk::cairo::LineJoin::Round);
+        cr.move_to(5.0 * k, 12.0 * k);
+        cr.line_to(19.0 * k, 12.0 * k);
+        cr.move_to(13.0 * k, 6.0 * k);
+        cr.line_to(19.0 * k, 12.0 * k);
+        cr.line_to(13.0 * k, 18.0 * k);
+        let _ = cr.stroke();
+    });
+    area
+}
+
 fn build(app: &gtk::Application) {
     common::load_css();
     let window = gtk::Window::builder().application(app).decorated(false).build();
     window.add_css_class("tripppin");
     window.add_css_class("screen");
-    window.add_css_class("tiles-greeter");
-    load_tiles_css();
+    window.add_css_class("bento");
+    load_bento_css();
     window.init_layer_shell();
     window.set_namespace(Some("tripppin-greeter"));
     window.set_layer(Layer::Overlay);
@@ -116,56 +155,48 @@ fn build(app: &gtk::Application) {
     window.set_exclusive_zone(-1);
     window.set_keyboard_mode(KeyboardMode::Exclusive);
 
-    // Two stages, like the lock screen: the curtain (the mock: time, date, hint, no password
-    // field) and, behind it, who you are and the password. A key, a click or an upward swipe
-    // slides the curtain up; Esc or ten idle seconds drop it again.
-    let flat = || {
-        let b = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        b.set_hexpand(true);
-        b.set_vexpand(true);
-        b
-    };
-    let curtain = gtk::Overlay::new();
-    curtain.add_css_class("tiles-curtain");
-    curtain.set_child(Some(&flat()));
-    let stage2 = gtk::Overlay::new();
-    stage2.add_css_class("tiles-stage2");
-    stage2.set_child(Some(&flat()));
+    // The board: two equal columns, 12 px apart, 28 px from the screen's edge.
+    let board = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    board.set_homogeneous(true);
+    board.set_margin_top(28);
+    board.set_margin_bottom(28);
+    board.set_margin_start(28);
+    board.set_margin_end(28);
+    let left = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let right = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    board.append(&left);
+    board.append(&right);
 
-    // The time and the date, bottom-left.
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    column.set_halign(gtk::Align::Start);
-    column.set_valign(gtk::Align::End);
-    column.set_margin_start(48);
-    column.set_margin_bottom(60);
-
-    // Clock.
-    let time = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    time.set_halign(gtk::Align::Start);
+    // The time tile: the big time and the date, bottom-left of the tile.
+    let time_tile = tile(&["tile-time"]);
+    time_tile.set_vexpand(true);
+    let spacer = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    spacer.set_vexpand(true);
+    time_tile.append(&spacer);
     let clock = label(&common::clock(), &["clock-big"]);
+    clock.set_halign(gtk::Align::Start);
     let date = label(&common::long_date(), &["date"]);
-    time.append(&clock);
-    time.append(&date);
-    column.append(&time);
-    curtain.add_overlay(&column);
+    date.set_halign(gtk::Align::Start);
+    time_tile.append(&clock);
+    time_tile.append(&date);
+    left.append(&time_tile);
 
-    // Who and the password.
+    // The sign-in tile: avatar circle, name, the password field, the arrow.
     let people = common::people();
     let user = people.first().cloned().unwrap_or_default();
-    let form = gtk::Box::new(gtk::Orientation::Vertical, 18);
-    form.set_halign(gtk::Align::Center);
-    form.set_valign(gtk::Align::Center);
-    form.set_size_request(380, -1);
-    let who = gtk::Box::new(gtk::Orientation::Vertical, 24);
-    who.set_halign(gtk::Align::Center);
+    let signin = tile(&["tile-signin"]);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
     let name = common::display_name(&user);
     let initial = name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default();
     let avatar = gtk::Label::new(Some(&initial));
-    avatar.add_css_class("avatar");
-    avatar.add_css_class("tiles-big");
-    avatar.set_halign(gtk::Align::Center);
-    who.append(&avatar);
-    who.append(&label(&name, &["tiles-name"]));
+    avatar.add_css_class("bento-avatar");
+    avatar.set_valign(gtk::Align::Center);
+    row.append(&avatar);
+    let middle = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    middle.set_hexpand(true);
+    middle.set_valign(gtk::Align::Center);
+    let name_label = label(&name, &["bento-name"]);
+    name_label.set_xalign(0.0);
     // More than one person: a name field instead of a fixed name.
     let username = gtk::Entry::new();
     username.add_css_class("pw");
@@ -179,39 +210,32 @@ fn build(app: &gtk::Application) {
     let password = gtk::PasswordEntry::new();
     password.add_css_class("pw");
     password.set_hexpand(true);
-    password.set_placeholder_text(Some("Password"));
+    password.set_placeholder_text(Some("Type your password"));
+    pill.append(&password);
     let go = gtk::Button::new();
     go.add_css_class("go");
     go.set_valign(gtk::Align::Center);
-    go.set_child(Some(&common::arrow(false)));
+    go.set_child(Some(&amber_arrow()));
     go.set_tooltip_text(Some("Log in"));
-    pill.append(&password);
-    pill.append(&go);
     let error = label("", &["error"]);
     error.set_visible(false);
+    error.set_xalign(0.0);
     // Who's logging in: the one person, or a chip each (and "other" for a name not listed).
     let chosen = std::rc::Rc::new(std::cell::RefCell::new(user.clone()));
     if people.len() == 1 {
-        form.append(&who);
+        middle.append(&name_label);
     } else {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let chips_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
         let chips: std::rc::Rc<std::cell::RefCell<Vec<gtk::Button>>> = std::rc::Rc::default();
         let add_chip = |login: Option<&str>| {
             let shown = login.map(common::display_name).unwrap_or_else(|| "Other".into());
-            let chip = gtk::Button::new();
+            let chip = gtk::Button::with_label(&shown);
             chip.add_css_class("person");
-            let inner = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-            let letter = shown.chars().next().map(|c| c.to_string()).unwrap_or_default();
-            let a = label(&letter, &["avatar", "small"]);
-            a.set_xalign(0.5);
-            inner.append(&a);
-            inner.append(&label(&shown, &["who-small"]));
-            chip.set_child(Some(&inner));
             if login == Some(user.as_str()) {
                 chip.add_css_class("selected");
             }
-            let (chosen, chips2, name_pill, password) =
-                (chosen.clone(), chips.clone(), name_pill.clone(), password.clone());
+            let (chosen, chips2, name_pill, password, avatar) =
+                (chosen.clone(), chips.clone(), name_pill.clone(), password.clone(), avatar.clone());
             let login = login.map(str::to_string);
             chip.connect_clicked(move |b| {
                 for c in chips2.borrow().iter() {
@@ -219,23 +243,30 @@ fn build(app: &gtk::Application) {
                 }
                 b.add_css_class("selected");
                 *chosen.borrow_mut() = login.clone().unwrap_or_default();
+                let initial = login
+                    .as_deref()
+                    .map(common::display_name)
+                    .and_then(|n| n.chars().next().map(|c| c.to_uppercase().to_string()))
+                    .unwrap_or_else(|| "?".into());
+                avatar.set_text(&initial);
                 name_pill.set_visible(login.is_none());
                 password.grab_focus();
             });
             chips.borrow_mut().push(chip.clone());
-            row.append(&chip);
+            chips_row.append(&chip);
         };
         for p in &people {
             add_chip(Some(p));
         }
         add_chip(None);
         name_pill.set_visible(false);
-        form.append(&row);
-        form.append(&name_pill);
+        middle.append(&chips_row);
+        middle.append(&name_pill);
     }
-    form.append(&pill);
+    middle.append(&pill);
     // Caps lock: the keyboard's light says so, checked a few times a second.
     let caps = label("Caps lock is on", &["caps-warning"]);
+    caps.set_xalign(0.0);
     caps.set_visible(crate::osd::caps_lock() == Some(true));
     {
         let caps = caps.clone();
@@ -244,8 +275,8 @@ fn build(app: &gtk::Application) {
             glib::ControlFlow::Continue
         });
     }
-    form.append(&caps);
-    form.append(&error);
+    middle.append(&caps);
+    middle.append(&error);
     let forgot = gtk::Button::with_label("Forgot your password?");
     forgot.add_css_class("link");
     forgot.set_halign(gtk::Align::Start);
@@ -261,59 +292,42 @@ fn build(app: &gtk::Application) {
         let help = help.clone();
         forgot.connect_clicked(move |_| help.set_visible(!help.is_visible()));
     }
-    form.append(&forgot);
-    form.append(&help);
-    stage2.add_overlay(&form);
+    middle.append(&forgot);
+    middle.append(&help);
+    row.append(&middle);
+    row.append(&go);
+    signin.append(&row);
+    left.append(&signin);
 
-    // Wi-Fi and battery, top-right: "Wi-Fi   82%", as on the lock screen.
-    let top = gtk::Box::new(gtk::Orientation::Horizontal, 16);
-    top.set_halign(gtk::Align::End);
-    top.set_valign(gtk::Align::Start);
-    top.set_margin_end(40);
-    top.set_margin_top(30);
-    if common::wifi_name().is_some() {
-        top.append(&label("Wi-Fi", &["status", "tiles-top"]));
+    // Right column: battery and connection (only what is real), then the power menu.
+    let wifi = common::wifi_name().is_some();
+    let battery = common::battery();
+    if wifi || battery.is_some() {
+        let status = tile(&[]);
+        status.set_valign(gtk::Align::Start);
+        status.append(&label(if battery.is_some() { "Battery" } else { "Network" }, &["tile-label"]));
+        let big = match battery {
+            Some(b) => format!("{b}%"),
+            None => "Wi-Fi".to_string(),
+        };
+        let big = label(&big, &["tile-big"]);
+        big.set_halign(gtk::Align::Start);
+        status.append(&big);
+        if wifi && battery.is_some() {
+            let net = label("Wi-Fi", &["status"]);
+            net.set_halign(gtk::Align::Start);
+            status.append(&net);
+        }
+        right.append(&status);
     }
-    if let Some(b) = common::battery() {
-        top.append(&label(&format!("{b}%"), &["status", "tiles-top"]));
-    }
-    curtain.add_overlay(&top);
-
-    // "Swipe up or type", bottom-right, with a chevron.
-    let hint = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    hint.set_halign(gtk::Align::End);
-    hint.set_valign(gtk::Align::End);
-    hint.set_margin_end(40);
-    hint.set_margin_bottom(60);
-    let chevron = gtk::DrawingArea::new();
-    chevron.set_content_width(22);
-    chevron.set_content_height(22);
-    chevron.set_halign(gtk::Align::Center);
-    chevron.set_draw_func(|_, cr, w, h| {
-        let k = f64::from(w.min(h)) / 24.0;
-        cr.set_source_rgb(0.604, 0.643, 0.671);
-        cr.set_line_width(1.5 * k);
-        cr.set_line_cap(gtk::cairo::LineCap::Round);
-        cr.set_line_join(gtk::cairo::LineJoin::Round);
-        cr.move_to(6.0 * k, 15.0 * k);
-        cr.line_to(12.0 * k, 9.0 * k);
-        cr.line_to(18.0 * k, 15.0 * k);
-        let _ = cr.stroke();
-    });
-    hint.append(&chevron);
-    hint.append(&label("Swipe up or type", &["status"]));
-    curtain.add_overlay(&hint);
-
-    // Power, bottom-right of the second stage.
-    let status = gtk::Box::new(gtk::Orientation::Horizontal, 22);
-    status.set_halign(gtk::Align::End);
-    status.set_valign(gtk::Align::End);
-    status.set_margin_end(40);
-    status.set_margin_bottom(60);
+    let fill = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    fill.set_vexpand(true);
+    right.append(&fill);
     let power = gtk::MenuButton::new();
     power.set_label("Power");
     power.set_always_show_arrow(false);
-    power.add_css_class("status");
+    power.add_css_class("power-tile");
+    power.set_halign(gtk::Align::End);
     let menu = gtk::gio::Menu::new();
     menu.append(Some("Shut down"), Some("app.poweroff"));
     menu.append(Some("Restart"), Some("app.reboot"));
@@ -325,118 +339,11 @@ fn build(app: &gtk::Application) {
         });
         app.add_action(&action);
     }
-    status.append(&power);
-    stage2.add_overlay(&status);
+    right.append(&power);
 
-    let stack = gtk::Stack::new();
-    stack.set_transition_duration(250);
-    stack.add_named(&curtain, Some("curtain"));
-    stack.add_named(&stage2, Some("form"));
-    stack.set_visible_child_name("curtain");
-    window.set_child(Some(&stack));
-
-    // Raise and drop the curtain. `last` is the time of the last input, for the idle drop.
-    let last = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
-    let raise = {
-        let (stack, password, last) = (stack.clone(), password.clone(), last.clone());
-        move |typed: Option<String>| {
-            last.set(std::time::Instant::now());
-            if stack.visible_child_name().as_deref() != Some("form") {
-                stack.set_visible_child_full("form", gtk::StackTransitionType::UnderUp);
-            }
-            password.grab_focus();
-            if let Some(t) = typed {
-                password.set_text(&format!("{}{t}", password.text()));
-                password.set_position(-1);
-            }
-        }
-    };
-    let drop_curtain = {
-        let (stack, password, error, last) = (stack.clone(), password.clone(), error.clone(), last.clone());
-        move || {
-            last.set(std::time::Instant::now());
-            if stack.visible_child_name().as_deref() == Some("form") {
-                stack.set_visible_child_full("curtain", gtk::StackTransitionType::OverDown);
-            }
-            password.set_text("");
-            error.set_visible(false);
-        }
-    };
-    {
-        // Keys: on the curtain any key raises it (a printable one other than Space goes into
-        // the box); on the second stage Esc drops it.
-        let keys = gtk::EventControllerKey::new();
-        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
-        let (stack, raise, drop_curtain, last) = (stack.clone(), raise.clone(), drop_curtain.clone(), last.clone());
-        keys.connect_key_pressed(move |_, key, _, _| {
-            use gtk::gdk::Key;
-            last.set(std::time::Instant::now());
-            let on_curtain = stack.visible_child_name().as_deref() != Some("form");
-            if matches!(
-                key,
-                Key::Shift_L
-                    | Key::Shift_R
-                    | Key::Control_L
-                    | Key::Control_R
-                    | Key::Alt_L
-                    | Key::Alt_R
-                    | Key::Super_L
-                    | Key::Super_R
-                    | Key::Meta_L
-                    | Key::Meta_R
-                    | Key::Caps_Lock
-                    | Key::ISO_Level3_Shift
-            ) {
-                return glib::Propagation::Proceed;
-            }
-            if key == Key::Escape {
-                if !on_curtain {
-                    drop_curtain();
-                }
-                return glib::Propagation::Stop;
-            }
-            if on_curtain {
-                let typed = key.to_unicode().filter(|c| !c.is_control() && *c != ' ').map(|c| c.to_string());
-                raise(typed);
-                return glib::Propagation::Stop;
-            }
-            glib::Propagation::Proceed
-        });
-        window.add_controller(keys);
-    }
-    {
-        // A click, or a drag upward, raises the curtain.
-        let click = gtk::GestureClick::new();
-        let r = raise.clone();
-        click.connect_pressed(move |_, _, _, _| r(None));
-        curtain.add_controller(click);
-        let drag = gtk::GestureDrag::new();
-        let r = raise.clone();
-        drag.connect_drag_update(move |_, _, dy| {
-            if dy < -40.0 {
-                r(None);
-            }
-        });
-        curtain.add_controller(drag);
-    }
-    {
-        // Ten seconds without input drops the curtain, unless something is typed.
-        let (stack, password, last, drop_curtain) =
-            (stack.clone(), password.clone(), last.clone(), drop_curtain.clone());
-        password.connect_changed({
-            let last = last.clone();
-            move |_| last.set(std::time::Instant::now())
-        });
-        glib::timeout_add_seconds_local(1, move || {
-            if stack.visible_child_name().as_deref() == Some("form")
-                && last.get().elapsed() > std::time::Duration::from_secs(10)
-                && password.text().is_empty()
-            {
-                drop_curtain();
-            }
-            glib::ControlFlow::Continue
-        });
-    }
+    window.set_child(Some(&board));
+    // The field has the focus from the start: typing goes straight into it.
+    password.grab_focus();
 
     glib::timeout_add_seconds_local(5, move || {
         clock.set_text(&common::clock());

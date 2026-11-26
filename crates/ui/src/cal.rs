@@ -4,7 +4,7 @@
 //! Events are standard iCalendar files, one VEVENT per file in
 //! `~/.local/share/tripppin/calendar/` (`$XDG_DATA_HOME` is honoured). Times are floating
 //! local times (`DTSTART:20261127T180000`), which is what a personal calendar means.
-//! Other programs (the start screen's live tile, the AI) read the same folder.
+//! Other programs (the bridge's live tile, the AI) read the same folder.
 
 use std::path::PathBuf;
 

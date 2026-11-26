@@ -3,7 +3,7 @@
     "KPlugin": {
         "Authors": [{ "Name": "Tripppin" }],
         "Category": "",
-        "Description": "Tiles: flat, square, solid colour, Inter and DM Mono",
+        "Description": "Bento: rounded tiles on graphite, amber, Manrope",
         "Id": "in.trippp.desktop",
         "License": "Apache-2.0",
         "Name": "Tripppin",

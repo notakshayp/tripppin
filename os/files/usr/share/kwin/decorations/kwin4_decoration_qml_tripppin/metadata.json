@@ -2,10 +2,10 @@
     "KPackageStructure": "KWin/Decoration",
     "KPlugin": {
         "Authors": [{ "Name": "Tripppin" }],
-        "Description": "Flat, square window frames: a 36 px strip in the accent colour when active",
+        "Description": "Bento window frames: a 38 px title strip with 14 px rounded top corners and round glyph buttons",
         "Id": "kwin4_decoration_qml_tripppin",
         "License": "Apache-2.0",
-        "Name": "Tripppin Tiles",
+        "Name": "Tripppin Bento",
         "Website": "https://trippp.in"
     },
     "X-KWin-Config-TranslationDomain": "aurorae"

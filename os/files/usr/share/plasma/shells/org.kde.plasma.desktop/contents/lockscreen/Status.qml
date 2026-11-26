@@ -2,13 +2,14 @@ import QtQuick
 import org.kde.plasma.plasma5support as P5Support
 import org.kde.plasma.private.battery
 
-// Top-right of the lock screen (mock section 01): "Wi-Fi   82%", 13 px, white. Wi-Fi shows
-// while connected over Wi-Fi ("Wired" over a cable), the percentage only with a battery.
-Row {
+// The lock board's status data (Bento mock 01): how the computer is connected and the battery
+// level. Data only; LockScreenUi.qml draws the tile. Wi-Fi shows while connected over Wi-Fi
+// ("Wired" over a cable), the battery only with one. Nothing is invented.
+Item {
     id: status
-    property real s: 1
     property string net: ""
-    spacing: 16 * s
+    readonly property bool hasBattery: battery.hasInternalBatteries
+    readonly property int percent: battery.percent
 
     BatteryControlModel { id: battery }
 
@@ -25,20 +26,5 @@ Row {
             else
                 status.net = "";
         }
-    }
-
-    Text {
-        visible: status.net !== ""
-        text: status.net
-        color: "#ffffff"
-        font.family: "Inter"
-        font.pixelSize: 13 * status.s
-    }
-    Text {
-        visible: battery.hasInternalBatteries
-        text: battery.percent + "%"
-        color: "#ffffff"
-        font.family: "Inter"
-        font.pixelSize: 13 * status.s
     }
 }

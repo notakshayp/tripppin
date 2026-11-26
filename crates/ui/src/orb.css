@@ -1,0 +1,252 @@
+/* The orb in Bento, after BentoAsk: a rounded board over the desktop. Everything it does is a
+   tile: your request (blue), each tool call (green when done, amber while it runs, dim when
+   next), what needs your OK, the answer and its receipts. Tokens are style.css's; this file
+   places them. Motion is opacity and transform only. Loaded over style.css (orb.rs). */
+
+window.clear { font-family: Manrope, Inter, sans-serif; }
+
+/* ---- the resting orb: a rounded tile with the mark ---- */
+button.orb {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface-2);
+    background-image: none;
+    box-shadow: var(--shadow-md);
+    transition: transform 180ms ease-out, opacity 180ms ease-out, background 180ms ease-out;
+}
+button.orb:hover { background: var(--surface-3); transform: translateY(-1px); }
+button.orb:active { transform: scale(0.96); }
+button.orb.tucked { min-width: 18px; min-height: 18px; border-radius: 9px; opacity: 0.55; box-shadow: none; }
+button.orb.tucked:hover { opacity: 1; }
+button.orb.dragging { transform: scale(1.06); }
+button.orb.working { border-color: var(--accent); background-image: none; animation: orb-work 1.2s ease-in-out infinite alternate; }
+@keyframes orb-work { from { opacity: 0.8; } to { opacity: 1; } }
+.orb-hint { font-size: 12px; font-weight: 600; color: var(--fg-3); }
+
+/* ---- the board: the ask window and the card share it ---- */
+.backdrop { background: rgba(16, 18, 20, 0.62); }
+.orb-board, .card {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    padding: 18px;
+    box-shadow: var(--shadow-lg);
+}
+.amber-chip { background: var(--accent); border-radius: 10px; }
+.board-title { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; color: var(--fg); }
+.k { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+.k.mute { color: var(--fg-3); }
+.hint, .model-line { font-size: 12px; font-weight: 600; color: var(--fg-3); }
+button.link.hint-link { font-size: 12px; font-weight: 600; color: var(--fg-3); }
+button.link.hint-link:hover { color: var(--fg); }
+
+/* the input: a dark rounded field with the amber mic */
+.ask-pill {
+    min-height: 52px;
+    padding: 6px 8px 6px 16px;
+    background: var(--bg);
+    border: none;
+    border-radius: 16px;
+    box-shadow: none;
+}
+entry.ask {
+    background: none;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--fg);
+    caret-color: var(--accent);
+}
+entry.ask > text > placeholder { color: var(--fg-3); }
+button.mic-btn, button.send {
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    transition: filter 150ms ease-out, transform 150ms ease-out;
+}
+button.mic-btn:hover, button.send:hover { background: var(--accent); filter: brightness(1.08); }
+button.mic-btn:active, button.send:active { transform: scale(0.94); }
+.mic-glyph { color: var(--accent-ink); font-size: 16px; }
+button.send.small { min-width: 34px; min-height: 34px; padding: 0; }
+
+/* ready: suggestion and recent tiles */
+button.try-tile, button.recent-tile {
+    background: var(--surface);
+    border: none;
+    border-radius: 18px;
+    box-shadow: none;
+    padding: 14px;
+    min-height: 0;
+    color: var(--fg);
+    transition: background 150ms ease-out, transform 150ms ease-out;
+}
+button.try-tile.first { background: var(--ok-tile); }
+button.try-tile:hover, button.recent-tile:hover { background: #2c3236; }
+button.try-tile.first:hover { background: #31453b; }
+button.try-tile:active, button.recent-tile:active { transform: scale(0.985); }
+.try-title { font-size: 14px; font-weight: 700; color: var(--fg); }
+.try-sub { font-size: 12px; font-weight: 500; color: var(--fg-3); }
+.recent-dot { background: var(--ok); border-radius: 50%; min-width: 10px; min-height: 10px; }
+.recent-dot.failed { background: var(--accent); }
+button.chip {
+    min-height: 0;
+    padding: 8px 13px;
+    border: none;
+    box-shadow: none;
+    border-radius: 999px;
+    background: var(--surface-3);
+    color: var(--fg);
+    font-size: 13px;
+    font-weight: 600;
+}
+button.chip:hover { background: #3a3f43; color: var(--fg); }
+button.chip.app-chip { border: none; color: var(--fg); }
+
+/* ---- the card: the conversation ---- */
+.card { padding: 18px; }
+.title-strip { background: none; padding: 0; margin-bottom: 2px; }
+.card > :not(.title-strip) { margin-left: 0; margin-right: 0; }
+.caption { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; color: var(--fg); }
+.caption.live { color: var(--accent); }
+.caption.orb-status { font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--fg-3); }
+button.icon-button { min-width: 34px; min-height: 34px; border-radius: 12px; color: var(--fg-3); }
+button.icon-button:hover { background: var(--surface-3); color: var(--fg); }
+.context-meter { margin-top: 0; }
+
+/* YOU ASKED: a blue tile */
+.asked-tile, .follow-up {
+    background: var(--c-blue);
+    color: #0e2233;
+    border-radius: 18px;
+    padding: 14px;
+}
+.asked-tile .k, .follow-up .k { color: #0e2233; opacity: 0.75; }
+.asked { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #0e2233; }
+.follow-text { font-size: 16px; font-weight: 700; color: #0e2233; }
+
+/* a tool call: a tile. Done is green, running is amber, failed is rust. */
+.step, .plan-step {
+    padding: 14px;
+    margin: 0;
+    background: var(--surface);
+    color: var(--fg);
+    border-radius: 18px;
+    transition: background 200ms ease-out, opacity 200ms ease-out;
+}
+.step:hover { background: #2c3236; }
+.step.now { background: var(--run-tile); }
+.step.done { background: var(--ok-tile); }
+.step.failed { background: #3a2724; }
+.step.now:hover { background: #443a28; }
+.step.done:hover { background: #31453b; }
+.step-state { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--fg-3); }
+.step.now .step-state { color: var(--accent); }
+.step.done .step-state { color: var(--ok); }
+.step.failed .step-state { color: var(--danger); }
+.step-title { font-size: 15px; font-weight: 700; color: var(--fg); }
+.step-title.running { color: var(--fg); font-weight: 700; }
+.step-detail { font-size: 12px; font-weight: 500; color: var(--fg-3); }
+.step.now .step-detail { font-family: "DM Mono", monospace; font-size: 12px; font-weight: 400; }
+.step-chevron { color: var(--fg-3); opacity: 0.7; }
+.step:hover .step-chevron { opacity: 1; }
+.step-more { background: rgba(22, 24, 26, 0.55); border: none; border-radius: 12px; padding: 10px 12px; margin-top: 6px; }
+.step-command, .step-output { font-family: "DM Mono", monospace; font-size: 12px; color: var(--fg-2); }
+progressbar.step-bar { margin-top: 4px; }
+progressbar.step-bar trough { min-height: 8px; border-radius: 4px; background: var(--bg); border: none; }
+progressbar.step-bar progress { min-height: 8px; border-radius: 4px; background: var(--accent); border: none; }
+.tick { background: none; color: inherit; min-width: 16px; min-height: 16px; animation: none; }
+.tick.failed { background: none; color: inherit; }
+.march-dot { min-width: 5px; min-height: 5px; border-radius: 50%; background: var(--accent); opacity: 0.25; animation: march 1.2s ease-in-out infinite; }
+.md1 { animation-delay: 120ms; }
+.md2 { animation-delay: 240ms; }
+.md3 { animation-delay: 360ms; }
+.md4 { animation-delay: 480ms; }
+@keyframes march { 0%, 100% { opacity: 0.25; } 25% { opacity: 1; } }
+
+/* the plan: the next tiles, dim until their turn */
+.plan { padding: 0; border: none; background: none; }
+.plan-caption { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--fg-3); margin: 4px 0 6px 0; }
+.plan-step { padding: 10px 14px; margin-bottom: 6px; opacity: 0.55; }
+.plan-step.now { background: var(--run-tile); opacity: 1; }
+.plan-step.done { background: var(--ok-tile); opacity: 0.8; }
+.plan-text { font-size: 13px; font-weight: 600; color: var(--fg); }
+.plan-todo { background: none; border: 2px solid var(--fg-4); border-radius: 50%; min-width: 10px; min-height: 10px; }
+.plan-now { background: var(--accent); border-radius: 50%; min-width: 12px; min-height: 12px; }
+.icon.plan-done { color: var(--ok); }
+
+/* the answer leads: a green tile, then the receipts */
+.answer-tile { background: var(--ok-tile); border-radius: 18px; padding: 18px; }
+.answer-tile .k { color: var(--ok); }
+.answer-tile.stopped { background: #3a2724; }
+.answer-tile.stopped .k { color: var(--danger); }
+.answer { font-size: 17px; font-weight: 600; color: var(--fg); }
+.receipt { background: var(--surface); border-radius: 18px; padding: 14px; }
+.receipt-number { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; color: var(--fg); }
+.receipt-what { font-size: 12px; font-weight: 500; color: var(--fg-3); }
+button.receipt-action {
+    background: var(--surface);
+    border: none;
+    border-radius: 18px;
+    box-shadow: none;
+    padding: 12px 14px;
+    min-height: 0;
+    color: var(--fg);
+}
+button.receipt-action:hover { background: #2c3236; }
+.blue-chip { background: var(--c-blue); border-radius: 12px; }
+.chip-glyph { color: #0e2233; font-size: 18px; }
+.receipt-title { font-size: 14px; font-weight: 700; color: var(--fg); }
+.receipt-link { font-size: 13px; font-weight: 700; color: var(--accent); }
+.turn-usage, .session-usage { font-size: 12px; font-weight: 500; color: var(--fg-3); }
+
+/* a follow-up: the same dark field */
+.follow-row { padding: 4px 8px 4px 16px; background: var(--bg); border: none; border-radius: 16px; }
+entry.follow { font-size: 14px; font-weight: 500; color: var(--fg); caret-color: var(--accent); }
+entry.follow > text > placeholder { color: var(--fg-3); }
+
+/* the bottom bar: tokens and time, the way on in the terminal, Stop */
+.card-foot { padding-top: 6px; }
+.foot-tile { background: var(--surface); border-radius: 14px; padding: 6px 8px 6px 14px; }
+button.link { color: var(--fg-3); font-size: 13px; font-weight: 600; }
+button.link:hover { color: var(--fg); }
+button.stop {
+    min-height: 40px;
+    padding: 0 18px;
+    border: none;
+    box-shadow: none;
+    border-radius: 14px;
+    background: var(--fg);
+    color: var(--accent-ink);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+button.stop:hover { background: #ffffff; }
+
+/* requests side by side, and the history */
+button.request-tab { min-height: 32px; border: none; border-radius: 999px; background: var(--surface); color: var(--fg-3); font-size: 13px; font-weight: 600; }
+button.request-tab:hover { background: var(--surface-3); color: var(--fg); }
+button.request-tab.selected { background: var(--accent); color: var(--accent-ink); }
+.request-tab-dot { background: var(--fg-4); border-radius: 50%; }
+.request-tab-dot.unseen { background: var(--accent); }
+list.sessions > row { background: none; }
+.session-row { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border-radius: 18px; }
+.session-row:hover { background: #2c3236; }
+.session-row.current { border: none; }
+.session-row.current.on-show { background: var(--surface-3); }
+.orb-dim { background: rgba(16, 18, 20, 0.5); }
+
+/* Entrances and exits: opacity and a short move, no scale pops. */
+.pop-a, .pop-b, .rise-a, .rise-b { animation-duration: 200ms; animation-timing-function: ease-out; }
+.drop-a, .drop-b { animation-duration: 200ms; animation-timing-function: ease-out; }
+.leave { animation-duration: 150ms; }

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="6" height="6" viewBox="0 0 6 6">
+  <g id="topleft"><rect x="0" y="0" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="top"><rect x="2" y="0" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="topright"><rect x="4" y="0" width="2" height="2" fill="#1c1f21"/><rect x="5" y="0" width="1" height="2" fill="#2a2e31"/></g>
+  <g id="left"><rect x="0" y="2" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="center"><rect x="2" y="2" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="right"><rect x="4" y="2" width="2" height="2" fill="#1c1f21"/><rect x="5" y="2" width="1" height="2" fill="#2a2e31"/></g>
+  <g id="bottomleft"><rect x="0" y="4" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="bottom"><rect x="2" y="4" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="bottomright"><rect x="4" y="4" width="2" height="2" fill="#1c1f21"/><rect x="5" y="4" width="1" height="2" fill="#2a2e31"/></g>
+  <rect id="hint-left-margin" x="0" y="0" width="0.01" height="1" fill="none"/>
+  <rect id="hint-right-margin" x="0" y="0" width="0.01" height="1" fill="none"/>
+  <rect id="hint-top-margin" x="0" y="0" width="1" height="0.01" fill="none"/>
+  <rect id="hint-bottom-margin" x="0" y="0" width="1" height="0.01" fill="none"/>
+  <rect id="hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>
+  <g id="floating-topleft"><rect x="0" y="0" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="floating-top"><rect x="2" y="0" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="floating-topright"><rect x="4" y="0" width="2" height="2" fill="#1c1f21"/><rect x="5" y="0" width="1" height="2" fill="#2a2e31"/></g>
+  <g id="floating-left"><rect x="0" y="2" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="floating-center"><rect x="2" y="2" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="floating-right"><rect x="4" y="2" width="2" height="2" fill="#1c1f21"/><rect x="5" y="2" width="1" height="2" fill="#2a2e31"/></g>
+  <g id="floating-bottomleft"><rect x="0" y="4" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="floating-bottom"><rect x="2" y="4" width="2" height="2" fill="#1c1f21"/></g>
+  <g id="floating-bottomright"><rect x="4" y="4" width="2" height="2" fill="#1c1f21"/><rect x="5" y="4" width="1" height="2" fill="#2a2e31"/></g>
+  <rect id="floating-hint-left-margin" x="0" y="0" width="0.01" height="1" fill="none"/>
+  <rect id="floating-hint-right-margin" x="0" y="0" width="0.01" height="1" fill="none"/>
+  <rect id="floating-hint-top-margin" x="0" y="0" width="1" height="0.01" fill="none"/>
+  <rect id="floating-hint-bottom-margin" x="0" y="0" width="1" height="0.01" fill="none"/>
+  <rect id="floating-hint-stretch-borders" x="0" y="0" width="1" height="1" fill="none"/>
+</svg>

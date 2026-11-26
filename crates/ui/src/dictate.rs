@@ -15,6 +15,7 @@ use gtk::prelude::*;
 use gtk::{gio, glib};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -23,6 +24,8 @@ use std::rc::Rc;
 const SAMPLE_RATE: u32 = 16_000;
 /// Samples per chunk read from the microphone: 100 ms.
 const CHUNK: usize = 1600;
+/// Bars in the live waveform.
+const WAVE_BARS: usize = 20;
 const CHUNK_MS: u32 = 100;
 /// Louder than this (RMS, 0 to 1) counts as speech.
 const SPEECH_RMS: f32 = 0.015;
@@ -291,7 +294,10 @@ struct Dictation {
     pill: gtk::Box,
     icon: gtk::Label,
     text: gtk::Label,
-    bar: gtk::ProgressBar,
+    hint: gtk::Label,
+    /// The live waveform: one bar per recent loudness reading.
+    bar: gtk::DrawingArea,
+    levels: Rc<RefCell<VecDeque<f64>>>,
     phase: Cell<Phase>,
     samples: RefCell<Vec<i16>>,
     end: RefCell<Endpointer>,
@@ -300,6 +306,14 @@ struct Dictation {
 
 impl Dictation {
     fn start(self: &Rc<Self>) {
+        // Development aid: TRIPPPIN_SHOT with TRIPPPIN_DICTATE_DEMO shows the pill with a made-up wave.
+        if std::env::var_os("TRIPPPIN_DICTATE_DEMO").is_some() {
+            let wave = [6, 12, 20, 9, 24, 16, 28, 11, 22, 26, 14, 8, 18, 24, 10, 20, 14, 8, 12, 6];
+            self.levels.borrow_mut().extend(wave.iter().map(|w| (f64::from(*w) - 6.0) / 22.0));
+            self.window.present();
+            common::snapshot_hook(&self.pill);
+            return;
+        }
         let child = Command::new("pw-record")
             .args(["--raw", "--rate", "16000", "--channels", "1", "--format", "s16", "-"])
             .stdout(Stdio::piped())
@@ -331,7 +345,14 @@ impl Dictation {
                 }
                 // The meter: quiet speech should still move it, so it follows the square root.
                 let level = f64::from(rms(&chunk)).sqrt() * 1.6;
-                d.bar.set_fraction(level.clamp(0.0, 1.0));
+                {
+                    let mut l = d.levels.borrow_mut();
+                    l.push_back(level.clamp(0.0, 1.0));
+                    while l.len() > WAVE_BARS {
+                        l.pop_front();
+                    }
+                }
+                d.bar.queue_draw();
                 d.samples.borrow_mut().extend_from_slice(&chunk);
                 if d.end.borrow_mut().feed(rms(&chunk), CHUNK_MS).is_some() {
                     d.finish(true);
@@ -365,6 +386,7 @@ impl Dictation {
         self.icon.set_text(&icons::SPARKLES.to_string());
         self.text.set_text("Transcribing…");
         self.bar.set_visible(false);
+        self.hint.set_visible(false);
         let (tx, rx) = async_channel::bounded::<Result<(), String>>(1);
         std::thread::spawn(move || {
             let wav = common::runtime_dir().join("dictation.wav");
@@ -395,6 +417,7 @@ impl Dictation {
         self.icon.set_text(&icons::MIC_OFF.to_string());
         self.text.set_text(message);
         self.bar.set_visible(false);
+        self.hint.set_visible(false);
         if !self.window.is_visible() {
             self.window.present();
             common::play(&self.pill, "pop");
@@ -460,15 +483,45 @@ fn build(app: &gtk::Application) -> Rc<Dictation> {
     pill.set_margin_start(24);
     pill.set_margin_end(24);
     let icon = common::icon(icons::MIC, &["osd-icon"]);
-    icon.set_width_chars(2);
+    icon.set_xalign(0.5);
+    icon.set_yalign(0.5);
+    icon.set_valign(gtk::Align::Center);
     let text = label("Listening", &["osd-name"]);
-    let bar = gtk::ProgressBar::new();
-    bar.add_css_class("osd-bar");
-    bar.set_hexpand(true);
+    text.set_valign(gtk::Align::Center);
+    let levels: Rc<RefCell<VecDeque<f64>>> = Rc::default();
+    let bar = gtk::DrawingArea::new();
+    bar.set_content_width((WAVE_BARS * 7 - 3) as i32);
+    bar.set_content_height(28);
     bar.set_valign(gtk::Align::Center);
+    {
+        let levels = levels.clone();
+        bar.set_draw_func(move |_, cr, w, h| {
+            // Rounded bars in the dictation orange, newest on the right; quiet ones stay short.
+            let l = levels.borrow();
+            let (w, h) = (f64::from(w), f64::from(h));
+            for i in 0..WAVE_BARS {
+                let level = (i + l.len()).checked_sub(WAVE_BARS).and_then(|j| l.get(j)).copied().unwrap_or(0.0);
+                let bh = 6.0 + level * (h - 6.0);
+                let x = i as f64 * 7.0;
+                let (r, y) = (2.0, (h - bh) / 2.0);
+                cr.new_sub_path();
+                cr.arc(x + r, y + r, r, std::f64::consts::PI, 1.5 * std::f64::consts::PI);
+                cr.arc(x + 4.0 - r, y + r, r, 1.5 * std::f64::consts::PI, 0.0);
+                cr.arc(x + 4.0 - r, y + bh - r, r, 0.0, 0.5 * std::f64::consts::PI);
+                cr.arc(x + r, y + bh - r, r, 0.5 * std::f64::consts::PI, std::f64::consts::PI);
+                cr.close_path();
+                cr.set_source_rgb(1.0, 0.541, 0.353);
+                let _ = cr.fill();
+            }
+            let _ = w;
+        });
+    }
+    let hint = label("Super M to finish", &["osd-hint"]);
+    hint.set_valign(gtk::Align::Center);
     pill.append(&icon);
     pill.append(&text);
     pill.append(&bar);
+    pill.append(&hint);
     window.set_child(Some(&pill));
     // Never takes clicks either.
     window.connect_map(|w| {
@@ -483,6 +536,8 @@ fn build(app: &gtk::Application) -> Rc<Dictation> {
         icon,
         text,
         bar,
+        hint,
+        levels,
         phase: Cell::new(Phase::Listening),
         samples: RefCell::new(Vec::new()),
         end: RefCell::new(Endpointer::default()),

@@ -47,7 +47,8 @@ pub fn load_css() {
 pub fn snapshot_hook(w: &impl IsA<gtk::Widget>) {
     let Ok(path) = std::env::var("TRIPPPIN_SHOT") else { return };
     let w = w.clone().upcast::<gtk::Widget>();
-    glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
+    let ms = std::env::var("TRIPPPIN_SHOT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(2500);
+    glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
         let (width, height) = (w.width(), w.height());
         let Some(renderer) = w.native().and_then(|n| n.renderer()) else { return };
         let paintable = gtk::WidgetPaintable::new(Some(&w));
@@ -252,7 +253,6 @@ pub mod icons {
     pub const CHEVRON_RIGHT: char = '\u{e06f}';
     pub const TERMINAL: char = '\u{e181}';
     pub const NEW: char = '\u{e172}';
-    pub const KEY: char = '\u{e4a3}';
     pub const EXTERNAL: char = '\u{e0b9}';
     pub const CLOUD: char = '\u{e088}';
     pub const CPU: char = '\u{e0a9}';

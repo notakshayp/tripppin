@@ -1,7 +1,6 @@
-//! Keyboard: layouts, the keys that switch between them and key repeat, written to
-//! ~/.config/niri/tripppin-keyboard.kdl (niri merges its `input` block with the system's).
-
-use std::path::PathBuf;
+//! Keyboard: layouts, the keys that switch between them and key repeat. Layouts live in
+//! kxkbrc (Plasma's keyboard daemon reloads on a D-Bus signal), repeat in kcminputrc (KWin
+//! watches it).
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Keyboard {
@@ -58,56 +57,60 @@ pub fn all_layouts() -> Vec<(String, String)> {
     parse_layouts(&std::fs::read_to_string("/usr/share/X11/xkb/rules/evdev.lst").unwrap_or_default())
 }
 
-fn file() -> PathBuf {
-    std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("niri/tripppin-keyboard.kdl")
-}
-
-pub fn to_kdl(k: &Keyboard) -> String {
-    format!(
-        "// Keyboard, written by tripppin settings.\ninput {{\n    keyboard {{\n        xkb {{\n            layout \"{}\"\n            options \"{}\"\n        }}\n        repeat-delay {}\n        repeat-rate {}\n    }}\n}}\n",
-        k.layouts.join(","),
-        k.switch,
-        k.delay,
-        k.rate
-    )
-}
-
-pub fn parse_kdl(text: &str) -> Keyboard {
+/// The keyboard from the text of kxkbrc and kcminputrc.
+pub fn parse(kxkbrc: &str, kcminputrc: &str) -> Keyboard {
     let mut k = Keyboard::default();
-    let quoted = |l: &str| l.split('"').nth(1).unwrap_or("").to_string();
-    for line in text.lines().map(str::trim) {
-        if line.starts_with("layout ") {
-            k.layouts = quoted(line).split(',').filter(|s| !s.is_empty()).map(str::to_string).collect();
-        } else if line.starts_with("options ") {
-            k.switch = quoted(line);
-        } else if let Some(v) = line.strip_prefix("repeat-delay ") {
-            k.delay = v.trim().parse().unwrap_or(k.delay);
-        } else if let Some(v) = line.strip_prefix("repeat-rate ") {
-            k.rate = v.trim().parse().unwrap_or(k.rate);
-        }
+    if let Some(list) = crate::kde::ini_get(kxkbrc, "Layout", "LayoutList") {
+        k.layouts = list.split(',').map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).collect();
     }
     if k.layouts.is_empty() {
         k.layouts = Keyboard::default().layouts;
     }
+    if let Some(options) = crate::kde::ini_get(kxkbrc, "Layout", "Options") {
+        // Only the switching key is ours; any other option is kept as it was when saving.
+        if let Some(s) = options.split(',').map(str::trim).find(|o| o.starts_with("grp:")) {
+            k.switch = s.to_string();
+        }
+    }
+    k.delay =
+        crate::kde::ini_get(kcminputrc, "Keyboard", "RepeatDelay").and_then(|v| v.parse().ok()).unwrap_or(k.delay);
+    k.rate = crate::kde::ini_get(kcminputrc, "Keyboard", "RepeatRate")
+        .and_then(|v| v.parse::<f64>().ok())
+        .map_or(k.rate, |r| r.round() as u32);
     k
 }
 
-pub fn current() -> Keyboard {
-    std::fs::read_to_string(file()).map(|t| parse_kdl(&t)).unwrap_or_default()
+/// kxkbrc's VariantList for `n` layouts: one empty variant each, so "us,in" pairs up.
+pub fn variant_list(n: usize) -> String {
+    ",".repeat(n.saturating_sub(1))
 }
 
-/// Saves the settings; niri notices the file change and applies them at once.
+/// kxkbrc's Options with the switching key replaced by `switch`.
+pub fn options_with(old: &str, switch: &str) -> String {
+    let mut parts: Vec<&str> =
+        old.split(',').map(str::trim).filter(|o| !o.is_empty() && !o.starts_with("grp:")).collect();
+    parts.push(switch);
+    parts.join(",")
+}
+
+pub fn current() -> Keyboard {
+    parse(&crate::kde::file_text("kxkbrc"), &crate::kde::file_text("kcminputrc"))
+}
+
+/// Saves the settings and tells Plasma, which applies them at once.
 pub fn save(k: &Keyboard) -> std::io::Result<()> {
-    let path = file();
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    std::fs::write(&path, to_kdl(k))?;
-    crate::display::include_in_niri("tripppin-keyboard.kdl")
+    use crate::kde::{emit, read, write, write_bool};
+    let old_options = read("kxkbrc", "Layout", "Options").unwrap_or_default();
+    let ok = write_bool("kxkbrc", "Layout", "Use", true)
+        && write("kxkbrc", "Layout", "LayoutList", &k.layouts.join(","))
+        && write("kxkbrc", "Layout", "VariantList", &variant_list(k.layouts.len()))
+        && write("kxkbrc", "Layout", "Options", &options_with(&old_options, &k.switch))
+        && write_bool("kxkbrc", "Layout", "ResetOldOptions", true)
+        && write("kcminputrc", "Keyboard", "RepeatDelay", &k.delay.to_string())
+        && write("kcminputrc", "Keyboard", "RepeatRate", &k.rate.to_string());
+    emit("/Layouts", "org.kde.keyboard", "reloadConfig");
+    crate::kde::kwin_reconfigure();
+    if ok { Ok(()) } else { Err(std::io::Error::other("kwriteconfig6 failed")) }
 }
 
 #[cfg(test)]
@@ -115,16 +118,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn layouts_and_settings_round_trip() {
+    fn reads_the_layouts_xkb_knows() {
         let lst = "! model\n  pc105 Generic\n\n! layout\n  custom          A user-defined custom Layout\n  us              English (US)\n  in              Indian\n\n! variant\n  dvorak us: English (Dvorak)\n";
         assert_eq!(parse_layouts(lst), vec![("us".into(), "English (US)".into()), ("in".into(), "Indian".into())]);
-        let k = Keyboard {
-            layouts: vec!["us".into(), "in".into()],
-            switch: "grp:caps_toggle".into(),
-            delay: 250,
-            rate: 40,
-        };
-        assert_eq!(parse_kdl(&to_kdl(&k)), k);
-        assert_eq!(parse_kdl(""), Keyboard::default());
+    }
+
+    #[test]
+    fn reads_kxkbrc_and_kcminputrc() {
+        let kxkb = "[Layout]\nLayoutList=us,in\nOptions=caps:escape,grp:caps_toggle\nUse=true\n";
+        let input = "[Keyboard]\nRepeatDelay=250\nRepeatRate=40.0\n";
+        assert_eq!(
+            parse(kxkb, input),
+            Keyboard {
+                layouts: vec!["us".into(), "in".into()],
+                switch: "grp:caps_toggle".into(),
+                delay: 250,
+                rate: 40
+            }
+        );
+        assert_eq!(parse("", ""), Keyboard::default());
+    }
+
+    #[test]
+    fn keeps_other_options_when_switching() {
+        assert_eq!(
+            options_with("caps:escape,grp:caps_toggle", "grp:alt_shift_toggle"),
+            "caps:escape,grp:alt_shift_toggle"
+        );
+        assert_eq!(options_with("", "grp:menu_toggle"), "grp:menu_toggle");
+        assert_eq!(variant_list(1), "");
+        assert_eq!(variant_list(3), ",,");
     }
 }

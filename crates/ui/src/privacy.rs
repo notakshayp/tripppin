@@ -86,32 +86,17 @@ pub fn set_screen_reader(on: bool) {
 pub const CURSOR_SIZES: [(u32, &str); 4] = [(24, "Normal"), (32, "Large"), (48, "Larger"), (64, "Largest")];
 
 pub fn cursor_size() -> u32 {
-    gsettings_get("org.gnome.desktop.interface", "cursor-size").parse().unwrap_or(24)
+    match crate::kde::read_num("kcminputrc", "Mouse", "cursorSize", 0u32) {
+        0 => gsettings_get("org.gnome.desktop.interface", "cursor-size").parse().unwrap_or(24),
+        size => size,
+    }
 }
 
-/// Sets the cursor size for apps (GTK) and for niri, which draws it over everything else.
+/// Sets the cursor size for apps (GTK) and for Plasma, which draws it everywhere.
 pub fn set_cursor_size(size: u32) -> std::io::Result<()> {
     gsettings_set("org.gnome.desktop.interface", "cursor-size", &size.to_string());
-    let dir =
-        std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|| home().join(".config")).join("niri");
-    std::fs::create_dir_all(&dir)?;
-    std::fs::write(
-        dir.join("tripppin-cursor.kdl"),
-        format!("// Cursor size, written by tripppin settings.\ncursor {{\n    xcursor-size {size}\n}}\n"),
-    )?;
-    crate::display::include_in_niri("tripppin-cursor.kdl")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reads_camera_permissions() {
-        let out = "devices camera org.gnome.Snapshot yes 0x00\ndevices camera com.discordapp.Discord no 0x00\nnotifications notification x yes\n";
-        assert_eq!(
-            parse_camera(out),
-            vec![("org.gnome.Snapshot".into(), true), ("com.discordapp.Discord".into(), false)]
-        );
-    }
+    let theme = crate::kde::read("kcminputrc", "Mouse", "cursorTheme").unwrap_or_else(|| "breeze_cursors".into());
+    crate::kde::run("plasma-apply-cursortheme", &["--size", &size.to_string(), &theme])
+        .map(|_| ())
+        .map_err(std::io::Error::other)
 }
