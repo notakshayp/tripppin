@@ -13,8 +13,11 @@ export EDITOR="${EDITOR:-vi}"
 [ -d "$XDG_RUNTIME_DIR" ] || { echo "tripppin: $XDG_RUNTIME_DIR missing (is trip-runtime up?)"; exit 1; }
 cfg=/etc/tripppin/sway.conf
 [ -f "$HOME/.config/tripppin/sway.conf" ] && cfg="$HOME/.config/tripppin/sway.conf"
-# Vulkan renderer on real GPUs; if the compositor dies at once (no Vulkan, e.g. a VM), use pixman.
-for r in vulkan pixman; do
+# Vulkan renderer on real GPUs; if the compositor dies at once (no Vulkan), use pixman.
+# Virtual GPUs go straight to pixman: with a GL virtio device Vulkan can hang instead of failing.
+renderers="vulkan pixman"
+grep -qs virtio_gpu /sys/class/drm/card*/device/uevent && renderers=pixman
+for r in $renderers; do
     start=$(date +%s)
     WLR_RENDERER=$r dbus-run-session sway -c "$cfg" 2>"$XDG_RUNTIME_DIR/sway-$r.log"
     [ $(( $(date +%s) - start )) -gt 5 ] && break
