@@ -1,8 +1,0 @@
-# bootc-image-builder settings for test builds. CI fills in the placeholders
-# from repository secrets; never commit real values here.
-
-[[customizations.user]]
-name = "tripppin"
-password = "@PASSWORD_HASH@"
-key = "@SSH_KEY@"
-groups = ["wheel"]

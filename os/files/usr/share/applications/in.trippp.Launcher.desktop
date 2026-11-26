@@ -1,6 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Open the bridge
-Exec=tripppin-ui bridge
-NoDisplay=true
-X-KDE-GlobalAccel-CommandShortcut=true

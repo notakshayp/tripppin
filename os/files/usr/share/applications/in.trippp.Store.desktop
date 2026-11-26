@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Store
-Comment=Find and install apps
-Exec=tripppin-ui store
-Icon=system-software-install
-Keywords=apps;install;software;flathub;flatpak;download;
-Categories=System;PackageManager;

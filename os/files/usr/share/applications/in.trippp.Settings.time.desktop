@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Date & time settings
-Comment=Settings → date & time
-Exec=tripppin-ui settings time
-Icon=preferences-system-time
-Keywords=clock;time zone;timezone;24-hour;
-Categories=Settings;

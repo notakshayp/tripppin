@@ -185,7 +185,12 @@ impl App {
             }
             Act::TestDictation => {
                 if let Ok(exe) = std::env::current_exe() {
-                    let _ = Command::new(exe).arg("dictate").spawn();
+                    let _ = Command::new(exe)
+                        .arg("dictate")
+                        .stdin(std::process::Stdio::null())
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .spawn();
                 }
             }
             Act::Field(2) => self.settings.key_focus = true,

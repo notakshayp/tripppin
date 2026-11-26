@@ -1,4 +1,0 @@
-# kde-gtk-config would rewrite GTK 3 and 4 settings to Breeze whenever the Plasma style
-# changes. GTK apps keep the Tripppin GTK theme (dconf and /etc/skel/.config/gtk-*).
-[Module-gtkconfig]
-autoload=false

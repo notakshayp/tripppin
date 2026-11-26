@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Settings
-Comment=Network, display, sound, the AI, apps, account and more
-Exec=tripppin-ui settings
-Icon=preferences-system
-Keywords=preferences;control;system;configure;wifi;wi-fi;network;vpn;bluetooth;sound;volume;display;screen;wallpaper;appearance;keyboard;mouse;touchpad;power;battery;printer;scanner;storage;disk;updates;privacy;accounts;language;time;date;notifications;accessibility;ai;model;about;
-Categories=Settings;

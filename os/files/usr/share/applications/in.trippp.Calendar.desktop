@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Calendar
-Comment=Day, week and month; add events in plain words
-Exec=tripppin-ui calendar
-Icon=x-office-calendar
-Keywords=calendar;events;schedule;agenda;appointments;reminders;
-Categories=Office;Calendar;
-StartupWMClass=in.trippp.Calendar

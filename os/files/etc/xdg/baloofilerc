@@ -1,4 +1,0 @@
-# Indexing files in the background costs speed and battery; search finds files by name
-# (KRunner and Dolphin) without it.
-[Basic Settings]
-Indexing-Enabled=false

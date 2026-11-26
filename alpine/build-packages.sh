@@ -16,7 +16,7 @@ arch=${1:-$(uname -m | sed 's/arm64/aarch64/')}
 [ $# -gt 0 ] && shift
 pkgs=${*:-"tripppin-base tripppin-firmware trip llama-cpp-vulkan whisper-cpp"}
 conn=${PODMAN_CONNECTION:-tripppin-build-root}
-pm="podman --connection $conn"
+pm="podman --connection $conn"; [ "$conn" = local ] && pm="podman"
 case $arch in
 	aarch64) platform=linux/arm64 ;;
 	x86_64) platform=linux/amd64 ;;

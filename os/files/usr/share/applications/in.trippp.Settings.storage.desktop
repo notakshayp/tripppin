@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Storage settings
-Comment=Settings → storage
-Exec=tripppin-ui settings storage
-Icon=drive-harddisk
-Keywords=disk;space;clean up;usb;eject;
-Categories=Settings;

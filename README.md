@@ -26,9 +26,9 @@
 
 ## What it is
 
-Open a terminal and type what you want in plain words. A model running on your own machine works out the steps, checks itself, and does it. Every line you type goes to the AI; `/chat` holds a conversation, `/terminal` gives you a normal shell.
+A small Linux distribution, based on Alpine, whose whole interface is one full-screen text UI (`trip home`) you can click and type into. Say what you want in plain words; a model running on your own machine works out the steps, shows each one, searches the web or installs what it needs, and asks before anything risky. GUI apps you install still open full screen.
 
-- **Built on Fedora bootc:** the whole OS is one signed image. Updates swap the image at reboot; a bad update rolls itself back.
+- **Light:** about a 460 MB ISO, ~90 MB of memory at the home screen, ~0% CPU when idle.
 - **Local first:** the model runs on your hardware, sized to it. Bring your own cloud key or server if you prefer.
 - **Safe by construction:** the AI picks from typed tools rather than typing commands, and risky actions get a second check.
 - **Rust:** everything we write.
@@ -43,13 +43,7 @@ Logging in on a text console plays the logo: the ring draws itself, the spark sp
 
 ## Try it
 
-Test builds are attached to the private [`nightly`](https://github.com/notakshayp/tripppin/releases/tag/nightly) pre-release: an x86_64 installer ISO and virtual disk, and an aarch64 virtual disk that runs natively in UTM on Apple Silicon.
-
-```bash
-gh release download nightly --repo notakshayp/tripppin --pattern '*aarch64*'
-```
-
-Files over 2 GB are split into `.part` files; join them with `cat file.part* > file` before use. Checksums are in `SHA256SUMS-<arch>`, signed with the key in [`cosign.pub`](cosign.pub).
+Test ISOs for x86_64 and aarch64 (runs natively in UTM on Apple Silicon) are on the [`nightly`](https://github.com/notakshayp/tripppin/releases/tag/nightly) pre-release and at trippp.in. Write the ISO to a USB stick and boot it; it starts straight into the TUI (user `trip`, password `tripppin`), and `trip-install` installs it to disk. Checksums are in `SHA256SUMS-<arch>`, signed with the key in [`cosign.pub`](cosign.pub). See [`alpine/README.md`](alpine/README.md).
 
 ## Layout
 
@@ -59,14 +53,13 @@ crates/
   trip/       the `trip` command: hw, logo, and more as milestones land
 models/
   catalog.toml   which model each hardware tier gets
-os/
-  Containerfile  the OS image: Fedora bootc 45 + our tools
-  files/         files copied into the image (login hooks, services)
-  disk/          settings for ISO and disk image builds
+alpine/
+  packages/      our APKBUILDs (tripppin-base, trip, llama.cpp, whisper.cpp, firmware)
+  mkimage/       the ISO profile and its initial /etc
+  build-packages.sh, build-iso.sh, install.sh, qemu.sh
 .github/workflows/
   ci.yml      fmt, clippy, tests on x86_64 and arm64; licences and advisories
-  image.yml   builds, scans, signs and publishes the OS image (x86_64 + arm64)
-  disk.yml    turns the image into an ISO and virtual disks on the nightly release
+  iso.yml     builds the x86_64 and aarch64 ISOs, signs them, nightly release + R2
 brand/        the logo (static, theme-aware, animated), avatars, terminal logo frames
 docs/         plan and research notes
 site/         plan pages (static HTML)
@@ -92,16 +85,17 @@ rustup target add x86_64-unknown-linux-gnu
 cargo clippy --workspace --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
 ```
 
-## Build the OS image
+## Build the OS
 
-Needs podman, run as root because bootc tooling needs rootful storage.
+Needs podman. Packages, then the ISO, then boot it:
 
 ```bash
-sudo podman build -f os/Containerfile -t localhost/tripppin .
-sudo podman run --rm localhost/tripppin trip logo --static
+alpine/build-packages.sh aarch64
+alpine/build-iso.sh aarch64
+alpine/qemu.sh iso
 ```
 
-CI builds the same image for x86_64 and arm64 on every PR that touches `os/`, `crates/` or `models/`, scans it for vulnerabilities, and on `main` and nightly publishes and signs `ghcr.io/notakshayp/tripppin:nightly`.
+CI builds both architectures on every push to `main` that touches `alpine/`, `crates/` or `models/`, and publishes them.
 
 ## Brand
 

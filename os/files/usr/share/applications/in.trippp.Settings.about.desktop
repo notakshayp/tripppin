@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=About settings
-Comment=Settings → about
-Exec=tripppin-ui settings about
-Icon=help-about
-Keywords=version;hardware;computer name;hostname;
-Categories=Settings;

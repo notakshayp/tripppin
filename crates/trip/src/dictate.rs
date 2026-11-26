@@ -269,10 +269,10 @@ impl Sink for Typer {
         match p {
             Pill::Text(t) => {
                 // wtype types into the focused Wayland window; a trailing space helps the next word.
-                let _ = Command::new("wtype").arg("--").arg(format!("{t} ")).status();
+                let _ = Command::new("wtype").arg("--").arg(format!("{t} ")).output();
             }
             Pill::Failed(e) => {
-                let _ = Command::new("notify-send").args(["dictation", e]).status();
+                let _ = Command::new("notify-send").args(["dictation", e]).output();
             }
             _ => {}
         }

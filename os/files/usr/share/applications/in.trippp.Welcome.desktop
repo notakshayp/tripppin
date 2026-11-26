@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Welcome & tips
-Comment=What Tripppin can do and where things are
-Exec=tripppin-ui welcome
-Icon=help-browser
-Keywords=help;tips;tour;getting started;how;shortcuts;
-Categories=Settings;

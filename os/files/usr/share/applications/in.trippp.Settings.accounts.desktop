@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Accounts settings
-Comment=Settings → accounts
-Exec=tripppin-ui settings accounts
-Icon=system-users
-Keywords=user;password;picture;login;people;
-Categories=Settings;

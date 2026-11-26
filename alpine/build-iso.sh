@@ -9,7 +9,7 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 arch=${1:-$(uname -m | sed 's/arm64/aarch64/')}
 conn=${PODMAN_CONNECTION:-tripppin-build-root}
-pm="podman --connection $conn"
+pm="podman --connection $conn"; [ "$conn" = local ] && pm="podman"
 alpine=v3.24
 tag=v3.24.4
 case $arch in

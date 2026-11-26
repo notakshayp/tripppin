@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=AI settings
-Comment=Settings → AI
-Exec=tripppin-ui settings ai
-Icon=tripppin
-Keywords=model;assistant;llm;local;cloud;key;
-Categories=Settings;

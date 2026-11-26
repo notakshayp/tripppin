@@ -205,7 +205,7 @@ pub fn wifi_connect(ssid: &str, password: Option<&str>) -> Result<(), String> {
 }
 
 pub fn wifi_forget(ssid: &str) -> bool {
-    Command::new("iwctl").args(["known-networks", ssid, "forget"]).status().is_ok_and(|s| s.success())
+    Command::new("iwctl").args(["known-networks", ssid, "forget"]).output().is_ok_and(|o| o.status.success())
 }
 
 // ---- sound ------------------------------------------------------------------------------
@@ -224,15 +224,15 @@ pub fn volume() -> Option<(u8, bool)> {
 pub fn set_volume(percent: u8) -> bool {
     Command::new("wpctl")
         .args(["set-volume", "@DEFAULT_AUDIO_SINK@", &format!("{:.2}", f32::from(percent.min(100)) / 100.0)])
-        .status()
-        .is_ok_and(|s| s.success())
+        .output()
+        .is_ok_and(|o| o.status.success())
 }
 
 pub fn set_mute(mute: bool) -> bool {
     Command::new("wpctl")
         .args(["set-mute", "@DEFAULT_AUDIO_SINK@", if mute { "1" } else { "0" }])
-        .status()
-        .is_ok_and(|s| s.success())
+        .output()
+        .is_ok_and(|o| o.status.success())
 }
 
 // ---- display ----------------------------------------------------------------------------
@@ -267,7 +267,7 @@ pub fn power_profile() -> Option<String> {
 }
 
 pub fn set_power_profile(p: &str) -> bool {
-    Command::new("powerprofilesctl").args(["set", p]).status().is_ok_and(|s| s.success())
+    Command::new("powerprofilesctl").args(["set", p]).output().is_ok_and(|o| o.status.success())
 }
 
 // ---- keyboard ---------------------------------------------------------------------------

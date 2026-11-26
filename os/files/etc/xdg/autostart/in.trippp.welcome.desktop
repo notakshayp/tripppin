@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Tripppin welcome
-Exec=tripppin-ui welcome --first-time
-OnlyShowIn=KDE;
-X-KDE-autostart-phase=2
-NoDisplay=true

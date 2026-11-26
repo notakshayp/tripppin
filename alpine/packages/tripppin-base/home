@@ -1,12 +1,19 @@
 #!/bin/sh
-# Runs inside the home terminal: the trip TUI. A clean exit starts it again; a failure
-# (or a crash loop) drops to a shell in the same terminal.
+# Runs inside the home terminal: the trip TUI. Whatever happens it comes back: a clean exit
+# or a crash starts it again. Only a crash loop (3 failures within 20 s) drops to a shell,
+# and `trip home` from there returns. Its error output goes to a log, never over the screen.
+log="${XDG_STATE_HOME:-$HOME/.local/state}/tripppin/home.log"
+mkdir -p "$(dirname "$log")"
+fails=0; first=0
 while :; do
-    start=$(date +%s)
-    trip home
+    trip home 2>>"$log"
     code=$?
-    [ "$code" -ne 0 ] && break
-    [ $(( $(date +%s) - start )) -lt 3 ] && break
+    [ "$code" -eq 0 ] && { fails=0; continue; }
+    now=$(date +%s)
+    [ $(( now - first )) -gt 20 ] && { first=$now; fails=0; }
+    fails=$(( fails + 1 ))
+    [ "$fails" -ge 3 ] && break
+    sleep 1
 done
-printf '\ntrip exited (%s). This is a shell; run "trip home" to go back.\n' "$code"
+printf '\ntrip keeps stopping (exit %s; details in %s).\nThis is a shell; run "trip home" to go back.\n' "$code" "$log"
 exec ash -l

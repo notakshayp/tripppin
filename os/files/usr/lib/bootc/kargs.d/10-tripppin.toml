@@ -1,2 +1,0 @@
-# A quiet boot behind the Tripppin splash (Plymouth); Esc shows the messages.
-kargs = ["quiet", "rhgb", "splash", "loglevel=3", "systemd.show_status=auto"]

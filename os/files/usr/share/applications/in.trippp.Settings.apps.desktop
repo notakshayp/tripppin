@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Apps settings
-Comment=Settings → apps
-Exec=tripppin-ui settings apps
-Icon=preferences-desktop-apps
-Keywords=default apps;browser;uninstall;remove;update;flatpak;
-Categories=Settings;

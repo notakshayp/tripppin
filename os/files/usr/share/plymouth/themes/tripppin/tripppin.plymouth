@@ -1,8 +1,0 @@
-[Plymouth Theme]
-Name=Tripppin
-Description=The power-spark logo on ink: the ring draws itself and the green × spins in, then turns gently while the computer starts.
-ModuleName=script
-
-[script]
-ImageDir=/usr/share/plymouth/themes/tripppin
-ScriptFile=/usr/share/plymouth/themes/tripppin/tripppin.script

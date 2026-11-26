@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Ask Tripppin
-Exec=tripppin-ui orb --toggle
-Icon=in.trippp.Ask
-Keywords=ai;assistant;help;calculator;calculate;search;do;
-Categories=Utility;
-X-KDE-GlobalAccel-CommandShortcut=true
