@@ -1,0 +1,44 @@
+# Maintainer: Tripppin <hello@trippp.in>
+# whisper.cpp for voice dictation: CPU only (small models run fine on any chip).
+# Its ggml libraries live in a private directory so they never clash with llama-cpp-vulkan.
+pkgname=whisper-cpp
+pkgver=1.9.6
+pkgrel=0
+pkgdesc="whisper.cpp speech-to-text for dictation"
+url="https://github.com/ggml-org/whisper.cpp"
+arch="x86_64 aarch64"
+license="MIT"
+depends="libgomp libstdc++"
+makedepends="cmake samurai libgomp linux-headers"
+options="!check !tracedeps"
+source="whisper.cpp-$pkgver.tar.gz::https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v$pkgver.tar.gz"
+builddir="$srcdir/whisper.cpp-$pkgver"
+
+build() {
+	cmake -S "$builddir" -B build -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib/whisper-cpp \
+		-DCMAKE_INSTALL_RPATH=/usr/lib/whisper-cpp \
+		-DBUILD_SHARED_LIBS=ON \
+		-DGGML_BACKEND_DL=ON \
+		-DGGML_BACKEND_DIR=/usr/lib/whisper-cpp \
+		-DGGML_NATIVE=OFF \
+		-DGGML_CPU_ALL_VARIANTS=ON \
+		-DGGML_OPENMP=ON \
+		-DWHISPER_BUILD_TESTS=OFF \
+		-DWHISPER_BUILD_EXAMPLES=ON
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	rm -rf "$pkgdir"/usr/include "$pkgdir"/usr/lib/whisper-cpp/cmake "$pkgdir"/usr/lib/whisper-cpp/pkgconfig
+	for f in "$pkgdir"/usr/bin/*; do
+		case "${f##*/}" in whisper-cli|whisper-server) ;; *) rm -f "$f" ;; esac
+	done
+}
+
+sha512sums="
+2576b6233eb7486ac87f56a267a9ecbf45f16e9eb037d77465f85ad5bdf0f85c350dce8e510e1260b562f5bd04c8dc4dc671ac5b3a2065f9213fcc27b1e302d8  whisper.cpp-1.9.6.tar.gz
+"

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Primary user, console autologin and services. Safe to run again.
+/usr/libexec/tripppin/setup-user
+[ -f /etc/hostname ] || echo tripppin > /etc/hostname
+if [ -f /etc/inittab ] && ! grep -q tripppin /etc/inittab; then
+    sed -i 's|^tty1::.*|tty1::respawn:/sbin/getty -n -l /usr/libexec/tripppin/autologin 38400 tty1 # tripppin|' /etc/inittab
+fi
+if command -v rc-update >/dev/null 2>&1; then
+    for s in devfs dmesg udev udev-trigger; do rc-update -q add $s sysinit; done
+    for s in modules sysctl hostname bootmisc syslog; do rc-update -q add $s boot; done
+    for s in trip-runtime seatd dbus iwd bluetooth dhcpcd acpid chronyd; do rc-update -q add $s default; done
+fi
+exit 0

@@ -1,0 +1,4 @@
+#!/bin/sh
+# getty -l helper: log in the primary user without asking.
+id trip >/dev/null 2>&1 || /usr/libexec/tripppin/setup-user
+exec /bin/login -f trip

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Audio stack for the session (speakers, mic for dictation, Bluetooth audio).
+pipewire >/dev/null 2>&1 &
+sleep 0.3
+wireplumber >/dev/null 2>&1 &
+pipewire-pulse >/dev/null 2>&1 &

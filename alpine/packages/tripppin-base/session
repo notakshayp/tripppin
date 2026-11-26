@@ -1,0 +1,17 @@
+#!/bin/sh
+# Start the invisible compositor on the console. Returns when it exits.
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=sway
+export LIBSEAT_BACKEND=seatd
+export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM=wayland
+export GDK_BACKEND=wayland
+export SDL_VIDEODRIVER=wayland
+export _JAVA_AWT_WM_NONREPARENTING=1
+export EDITOR="${EDITOR:-vi}"
+[ -d "$XDG_RUNTIME_DIR" ] || { echo "tripppin: $XDG_RUNTIME_DIR missing (is trip-runtime up?)"; exit 1; }
+cfg=/etc/tripppin/sway.conf
+[ -f "$HOME/.config/tripppin/sway.conf" ] && cfg="$HOME/.config/tripppin/sway.conf"
+dbus-run-session sway -c "$cfg" 2>"$XDG_RUNTIME_DIR/sway.log"
+echo "tripppin: compositor exited (log: $XDG_RUNTIME_DIR/sway.log)"

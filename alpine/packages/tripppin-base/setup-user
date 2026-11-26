@@ -1,0 +1,9 @@
+#!/bin/sh
+# Create the primary user. Safe to run again.
+id trip >/dev/null 2>&1 && exit 0
+adduser -D -s /bin/ash trip
+echo 'trip:tripppin' | chpasswd
+for g in wheel video audio input seat netdev plugdev; do
+    addgroup -S "$g" 2>/dev/null
+    addgroup trip "$g" 2>/dev/null
+done

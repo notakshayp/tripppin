@@ -1,0 +1,7 @@
+#!/sbin/openrc-run
+description="Per-user runtime directory for the primary user"
+depend() { need localmount; before seatd; }
+start() {
+    uid=$(id -u trip 2>/dev/null) || return 0
+    mkdir -p /run/user/$uid && chown trip:trip /run/user/$uid && chmod 700 /run/user/$uid
+}

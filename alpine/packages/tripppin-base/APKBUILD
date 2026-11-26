@@ -1,0 +1,83 @@
+# Maintainer: Tripppin <hello@trippp.in>
+pkgname=tripppin-base
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="Tripppin base system: invisible sway compositor, foot, autologin, fonts, tuning"
+url="https://trippp.in"
+arch="noarch"
+license="Apache-2.0"
+depends="
+	alpine-base
+	openrc
+	eudev
+	dbus
+	seatd
+	sway
+	foot
+	font-jetbrains-mono
+	font-dejavu
+	fontconfig
+	mesa-dri-gallium
+	mesa-egl
+	mesa-gles
+	mesa-gbm
+	mesa-vulkan-swrast
+	vulkan-loader
+	iwd
+	dhcpcd
+	openresolv
+	chrony
+	acpid
+	bluez
+	pipewire
+	pipewire-pulse
+	pipewire-tools
+	wireplumber
+	brightnessctl
+	doas
+	openssh
+	tzdata
+	ca-certificates
+	curl
+	btrfs-progs
+	"
+# Hardware-specific Vulkan drivers (mesa-vulkan-intel, mesa-vulkan-ati, mesa-vulkan-virtio)
+# are pulled in per architecture by the image profile.
+install="$pkgname.post-install"
+options="!check"
+source="
+	sway.conf
+	foot.ini
+	fonts-tripppin.conf
+	sysctl.conf
+	doas.conf
+	iwd.conf
+	dhcpcd.conf
+	session
+	home
+	audio
+	autologin
+	setup-user
+	profile.sh
+	trip-runtime.initd
+	"
+
+package() {
+	install -Dm644 "$srcdir"/sway.conf "$pkgdir"/etc/tripppin/sway.conf
+	install -dm755 "$pkgdir"/etc/tripppin/sway.d
+	install -Dm644 "$srcdir"/foot.ini "$pkgdir"/etc/tripppin/foot.ini
+	install -Dm644 "$srcdir"/fonts-tripppin.conf "$pkgdir"/etc/fonts/conf.d/60-tripppin.conf
+	install -Dm644 "$srcdir"/sysctl.conf "$pkgdir"/etc/sysctl.d/90-tripppin.conf
+	install -Dm600 "$srcdir"/doas.conf "$pkgdir"/etc/doas.d/tripppin.conf
+	install -Dm644 "$srcdir"/iwd.conf "$pkgdir"/etc/iwd/main.conf
+	install -Dm644 "$srcdir"/dhcpcd.conf "$pkgdir"/etc/dhcpcd.conf.tripppin
+	install -Dm755 "$srcdir"/session "$pkgdir"/usr/libexec/tripppin/session
+	install -Dm755 "$srcdir"/home "$pkgdir"/usr/libexec/tripppin/home
+	install -Dm755 "$srcdir"/audio "$pkgdir"/usr/libexec/tripppin/audio
+	install -Dm755 "$srcdir"/autologin "$pkgdir"/usr/libexec/tripppin/autologin
+	install -Dm755 "$srcdir"/setup-user "$pkgdir"/usr/libexec/tripppin/setup-user
+	install -Dm644 "$srcdir"/profile.sh "$pkgdir"/etc/profile.d/tripppin.sh
+	install -Dm755 "$srcdir"/trip-runtime.initd "$pkgdir"/etc/init.d/trip-runtime
+}
+
+sha512sums="SKIP"

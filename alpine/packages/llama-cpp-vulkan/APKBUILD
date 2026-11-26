@@ -1,0 +1,55 @@
+# Maintainer: Tripppin <hello@trippp.in>
+# llama.cpp built for musl with the Vulkan backend. CPU kernels are picked at run time
+# (GGML_CPU_ALL_VARIANTS), so one package serves old Atoms and new Ryzens alike.
+pkgname=llama-cpp-vulkan
+pkgver=1.0.0
+pkgrel=0
+pkgdesc="llama.cpp inference server with Vulkan, runtime CPU dispatch"
+url="https://github.com/ggml-org/llama.cpp"
+arch="x86_64 aarch64"
+license="MIT"
+depends="vulkan-loader libgomp libstdc++"
+makedepends="cmake samurai vulkan-headers vulkan-loader-dev shaderc glslang spirv-headers libgomp linux-headers"
+options="!check !tracedeps"
+source="llama.cpp-$pkgver.tar.gz::https://github.com/ggml-org/llama.cpp/archive/refs/tags/v$pkgver.tar.gz"
+builddir="$srcdir/llama.cpp-$pkgver"
+
+prepare() {
+	default_prepare
+	# The tarball carries a partial web UI tree that fails validation; we serve no web UI.
+	rm -rf "$builddir"/tools/ui/dist
+}
+
+build() {
+	cmake -S "$builddir" -B build -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib/llama-cpp \
+		-DCMAKE_INSTALL_RPATH=/usr/lib/llama-cpp \
+		-DBUILD_SHARED_LIBS=ON \
+		-DGGML_BACKEND_DL=ON \
+		-DGGML_BACKEND_DIR=/usr/lib/llama-cpp \
+		-DGGML_NATIVE=OFF \
+		-DGGML_CPU_ALL_VARIANTS=ON \
+		-DGGML_VULKAN=ON \
+		-DGGML_OPENMP=ON \
+		-DLLAMA_CURL=OFF \
+		-DLLAMA_OPENSSL=OFF \
+		-DLLAMA_BUILD_TESTS=OFF \
+		-DLLAMA_BUILD_EXAMPLES=OFF \
+		-DLLAMA_BUILD_SERVER=ON
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	# Keep the server, the CLI and the benchmark; drop headers and the rest.
+	rm -rf "$pkgdir"/usr/include "$pkgdir"/usr/lib/llama-cpp/cmake "$pkgdir"/usr/lib/llama-cpp/pkgconfig
+	for f in "$pkgdir"/usr/bin/*; do
+		case "${f##*/}" in llama-server|llama-cli|llama-bench) ;; *) rm -f "$f" ;; esac
+	done
+}
+
+sha512sums="
+d5e204e7983280001e4fba1c4cba2d6b82eca3a628867dcf9c3ff3333fff93d2d416535edeb4baad546979967d0b04c9b35d9728e0ab200d49d832b137cc4a56  llama.cpp-1.0.0.tar.gz
+"

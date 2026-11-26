@@ -1,0 +1,25 @@
+# Maintainer: Tripppin <hello@trippp.in>
+pkgname=trip
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="Tripppin AI harness, TUI and hardware detection (hwdetect is a library inside it)"
+url="https://trippp.in"
+arch="x86_64 aarch64"
+license="Apache-2.0"
+makedepends="cargo rust"
+depends="ca-certificates"
+options="net !check"
+# The tarball is made from the working tree by alpine/build-packages.sh (git archive).
+source="tripppin-$pkgver.tar.gz"
+builddir="$srcdir/tripppin-$pkgver"
+
+build() {
+	cd "$builddir"
+	cargo build --release --locked -p trip
+}
+
+package() {
+	install -Dm755 "$builddir"/target/release/trip "$pkgdir"/usr/bin/trip
+}
+
+sha512sums="SKIP"

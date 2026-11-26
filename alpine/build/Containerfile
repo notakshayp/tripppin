@@ -1,0 +1,13 @@
+# Builder for the Tripppin Alpine image: abuild (packages) and aports mkimage (ISO).
+# Pinned: Alpine 3.24.4 base container, aports at the v3.24.4 release commit.
+FROM docker.io/library/alpine@sha256:1829893486be257df5049ab3b7fc95afbd0fc09d89803cbc580bda1ba5386b29
+ARG APORTS_REV=105b835acd9971b9770fb61f5a1ddcc133c180dc
+RUN apk add --no-cache alpine-sdk abuild apk-tools alpine-conf busybox fakeroot xorriso squashfs-tools \
+      mtools dosfstools grub grub-efi mkinitfs cargo rust git bash cmake samurai \
+      vulkan-headers vulkan-loader-dev shaderc glslang spirv-headers curl openssl sudo \
+ && adduser -D -G abuild builder && echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder \
+ && install -d -o builder -g abuild /home/builder/work \
+ && { [ "$(uname -m)" != x86_64 ] || apk add --no-cache syslinux; }
+RUN su builder -c "cd /home/builder && git init -q aports && cd aports \
+      && git remote add origin https://gitlab.alpinelinux.org/alpine/aports.git \
+      && git fetch -q --depth 1 origin $APORTS_REV && git checkout -q FETCH_HEAD"
