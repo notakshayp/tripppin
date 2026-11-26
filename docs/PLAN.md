@@ -6,10 +6,10 @@ The full picture, with diagrams, is in `site/roadmap.html`. This file is the wor
 
 | Area | Decision |
 |---|---|
-| Base | Fedora bootc 45, image-based. The whole OS is one signed OCI image; machines update atomically and roll back on failed boots. |
+| Base | **Alpine Linux 3.24** (musl, OpenRC), minimal, from 2026-11-26 (see "Alpine switch" below). Replaces Fedora bootc; the old image in `os/` stays until the Alpine one is accepted. |
 | Language | Rust for everything we write (edition 2024, MSRV 1.85). |
 | Model engine | llama.cpp server as a supervised child process; Vulkan by default, NVIDIA image variant later. |
-| Desktop | KDE Plasma 6 on KWin (Wayland), restyled end to end ("Tripppin" look-and-feel, colour scheme, Plasma style, Konsole profile), with our own screens in Rust (orb, login, Settings hub). Replaced niri on 2026-11-25: niri lacked desktop icons, right-click menus and a complete file manager. Hyprland was the first plan; COSMIC was dropped as too generic. |
+| Desktop | **None** (from 2026-11-26): one full-screen TUI, `trip home`, in `foot` inside an invisible sway. Before that: KDE Plasma 6 on KWin (Wayland), restyled end to end ("Tripppin" look-and-feel, colour scheme, Plasma style, Konsole profile), with our own screens in Rust (orb, login, Settings hub). Replaced niri on 2026-11-25: niri lacked desktop icons, right-click menus and a complete file manager. Hyprland was the first plan; COSMIC was dropped as too generic. |
 | Shell | Plain text goes to the model. `!cmd` runs a raw command; `/term` opens a classic shell. |
 | Safety | Code is the boundary (taint labels, policy engine, sandbox); an AI verifier checks intent on top. YOLO keeps two exceptions. |
 | Minimum | 16 GB memory for local AI; below that, a cloud key or the user's own server. |
@@ -173,3 +173,16 @@ For now the ISO uses Fedora's Anaconda in interactive mode. The owner wants our 
 - [ ] Calendar app writes `~/.local/share/tripppin/next-event.json`; `tripppin-ui bridge` bound once it lands
 - [ ] Checked at scale 1, 1.5 and 2 on the laptop (checked in the VM at 1)
 - [~] Shell polish: orb redesigned after the website's ask demo and resting bottom-centre; the start screen is now the bridge (`tripppin-ui bridge`, click-out closes, name/avatar opens Settings account); one Tiles quick panel (`tripppin-ui quick`) from the taskbar status; KDE jargon and stock context-menu entries removed; fade/squash window animations. See docs/DESKTOP.md "Shell polish".
+
+## Alpine switch (2026-11-26, branch `alpine-base`)
+
+Owner decision: Tripppin becomes a minimal Alpine Linux distribution with no desktop. The whole UI is the `trip home` TUI running full screen in `foot` inside an invisible `sway` (crisp fonts, truecolor, mouse, installed GUI apps open full screen; Super+Tab switches, Super+Esc returns home). Priorities: speed on low-power devices, then small image, then a strong AI harness. Details and build instructions: `alpine/README.md`.
+
+- [x] `alpine/` builder: pinned Alpine 3.24.4 container + aports v3.24.4, abuild packages (`tripppin-base`, `trip`, `llama-cpp-vulkan`, `whisper-cpp`), mkimage profile and apkovl, signing via `ABUILD_PRIVKEY` (no key committed)
+- [x] Kernel `linux-lts`, firmware subset, sway (no bar), foot, JetBrains Mono, seatd, iwd, pipewire, bluez, doas
+- [x] `alpine/install.sh`: UEFI, btrfs `@` and `@snapshots`
+- [~] Booted and checked in QEMU (aarch64); see the test notes in `alpine/README.md`
+- [ ] x86_64 ISO built and booted in CI; CI workflows for packages and ISO
+- [ ] Real signing key, hosted apk repository, `trip update` (snapshot + `apk upgrade`), rollback
+- [ ] `trip install`, in-TUI login screen
+- [ ] Delete `os/`, `crates/ui`, Plasma/Bento docs and workflows once the Alpine image replaces them
