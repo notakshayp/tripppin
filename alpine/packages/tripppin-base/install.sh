@@ -14,8 +14,14 @@ set -eu
 disk=${1:?usage: install.sh /dev/DISK [hostname]}
 host=${2:-tripppin}
 arch=$(uname -m)
-repo=${TRIPPPIN_REPO:-/media/cdrom/apks}
-[ -d "$repo/$arch" ] || { echo "no package repository at $repo/$arch (are you on the live ISO?)"; exit 1; }
+# The live medium's packages: /media/cdrom when booted as a CD (VMs), /media/<dev> from a USB stick.
+repo=${TRIPPPIN_REPO:-}
+if [ -z "$repo" ]; then
+	for d in /media/cdrom/apks /media/*/apks; do
+		[ -d "$d/$arch" ] && { repo=$d; break; }
+	done
+fi
+[ -n "$repo" ] && [ -d "$repo/$arch" ] || { echo "no package repository found under /media/*/apks/$arch (are you on the live ISO?)"; exit 1; }
 [ -d /sys/firmware/efi ] || { echo "not booted in UEFI mode"; exit 1; }
 [ "$(id -u)" = 0 ] || { echo "run as root (doas sh $0 ...)"; exit 1; }
 
