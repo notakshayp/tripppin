@@ -232,19 +232,49 @@ widget_create, widget_remove, calendar_add, setting and model_switch";
 /// A tool call that passed the checks.
 #[derive(Debug, PartialEq)]
 pub enum Action {
-    Exec { command: String, wait_secs: u64, background: bool },
-    JobWait { job: usize, wait_secs: u64 },
-    JobOutput { job: usize },
-    JobStop { job: usize },
-    Plan { steps: Vec<String> },
-    Done { step: usize, check: String },
-    Note { text: String },
-    StoreSearch { query: String },
-    StoreInstall { id: String },
-    ReadFile { path: String },
-    WriteFile { path: String, content: String },
+    Exec {
+        command: String,
+        wait_secs: u64,
+        background: bool,
+    },
+    JobWait {
+        job: usize,
+        wait_secs: u64,
+    },
+    JobOutput {
+        job: usize,
+    },
+    JobStop {
+        job: usize,
+    },
+    Plan {
+        steps: Vec<String>,
+    },
+    Done {
+        step: usize,
+        check: String,
+    },
+    Note {
+        text: String,
+    },
+    StoreSearch {
+        query: String,
+    },
+    StoreInstall {
+        id: String,
+    },
+    ReadFile {
+        path: String,
+    },
+    WriteFile {
+        path: String,
+        content: String,
+    },
     /// One of the everyday tools in `tools.rs`, its arguments already checked.
-    Ext { name: String, args: Value },
+    Ext {
+        name: String,
+        args: Value,
+    },
 }
 
 /// Plan steps as a small model may send them: a list, or one string with a step per line
@@ -455,6 +485,8 @@ pub trait Ui {
     }
     /// What the step that just ran returned, in full (what the model was told).
     fn result(&mut self, _text: &str) {}
+    /// The next step's command, query or path in full (`step` gets it cut to one line).
+    fn full_detail(&mut self, _full: &str) {}
 }
 
 /// How a task ended.
@@ -621,6 +653,7 @@ with {n}.",
                 }
                 Ok(action) => {
                     let (label, detail) = describe_action(&action);
+                    ui.full_detail(&detail);
                     session.step_started(&label, &detail);
                     session.save();
                     let result = match approval(&action, &label, &detail, ui) {

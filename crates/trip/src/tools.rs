@@ -90,8 +90,18 @@ pub fn schemas() -> Vec<Value> {
             &["url"],
         ),
         t("pkg_search", "Search installable packages.", &[("query", "string", "Name or what it does.")], &["query"]),
-        t("pkg_add", "Install packages (asks first).", &[("names", "string", "Package names, space separated.")], &["names"]),
-        t("pkg_remove", "Remove packages (asks first).", &[("names", "string", "Package names, space separated.")], &["names"]),
+        t(
+            "pkg_add",
+            "Install packages (asks first).",
+            &[("names", "string", "Package names, space separated.")],
+            &["names"],
+        ),
+        t(
+            "pkg_remove",
+            "Remove packages (asks first).",
+            &[("names", "string", "Package names, space separated.")],
+            &["names"],
+        ),
         t("sys_info", "Memory, cpu, disk, battery, Wi-Fi and the model in use.", &[], &[]),
         t("list_files", "List a folder.", &[("path", "string", "Folder path; ~ is home.")], &["path"]),
         t(
@@ -131,7 +141,12 @@ pub fn schemas() -> Vec<Value> {
             ],
             &["name", "value"],
         ),
-        t("model_switch", "Use another downloaded model for the next message.", &[("name", "string", "Part of its name.")], &["name"]),
+        t(
+            "model_switch",
+            "Use another downloaded model for the next message.",
+            &[("name", "string", "Part of its name.")],
+            &["name"],
+        ),
     ]
 }
 
@@ -189,7 +204,9 @@ pub fn check(name: &str, args: &Map<String, Value>) -> Result<Value, String> {
     let opt_num = |k: &str, default: u64| -> Result<u64, String> {
         match args.get(k) {
             None | Some(Value::Null) => Ok(default),
-            Some(Value::Number(n)) => n.as_f64().filter(|v| *v >= 0.0).map(|v| v as u64).ok_or(format!("\"{k}\" must be a positive number.")),
+            Some(Value::Number(n)) => {
+                n.as_f64().filter(|v| *v >= 0.0).map(|v| v as u64).ok_or(format!("\"{k}\" must be a positive number."))
+            }
             Some(Value::String(s)) => s.trim().parse().map_err(|_| format!("\"{k}\" must be a number.")),
             Some(_) => Err(format!("\"{k}\" must be a number.")),
         }
@@ -288,7 +305,11 @@ pub fn needs_ok(name: &str, a: &Value) -> Option<Confirm> {
         "pkg_add" => Confirm {
             kind: "installs",
             title: format!("Install {} package{}?", s(a, "names").split_whitespace().count(), plural(s(a, "names"))),
-            lines: vec![("packages".into(), s(a, "names").into()), ("from".into(), "alpine, signed".into()), ("undo".into(), "pkg.remove, any time".into())],
+            lines: vec![
+                ("packages".into(), s(a, "names").into()),
+                ("from".into(), "alpine, signed".into()),
+                ("undo".into(), "pkg.remove, any time".into()),
+            ],
         },
         "pkg_remove" => Confirm {
             kind: "deletes",
@@ -321,11 +342,17 @@ fn capital(w: &str) -> String {
 
 /// Confirmation for the agent's older tools: exec (by what the command does) and write_file.
 pub fn needs_ok_exec(command: &str) -> Option<Confirm> {
-    let words: Vec<&str> = command.split(|c: char| c.is_whitespace() || ";&|".contains(c)).filter(|w| !w.is_empty()).collect();
+    let words: Vec<&str> =
+        command.split(|c: char| c.is_whitespace() || ";&|".contains(c)).filter(|w| !w.is_empty()).collect();
     let has = |w: &str| words.contains(&w);
     let kind = if (has("apk") && (has("add") || has("upgrade") || has("fix"))) || has("pip") && has("install") {
         "installs"
-    } else if has("rm") || has("rmdir") || has("shred") || (has("apk") && has("del")) || crate::permissions::is_risky(command) {
+    } else if has("rm")
+        || has("rmdir")
+        || has("shred")
+        || (has("apk") && has("del"))
+        || crate::permissions::is_risky(command)
+    {
         "deletes"
     } else if has("rc-service") || has("rc-update") || has("reboot") || has("poweroff") || has("shutdown") {
         "services"
@@ -357,7 +384,10 @@ pub fn needs_ok_write(path: &str) -> Option<Confirm> {
     let c = Confirm {
         kind: "writes",
         title: "Overwrite a file?".into(),
-        lines: vec![("file".into(), path.into()), ("exists".into(), if p.exists() { "yes, it's replaced".into() } else { "no, new file".into() })],
+        lines: vec![
+            ("file".into(), path.into()),
+            ("exists".into(), if p.exists() { "yes, it's replaced".into() } else { "no, new file".into() }),
+        ],
     };
     ask_before().iter().any(|k| k == c.kind).then_some(c)
 }
@@ -382,7 +412,15 @@ pub fn run(name: &str, a: &Value, _cancel: &AtomicBool, _ui: &mut dyn Ui) -> Str
             }
             hits.iter()
                 .take(12)
-                .map(|p| format!("{}{}{}: {}", p.name, if p.gui { " [app]" } else { "" }, if p.installed { " [installed]" } else { "" }, p.desc))
+                .map(|p| {
+                    format!(
+                        "{}{}{}: {}",
+                        p.name,
+                        if p.gui { " [app]" } else { "" },
+                        if p.installed { " [installed]" } else { "" },
+                        p.desc
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join("\n")
         }
@@ -391,12 +429,18 @@ pub fn run(name: &str, a: &Value, _cancel: &AtomicBool, _ui: &mut dyn Ui) -> Str
         "service" => {
             let out = std::process::Command::new("rc-service").args([s(a, "name"), "status"]).output();
             match out {
-                Ok(o) => format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr)).trim().to_string(),
+                Ok(o) => format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr))
+                    .trim()
+                    .to_string(),
                 Err(e) => format!("Error: rc-service didn't start: {e}"),
             }
         }
-        "widget_create" => match widgets::create(s(a, "name"), s(a, "command"), a["every_secs"].as_u64().unwrap_or(60)) {
-            Ok(w) => format!("Added the widget \"{}\" to the home screen; it refreshes every {} seconds.", w.name, w.every_secs),
+        "widget_create" => match widgets::create(s(a, "name"), s(a, "command"), a["every_secs"].as_u64().unwrap_or(60))
+        {
+            Ok(w) => format!(
+                "Added the widget \"{}\" to the home screen; it refreshes every {} seconds.",
+                w.name, w.every_secs
+            ),
             Err(e) => format!("Error: {e}"),
         },
         "widget_remove" => {
@@ -438,7 +482,10 @@ fn model_switch(name: &str) -> String {
     let Ok(models) = crate::models::list() else { return "Error: can't read the model list.".into() };
     let Some(m) = models.iter().find(|m| m.installed && m.tier.model.to_lowercase().contains(&want)) else {
         let have: Vec<String> = models.iter().filter(|m| m.installed).map(|m| m.tier.model.clone()).collect();
-        return format!("Error: no downloaded model matches \"{name}\". Downloaded: {}.", if have.is_empty() { "none".into() } else { have.join(", ") });
+        return format!(
+            "Error: no downloaded model matches \"{name}\". Downloaded: {}.",
+            if have.is_empty() { "none".into() } else { have.join(", ") }
+        );
     };
     match crate::models::activate(&m.tier) {
         Ok(()) => format!("Now using {} (applies to the next message).", m.tier.model),
@@ -453,7 +500,11 @@ fn list_files(path: &str) -> String {
         .flatten()
         .map(|e| {
             let m = e.metadata().ok();
-            (m.as_ref().is_some_and(|m| m.is_dir()), e.file_name().to_string_lossy().into_owned(), m.map_or(0, |m| m.len()))
+            (
+                m.as_ref().is_some_and(|m| m.is_dir()),
+                e.file_name().to_string_lossy().into_owned(),
+                m.map_or(0, |m| m.len()),
+            )
         })
         .collect();
     rows.sort_by(|a, b| (!a.0, a.1.to_lowercase()).cmp(&(!b.0, b.1.to_lowercase())));
@@ -477,7 +528,11 @@ pub fn sys_info() -> String {
     let (model, local) = crate::models::model_label();
     let mut out = vec![
         format!("host     {}", sysx::hostname()),
-        format!("memory   {:.1} of {:.1} GB used", snap.mem_used_kib as f64 / 1048576.0, snap.mem_total_kib as f64 / 1048576.0),
+        format!(
+            "memory   {:.1} of {:.1} GB used",
+            snap.mem_used_kib as f64 / 1048576.0,
+            snap.mem_total_kib as f64 / 1048576.0
+        ),
         format!("load     {}", snap.load),
         format!("disk     {} of {} used", apk::size_words(snap.disk_used), apk::size_words(snap.disk_total)),
     ];

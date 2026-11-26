@@ -60,8 +60,16 @@ pub fn braille(cols: usize, ring: f64, spark: f64) -> Vec<Vec<(char, Ink)>> {
     let (x0, y0, w, h) = (27.0, 10.0, 146.0, 180.0);
     let rows = (cols as f64 * h / w / 2.0).ceil() as usize;
     let (dw, dh) = (w / (cols * 2) as f64, h / (rows * 4) as f64);
-    const BITS: [(usize, usize, u32); 8] =
-        [(0, 0, 0x01), (0, 1, 0x02), (0, 2, 0x04), (1, 0, 0x08), (1, 1, 0x10), (1, 2, 0x20), (0, 3, 0x40), (1, 3, 0x80)];
+    const BITS: [(usize, usize, u32); 8] = [
+        (0, 0, 0x01),
+        (0, 1, 0x02),
+        (0, 2, 0x04),
+        (1, 0, 0x08),
+        (1, 1, 0x10),
+        (1, 2, 0x20),
+        (0, 3, 0x40),
+        (1, 3, 0x80),
+    ];
     (0..rows)
         .map(|r| {
             (0..cols)

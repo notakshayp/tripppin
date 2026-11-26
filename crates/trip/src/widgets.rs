@@ -12,7 +12,6 @@ use std::time::{Duration, Instant};
 pub const MAX_LINES: usize = 14;
 pub const MAX_CHARS: usize = 1500;
 pub const MIN_EVERY_SECS: u64 = 5;
-const RUN_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Widget {
@@ -36,9 +35,7 @@ fn file_for(name: &str) -> PathBuf {
 pub fn list() -> Vec<Widget> {
     let mut out: Vec<Widget> = std::fs::read_dir(dir())
         .map(|d| {
-            d.flatten()
-                .filter_map(|e| serde_json::from_str(&std::fs::read_to_string(e.path()).ok()?).ok())
-                .collect()
+            d.flatten().filter_map(|e| serde_json::from_str(&std::fs::read_to_string(e.path()).ok()?).ok()).collect()
         })
         .unwrap_or_default();
     out.sort_by(|a, b| a.name.cmp(&b.name));
@@ -52,9 +49,14 @@ pub fn create(name: &str, command: &str, every_secs: u64) -> Result<Widget, Stri
     if command.trim().is_empty() {
         return Err("the command is empty.".into());
     }
-    let w = Widget { name: name.trim().to_string(), command: command.trim().to_string(), every_secs: every_secs.max(MIN_EVERY_SECS) };
+    let w = Widget {
+        name: name.trim().to_string(),
+        command: command.trim().to_string(),
+        every_secs: every_secs.max(MIN_EVERY_SECS),
+    };
     std::fs::create_dir_all(dir()).map_err(|e| e.to_string())?;
-    std::fs::write(file_for(&w.name), serde_json::to_string_pretty(&w).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    std::fs::write(file_for(&w.name), serde_json::to_string_pretty(&w).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
     Ok(w)
 }
 
@@ -65,7 +67,13 @@ pub fn remove(name: &str) -> bool {
 /// Runs a widget's command (through `sh -c`), waiting at most `timeout`, and returns what it
 /// printed, cut to a handful of short lines.
 pub fn run_command(command: &str, timeout: Duration) -> String {
-    let child = Command::new("sh").arg("-c").arg(command).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn();
+    let child = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn();
     let Ok(mut child) = child else { return "(could not start)".into() };
     let mut stdout = child.stdout.take();
     let reader = std::thread::spawn(move || {
@@ -107,7 +115,7 @@ pub struct State {
     pub updated: Option<Instant>,
     pub updated_at: String,
     pub running: bool,
-    last_start: Option<Instant>,
+    pub last_start: Option<Instant>,
 }
 
 #[derive(Default)]
@@ -194,7 +202,11 @@ pub fn events_on(ics: &str, ymd: &str) -> Vec<Event> {
             "END:VEVENT" if inside => {
                 inside = false;
                 if start.starts_with(ymd) && !title.is_empty() {
-                    let time = start.get(9..13).filter(|_| start.len() >= 13).map(|t| format!("{}:{}", &t[..2], &t[2..])).unwrap_or_default();
+                    let time = start
+                        .get(9..13)
+                        .filter(|_| start.len() >= 13)
+                        .map(|t| format!("{}:{}", &t[..2], &t[2..]))
+                        .unwrap_or_default();
                     out.push(Event { time, title: title.clone() });
                 }
             }

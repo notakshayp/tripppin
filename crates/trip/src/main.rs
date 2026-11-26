@@ -53,6 +53,24 @@ enum Command {
     /// Find, install and remove apps (Flathub).
     #[command(subcommand)]
     Store(StoreCommand),
+    /// The full-screen interface (the OS runs this in its terminal).
+    Home {
+        /// Skip the boot animation.
+        #[arg(long)]
+        no_boot: bool,
+        /// Draw one frame of a view as text (WIDTHxHEIGHT, such as 120x34) and exit.
+        #[arg(long, hide = true, value_name = "WxH")]
+        dump: Option<String>,
+        /// Which view to dump.
+        #[arg(long, hide = true, default_value = "home")]
+        view: String,
+    },
+    /// Dictation: speak, run it again to finish; the words are typed where you were.
+    Dictate {
+        /// Throw the recording away instead of typing it.
+        #[arg(long)]
+        cancel: bool,
+    },
     /// Show the tripppin logo with a short system summary.
     Logo {
         /// Draw it once without animating.
@@ -128,11 +146,29 @@ fn main() -> Result<()> {
         Command::Store(StoreCommand::Install { words }) => storecmd::install(&words),
         Command::Store(StoreCommand::Remove { words }) => storecmd::remove(&words),
         Command::Store(StoreCommand::Updates { apply }) => storecmd::updates(apply),
+        Command::Home { no_boot, dump: Some(size), view, .. } => {
+            let _ = no_boot;
+            home_dump(&size, &view)
+        }
+        Command::Home { no_boot, .. } => trip::home::run(no_boot),
+        Command::Dictate { cancel } => trip::dictate::run(cancel),
         Command::Logo { still, bare } => {
             let info = if bare { Vec::new() } else { summary() };
             Ok(logo::show(&info, !still)?)
         }
     }
+}
+
+/// `trip home --dump 120x34 --view ask`: one frame as text.
+fn home_dump(size: &str, view: &str) -> Result<()> {
+    use trip::home::ui::View;
+    let (w, h) = size.split_once('x').and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?))).unwrap_or((120, 34));
+    let (tx, _rx) = std::sync::mpsc::channel();
+    let mut app = trip::home::App::new(tx, (w, h));
+    app.go(View::ALL.into_iter().find(|v| v.name() == view).unwrap_or(View::Home));
+    let buf = app.render(w, h);
+    println!("{}", trip::home::buffer_text(&buf));
+    Ok(())
 }
 
 /// The lines printed beside the logo. Each piece is skipped if it can't be read.

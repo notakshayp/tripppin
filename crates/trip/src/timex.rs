@@ -17,8 +17,20 @@ pub struct Local {
 }
 
 pub const WEEKDAYS: [&str; 7] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-pub const MONTHS: [&str; 12] =
-    ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+pub const MONTHS: [&str; 12] = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+];
 
 /// Days since 1970-01-01 to (year, month, day).
 pub fn civil_from_days(z: i64) -> (i64, u32, u32) {

@@ -66,7 +66,10 @@ pub fn is_gui(name: &str, files: &[String]) -> bool {
 /// "firefox-128.0.1-r0" → ("firefox", "128.0.1-r0").
 pub fn split_name_version(nv: &str) -> (String, String) {
     // The release suffix (-r0) belongs to the version; the version starts at the last "-<digit>".
-    let body = nv.rfind("-r").filter(|&i| nv[i + 2..].chars().all(|c| c.is_ascii_digit()) && nv.len() > i + 2).unwrap_or(nv.len());
+    let body = nv
+        .rfind("-r")
+        .filter(|&i| nv[i + 2..].chars().all(|c| c.is_ascii_digit()) && nv.len() > i + 2)
+        .unwrap_or(nv.len());
     let head = &nv[..body];
     let cut = head
         .char_indices()
@@ -181,14 +184,19 @@ pub fn exec_line(desktop: &str) -> Option<String> {
 
 /// Whether a package name is safe to hand to apk.
 pub fn valid_name(n: &str) -> bool {
-    !n.is_empty() && n.len() < 80 && n.starts_with(|c: char| c.is_ascii_alphanumeric()) && n.chars().all(|c| c.is_ascii_alphanumeric() || "._+-:=<>~".contains(c))
+    !n.is_empty()
+        && n.len() < 80
+        && n.starts_with(|c: char| c.is_ascii_alphanumeric())
+        && n.chars().all(|c| c.is_ascii_alphanumeric() || "._+-:=<>~".contains(c))
 }
 
 /// The command prefix that gets administrator rights: none for root, else doas or sudo.
 pub fn privilege() -> &'static str {
     let root = std::fs::read_to_string("/proc/self/status")
         .ok()
-        .and_then(|s| s.lines().find_map(|l| l.strip_prefix("Uid:").and_then(|v| v.split_whitespace().next().map(str::to_string))))
+        .and_then(|s| {
+            s.lines().find_map(|l| l.strip_prefix("Uid:").and_then(|v| v.split_whitespace().next().map(str::to_string)))
+        })
         .is_some_and(|u| u == "0");
     if root {
         ""

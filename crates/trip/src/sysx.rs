@@ -46,7 +46,9 @@ pub fn cpu_percent(prev: CpuCounters, now: CpuCounters) -> u8 {
 pub fn parse_mem(info: &str) -> (u64, u64) {
     let get = |k: &str| {
         info.lines()
-            .find_map(|l| l.strip_prefix(k).and_then(|v| v.trim_start_matches(':').split_whitespace().next()?.parse::<u64>().ok()))
+            .find_map(|l| {
+                l.strip_prefix(k).and_then(|v| v.trim_start_matches(':').split_whitespace().next()?.parse::<u64>().ok())
+            })
             .unwrap_or(0)
     };
     let total = get("MemTotal");
@@ -80,7 +82,11 @@ pub fn battery() -> Option<(u8, bool, Option<f32>)> {
 
 /// (used, total) bytes of the root filesystem, from `df`.
 pub fn disk() -> (u64, u64) {
-    let out = Command::new("df").args(["-k", "/"]).output().map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
+    let out = Command::new("df")
+        .args(["-k", "/"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default();
     let f: Vec<&str> = out.lines().nth(1).unwrap_or("").split_whitespace().collect();
     let n = |i: usize| f.get(i).and_then(|v| v.parse::<u64>().ok()).unwrap_or(0) * 1024;
     (n(2), n(1))
@@ -155,7 +161,9 @@ pub fn parse_networks(out: &str) -> Vec<Network> {
 
 pub fn wifi_device() -> Option<String> {
     let d = fs::read_dir("/sys/class/net").ok()?;
-    d.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).find(|n| PathBuf::from(format!("/sys/class/net/{n}/wireless")).exists())
+    d.flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .find(|n| PathBuf::from(format!("/sys/class/net/{n}/wireless")).exists())
 }
 
 pub fn wifi_networks() -> Vec<Network> {
@@ -189,7 +197,11 @@ pub fn wifi_connect(ssid: &str, password: Option<&str>) -> Result<(), String> {
         c.args(["--passphrase", p]);
     }
     let out = c.args(["station", &dev, "connect", ssid]).output().map_err(|e| format!("iwctl didn't start: {e}"))?;
-    if out.status.success() { Ok(()) } else { Err(strip_ansi(&String::from_utf8_lossy(&out.stdout)).trim().to_string()) }
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(strip_ansi(&String::from_utf8_lossy(&out.stdout)).trim().to_string())
+    }
 }
 
 pub fn wifi_forget(ssid: &str) -> bool {
@@ -217,7 +229,10 @@ pub fn set_volume(percent: u8) -> bool {
 }
 
 pub fn set_mute(mute: bool) -> bool {
-    Command::new("wpctl").args(["set-mute", "@DEFAULT_AUDIO_SINK@", if mute { "1" } else { "0" }]).status().is_ok_and(|s| s.success())
+    Command::new("wpctl")
+        .args(["set-mute", "@DEFAULT_AUDIO_SINK@", if mute { "1" } else { "0" }])
+        .status()
+        .is_ok_and(|s| s.success())
 }
 
 // ---- display ----------------------------------------------------------------------------
@@ -280,7 +295,13 @@ pub fn parse_playing(out: &str) -> Option<Playing> {
         return None;
     }
     let micros = |s: &str| s.trim().parse::<f64>().unwrap_or(0.0) / 1e6;
-    Some(Playing { playing: f[0] == "Playing", title: f[1].into(), artist: f[2].into(), position: micros(f[3]), length: micros(f[4]) })
+    Some(Playing {
+        playing: f[0] == "Playing",
+        title: f[1].into(),
+        artist: f[2].into(),
+        position: micros(f[3]),
+        length: micros(f[4]),
+    })
 }
 
 pub fn playing() -> Option<Playing> {
@@ -345,7 +366,10 @@ mod tests {
 
     #[test]
     fn parses_status_volume_and_player() {
-        assert_eq!(parse_wifi_status("  State   connected\n  Connected network   home-5g\n").as_deref(), Some("home-5g"));
+        assert_eq!(
+            parse_wifi_status("  State   connected\n  Connected network   home-5g\n").as_deref(),
+            Some("home-5g")
+        );
         assert_eq!(parse_wifi_status("State disconnected"), None);
         assert_eq!(parse_volume("Volume: 0.60"), Some((60, false)));
         assert_eq!(parse_volume("Volume: 0.35 [MUTED]"), Some((35, true)));

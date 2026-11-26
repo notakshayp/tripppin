@@ -94,7 +94,10 @@ pub fn search(query: &str, limit: usize) -> Result<Vec<Hit>> {
         }
         "tavily" if !c.key.is_empty() => {
             let body = serde_json::json!({"api_key": c.key, "query": query, "max_results": limit});
-            let mut r = agent.post("https://api.tavily.com/search").header("Content-Type", "application/json").send(body.to_string())?;
+            let mut r = agent
+                .post("https://api.tavily.com/search")
+                .header("Content-Type", "application/json")
+                .send(body.to_string())?;
             parse_tavily(&r.body_mut().read_to_string()?)
         }
         _ => {
@@ -168,11 +171,7 @@ pub fn parse_brave(json: &str) -> Vec<Hit> {
         .and_then(Value::as_array)
         .map(|a| {
             a.iter()
-                .map(|r| Hit {
-                    title: s(r, "title"),
-                    url: s(r, "url"),
-                    snippet: text_of(&s(r, "description")),
-                })
+                .map(|r| Hit { title: s(r, "title"), url: s(r, "url"), snippet: text_of(&s(r, "description")) })
                 .collect()
         })
         .unwrap_or_default()
@@ -309,14 +308,19 @@ pub fn read(url: &str) -> Result<String> {
     check_url(url).map_err(anyhow::Error::msg)?;
     let mut r = agent().get(url.trim()).call().map_err(|e| anyhow::anyhow!("couldn't load {url}: {e}"))?;
     let kind = r.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_lowercase();
-    if !(kind.is_empty() || kind.contains("html") || kind.contains("text") || kind.contains("json") || kind.contains("xml"))
+    if !(kind.is_empty()
+        || kind.contains("html")
+        || kind.contains("text")
+        || kind.contains("json")
+        || kind.contains("xml"))
     {
         bail!("that's not a web page ({kind}); can't read it as text.");
     }
     let mut buf = Vec::new();
     r.body_mut().as_reader().take(MAX_PAGE_BYTES).read_to_end(&mut buf)?;
     let body = String::from_utf8_lossy(&buf);
-    let text = if kind.contains("html") || body.trim_start().starts_with('<') { readable(&body) } else { body.to_string() };
+    let text =
+        if kind.contains("html") || body.trim_start().starts_with('<') { readable(&body) } else { body.to_string() };
     Ok(cap(&text, MAX_PAGE_CHARS))
 }
 
@@ -332,7 +336,8 @@ fn cap(text: &str, max: usize) -> String {
 /// paragraphs and list items on their own lines; prefers `<main>` or `<article>` when present.
 pub fn readable(html: &str) -> String {
     let mut h = html.to_string();
-    for tag in ["script", "style", "noscript", "svg", "nav", "header", "footer", "aside", "form", "template", "iframe"] {
+    for tag in ["script", "style", "noscript", "svg", "nav", "header", "footer", "aside", "form", "template", "iframe"]
+    {
         h = drop_element(&h, tag);
     }
     h = drop_comments(&h);
@@ -359,8 +364,8 @@ pub fn readable(html: &str) -> String {
                 in_tag = false;
                 let name = tag.trim_start_matches('/').split(|c: char| !c.is_alphanumeric()).next().unwrap_or("");
                 match name.to_lowercase().as_str() {
-                    "p" | "div" | "br" | "tr" | "section" | "ul" | "ol" | "table" | "h1" | "h2" | "h3" | "h4" | "h5"
-                    | "h6" | "pre" | "blockquote" => out.push('\n'),
+                    "p" | "div" | "br" | "tr" | "section" | "ul" | "ol" | "table" | "h1" | "h2" | "h3" | "h4"
+                    | "h5" | "h6" | "pre" | "blockquote" => out.push('\n'),
                     "li" if !tag.starts_with('/') => out.push_str("\n- "),
                     "li" => out.push('\n'),
                     _ => {}
@@ -471,7 +476,9 @@ mod tests {
 
     #[test]
     fn parses_the_keyed_services() {
-        let b = parse_brave(r#"{"web":{"results":[{"title":"A","url":"https://a.com","description":"d <strong>x</strong>"}]}}"#);
+        let b = parse_brave(
+            r#"{"web":{"results":[{"title":"A","url":"https://a.com","description":"d <strong>x</strong>"}]}}"#,
+        );
         assert_eq!(b, vec![Hit { title: "A".into(), url: "https://a.com".into(), snippet: "d x".into() }]);
         let s = parse_searxng(r#"{"results":[{"title":"B","url":"https://b.com","content":"c"}]}"#);
         assert_eq!(s[0].url, "https://b.com");
