@@ -3,27 +3,30 @@
 
 Qt apps that are not ours (Dolphin, Konsole, System Settings, anything installed later) are
 drawn by Kvantum (a separate GPL style plugin, loaded as a library by Qt, so it stays a
-separate program for licence purposes). The theme is the "Tiles" look: flat, square, solid
-colour, 1 px outlines, no shadow, no gradient. Every element is a plain rectangle or a
-stroked line, so it is vector at any scale. Run from the repository root:
+separate program for licence purposes). The theme is the "Bento" look: rounded tiles on a
+graphite board, amber for the selected and active, no gradient. Buttons, fields, menus, tool
+tips, list rows, sliders and scroll bars are rounded (RADII, in px; the slices are as big as
+the radius, so Kvantum draws the arcs at 1:1); every element is a path or rectangle, so it is
+vector at any scale. Run from the repository root:
 python3 scripts/kvantum-theme.py
 """
 import pathlib
 
 OUT = pathlib.Path("os/files/usr/share/Kvantum/Tripppin")
 
-BG = "#101418"
-BASE = "#0b0e11"
-RAISED = "#1a2025"
-RAISED2 = "#222a30"
-LINE = "#2a3238"
-TEXT = "#ffffff"
-MUTED = "#9aa4ab"
-ACCENT = "#3fae7a"
-GREEN = "#1f6b45"
-GREEN2 = "#2a7b54"
-SLATE = "#3a4a5a"
-DIS = "#14191d"
+BG = "#16181a"
+BASE = "#111314"
+RAISED = "#23272a"
+RAISED2 = "#2e3337"
+LINE = "#2e3337"
+TEXT = "#f1f3f4"
+MUTED = "#9aa3a8"
+ACCENT = "#f2b84b"
+GREEN = "#f2b84b"  # selected / pressed fill (amber; text on it is DARK)
+GREEN2 = "#f7cc77"
+DARK = "#16181a"
+SLATE = "#3a3f43"
+DIS = "#1c1f21"
 NONE = "none"
 
 STATES = ["normal", "focused", "pressed", "toggled", "disabled", "default", "toggled-focused", "toggled-pressed"]
@@ -42,15 +45,15 @@ def box(fills):
     return out
 
 
-def button(normal=(RAISED, LINE)):
+def button(normal=(RAISED, RAISED)):
     return box({
         "normal": normal,
-        "focused": (RAISED2, ACCENT),
+        "focused": (RAISED2, RAISED2),
         "pressed": (GREEN, GREEN),
         "toggled": (GREEN, GREEN),
-        "toggled-focused": (GREEN2, ACCENT),
+        "toggled-focused": (GREEN2, GREEN2),
         "toggled-pressed": (GREEN, GREEN),
-        "disabled": (DIS, RAISED),
+        "disabled": (DIS, DIS),
         "default": (RAISED, ACCENT),
     })
 
@@ -84,7 +87,7 @@ FRAMES = {
     "slidercursor": box({"normal": (TEXT, TEXT), "focused": (ACCENT, ACCENT), "pressed": (ACCENT, ACCENT),
                          "disabled": (MUTED, MUTED)}),
     "scrollbargroove": box({"normal": (NONE, NONE)}),
-    "scrollbarslider": box({"normal": (SLATE, SLATE), "focused": ("#4b5d70", "#4b5d70"), "pressed": (ACCENT, ACCENT),
+    "scrollbarslider": box({"normal": (SLATE, SLATE), "focused": ("#4a5055", "#4a5055"), "pressed": (ACCENT, ACCENT),
                             "disabled": (RAISED, RAISED)}),
     "ss": box({"normal": (SLATE, SLATE), "focused": (SLATE, SLATE), "pressed": (ACCENT, ACCENT)}),
     "splitter": box({"normal": (NONE, NONE), "focused": (ACCENT, ACCENT), "pressed": (ACCENT, ACCENT)}),
@@ -105,7 +108,48 @@ def rect(x, y, w, h, fill, line=None, sw=1):
     return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{fill_attr}"{stroke}/>'
 
 
+RADII = {"button": 10, "tbutton": 10, "lineedit": 10, "menu": 14, "tooltip": 12, "itemview": 8,
+         "menuitem": 8, "menubaritem": 8, "scrollbarslider": 5, "ss": 5, "slider": 2, "progress": 2,
+         "progress-pattern": 2, "slidercursor": 6}
+
+
+def corner(r, which, fill, line):
+    s_ = r - 0.5
+    d = {
+        "topleft": (f"M0 {r} A{r} {r} 0 0 1 {r} 0 V{r} Z", f"M.5 {r} A{s_} {s_} 0 0 1 {r} .5"),
+        "topright": (f"M0 0 A{r} {r} 0 0 1 {r} {r} H0 Z", f"M0 .5 A{s_} {s_} 0 0 1 {r - .5} {r}"),
+        "bottomleft": (f"M0 0 A{r} {r} 0 0 0 {r} {r} V0 Z", f"M.5 0 A{s_} {s_} 0 0 0 {r} {r - .5}"),
+        "bottomright": (f"M{r} 0 A{r} {r} 0 0 1 0 {r} H{r} Z", f"M{r - .5} 0 A{s_} {s_} 0 0 1 0 {r - .5}"),
+    }[which]
+    out = f'<rect x="0" y="0" width="{r}" height="{r}" fill="none"/>'
+    if fill != NONE:
+        out += f'<path d="{d[0]}" fill="{fill}"/>'
+    if line not in (NONE, fill):
+        out += f'<path d="{d[1]}" fill="none" stroke="{line}" stroke-width="1"/>'
+    return out
+
+
+def rounded_group(base, state, fill, line, r):
+    """Interior plus eight r-sized slices: arcs in the corners, the fill (and a hairline) on the edges."""
+    p = f"{base}-{state}"
+    f = fill if fill != NONE else "none"
+    parts = [f'<g id="{p}"><rect x="0" y="0" width="6" height="6" fill="{f}"/></g>']
+    for pos in POS:
+        if pos in ("topleft", "topright", "bottomleft", "bottomright"):
+            body = corner(r, pos, fill, line)
+        else:
+            w, h = (6, r) if pos in ("top", "bottom") else (r, 6)
+            body = f'<rect x="0" y="0" width="{w}" height="{h}" fill="{f}"/>'
+            if line not in (NONE, fill):
+                ln = {"top": (0, 0, w, 1), "bottom": (0, h - 1, w, 1), "left": (0, 0, 1, h), "right": (w - 1, 0, 1, h)}[pos]
+                body += f'<rect x="{ln[0]}" y="{ln[1]}" width="{ln[2]}" height="{ln[3]}" fill="{line}"/>'
+        parts.append(f'<g id="{p}-{pos}">{body}</g>')
+    return "\n".join(parts)
+
+
 def frame_group(base, state, fill, line):
+    if base in RADII:
+        return rounded_group(base, state, fill, line, RADII[base])
     """The interior and the eight slices of one frame in one state."""
     p = f"{base}-{state}"
     # Interior: a 6 x 6 patch of the fill. Slices: the 1 px outline, stretched by Kvantum.
@@ -118,10 +162,10 @@ def frame_group(base, state, fill, line):
 def glyphs():
     out = []
     for name, d in ARROWS.items():
-        for state, colour in [("normal", TEXT), ("focused", TEXT), ("pressed", TEXT), ("toggled", TEXT), ("disabled", "#4b555c")]:
+        for state, colour in [("normal", TEXT), ("focused", TEXT), ("pressed", TEXT), ("toggled", TEXT), ("disabled", "#5a6268")]:
             out.append(
                 f'<g id="arrow-{name}-{state}"><rect x="0" y="0" width="9" height="9" fill="none"/>'
-                f'<path d="{d}" fill="none" stroke="{colour}" stroke-width="1.5" stroke-linecap="square"/></g>'
+                f'<path d="{d}" fill="none" stroke="{colour}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>'
             )
     # Plus and minus for the +/- of spin boxes.
     for name, d in [("plus", "M1 4.5 H8 M4.5 1 V8"), ("minus", "M1 4.5 H8")]:
@@ -133,17 +177,18 @@ def glyphs():
     # Check boxes and radio buttons (square: the Tiles look has no circles).
     for kind in ("checkbox", "radio"):
         for state, line, fill in [("normal", MUTED, NONE), ("focused", ACCENT, NONE), ("pressed", ACCENT, RAISED),
-                                  ("disabled", "#4b555c", NONE)]:
-            box_el = rect(1, 1, 14, 14, fill, line, 1.5)
+                                  ("disabled", "#5a6268", NONE)]:
+            box_el = (f'<circle cx="8" cy="8" r="7" fill="{fill}" stroke="{line}" stroke-width="1.5"/>' if kind == "radio" else f'<rect x="1" y="1" width="14" height="14" rx="4" fill="{fill}" stroke="{line}" stroke-width="1.5"/>')
             out.append(f'<g id="{kind}-{state}"><rect x="0" y="0" width="16" height="16" fill="none"/>{box_el}</g>')
             if kind == "checkbox":
-                mark = f'<path d="M4 8.5 L7 11.5 L12 4.5" fill="none" stroke="{TEXT}" stroke-width="1.8"/>'
-                tri = f'<path d="M4.5 8 H11.5" fill="none" stroke="{TEXT}" stroke-width="1.8"/>'
-                solid = rect(1, 1, 14, 14, GREEN if state != "disabled" else RAISED, GREEN if state != "disabled" else RAISED)
+                mark = f'<path d="M4 8.5 L7 11.5 L12 4.5" fill="none" stroke="{DARK}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+                tri = f'<path d="M4.5 8 H11.5" fill="none" stroke="{DARK}" stroke-width="2" stroke-linecap="round"/>'
+                c_ = GREEN if state != "disabled" else RAISED
+                solid = f'<rect x="1" y="1" width="14" height="14" rx="4" fill="{c_}"/>'
                 out.append(f'<g id="checkbox-checked-{state}"><rect x="0" y="0" width="16" height="16" fill="none"/>{solid}{mark}</g>')
                 out.append(f'<g id="checkbox-tristate-{state}"><rect x="0" y="0" width="16" height="16" fill="none"/>{solid}{tri}</g>')
             else:
-                dot = rect(5, 5, 6, 6, TEXT if state != "disabled" else "#4b555c")
+                dot = f'<circle cx="8" cy="8" r="3" fill="{ACCENT if state != "disabled" else "#5a6268"}"/>'
                 out.append(f'<g id="radio-checked-{state}"><rect x="0" y="0" width="16" height="16" fill="none"/>{box_el}{dot}</g>')
     # Grips, tab tear, header separator, menu indicator: small and quiet.
     out.append(f'<g id="grip-normal"><rect x="0" y="0" width="13" height="13" fill="none"/>{rect(4, 4, 5, 1, MUTED)}{rect(4, 8, 5, 1, MUTED)}</g>')
@@ -170,17 +215,17 @@ def svg():
 
 KVCONFIG = f"""[%General]
 author=Tripppin
-comment=Tiles: flat, square, solid colour (generated by scripts/kvantum-theme.py)
+comment=Bento: rounded tiles on graphite, amber accent (generated by scripts/kvantum-theme.py)
 x11drag=all
 alt_mnemonic=true
 left_tabs=false
 attach_active_tab=false
 group_toolbar_buttons=false
 spread_progressbar=true
-progressbar_thickness=4
+progressbar_thickness=6
 composite=true
-menu_shadow_depth=0
-tooltip_shadow_depth=0
+menu_shadow_depth=8
+tooltip_shadow_depth=6
 translucent_windows=false
 blurring=false
 popup_blurring=false
@@ -190,9 +235,9 @@ scroll_min_extent=40
 scroll_arrows=false
 combo_as_lineedit=true
 inline_spin_indicators=true
-slider_width=4
-slider_handle_width=12
-slider_handle_length=12
+slider_width=6
+slider_handle_width=14
+slider_handle_length=14
 check_size=16
 toolbar_icon_size=16
 animate_states=true
@@ -222,7 +267,7 @@ window.text.color={TEXT}
 button.text.color={TEXT}
 disabled.text.color=#4b555c
 tooltip.text.color={TEXT}
-highlight.text.color={TEXT}
+highlight.text.color={DARK}
 link.color={ACCENT}
 link.visited.color={MUTED}
 
@@ -237,17 +282,13 @@ no_selection_tint=true
 [PanelButtonCommand]
 frame=true
 frame.element=button
-frame.top=1
-frame.bottom=1
-frame.left=1
-frame.right=1
 interior=true
 interior.element=button
 indicator.size=9
 text.normal.color={TEXT}
 text.focus.color={TEXT}
-text.press.color={TEXT}
-text.toggle.color={TEXT}
+text.press.color={DARK}
+text.toggle.color={DARK}
 text.shadow=0
 text.margin=1
 text.iconspacing=4
@@ -256,6 +297,10 @@ text.margin.top=4
 text.margin.bottom=4
 text.margin.left=8
 text.margin.right=8
+frame.top=10
+frame.bottom=10
+frame.left=10
+frame.right=10
 
 [PanelButtonTool]
 inherits=PanelButtonCommand
@@ -265,6 +310,10 @@ text.margin.top=3
 text.margin.bottom=3
 text.margin.left=4
 text.margin.right=4
+frame.top=10
+frame.bottom=10
+frame.left=10
+frame.right=10
 
 [Dock]
 inherits=PanelButtonCommand
@@ -306,10 +355,14 @@ interior.element=common
 inherits=PanelButtonCommand
 frame.element=lineedit
 interior.element=lineedit
-text.margin.left=4
-text.margin.right=4
-text.margin.top=3
-text.margin.bottom=3
+text.margin.left=2
+text.margin.right=2
+text.margin.top=0
+text.margin.bottom=0
+frame.top=10
+frame.bottom=10
+frame.left=10
+frame.right=10
 
 [DropDownButton]
 inherits=PanelButtonCommand
@@ -371,15 +424,20 @@ interior=false
 inherits=PanelButtonCommand
 frame.element=slider
 interior.element=slider
-frame.top=0
-frame.bottom=0
-frame.left=0
-frame.right=0
+
+frame.top=2
+frame.bottom=2
+frame.left=2
+frame.right=2
 
 [SliderCursor]
 inherits=PanelButtonCommand
 frame=false
 interior.element=slidercursor
+frame.top=6
+frame.bottom=6
+frame.left=6
+frame.right=6
 
 [Progressbar]
 inherits=PanelButtonCommand
@@ -390,16 +448,21 @@ text.focus.color={TEXT}
 text.press.color={TEXT}
 text.toggle.color={TEXT}
 text.bold=false
+frame.top=2
+frame.bottom=2
+frame.left=2
+frame.right=2
 
 [ProgressbarContents]
 inherits=PanelButtonCommand
 frame=true
 frame.element=progress-pattern
 interior.element=progress-pattern
-frame.top=0
-frame.bottom=0
-frame.left=0
-frame.right=0
+
+frame.top=2
+frame.bottom=2
+frame.left=2
+frame.right=2
 
 [ItemView]
 inherits=PanelButtonCommand
@@ -410,6 +473,10 @@ text.normal.color={TEXT}
 text.focus.color={TEXT}
 text.press.color={TEXT}
 text.toggle.color={TEXT}
+frame.top=8
+frame.bottom=8
+frame.left=8
+frame.right=8
 
 [Splitter]
 inherits=PanelButtonCommand
@@ -430,21 +497,22 @@ indicator.size=9
 inherits=PanelButtonCommand
 frame.element=scrollbarslider
 interior.element=scrollbarslider
-frame.top=0
-frame.bottom=0
-frame.left=0
-frame.right=0
 indicator.element=grip
 indicator.size=13
+frame.top=5
+frame.bottom=5
+frame.left=5
+frame.right=5
 
 [ScrollbarTransientSlider]
 frame=true
 frame.element=ss
 interior=false
-frame.top=0
-frame.bottom=0
-frame.left=0
-frame.right=0
+
+frame.top=5
+frame.bottom=5
+frame.left=5
+frame.right=5
 
 [ScrollbarGroove]
 inherits=PanelButtonCommand
@@ -461,11 +529,15 @@ frame=true
 frame.element=menuitem
 interior.element=menuitem
 indicator.element=menuitem
-text.focus.color={TEXT}
+text.focus.color={DARK}
 text.margin.top=4
 text.margin.bottom=4
 text.margin.left=8
 text.margin.right=8
+frame.top=8
+frame.bottom=8
+frame.left=8
+frame.right=8
 
 [MenuBarItem]
 inherits=PanelButtonCommand
@@ -473,6 +545,10 @@ interior.element=menubaritem
 frame.element=menubaritem
 text.margin.left=8
 text.margin.right=8
+frame.top=8
+frame.bottom=8
+frame.left=8
+frame.right=8
 
 [TitleBar]
 inherits=PanelButtonCommand
@@ -491,6 +567,10 @@ inherits=PanelButtonCommand
 inherits=PanelButtonCommand
 frame.element=menu
 interior.element=menu
+frame.top=14
+frame.bottom=14
+frame.left=14
+frame.right=14
 
 [GroupBox]
 inherits=GenericFrame
@@ -509,6 +589,10 @@ interior=true
 text.margin=2
 interior.element=tooltip
 frame.element=tooltip
+frame.top=12
+frame.bottom=12
+frame.left=12
+frame.right=12
 
 [StatusBar]
 inherits=GenericFrame

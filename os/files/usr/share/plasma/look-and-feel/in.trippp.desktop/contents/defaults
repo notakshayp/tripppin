@@ -18,4 +18,4 @@ library=org.kde.kwin.aurorae
 theme=kwin4_decoration_qml_tripppin
 
 [plasmarc][Theme]
-name=tripppin-tiles
+name=tripppin-bento

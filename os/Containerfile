@@ -108,6 +108,19 @@ RUN dnf -y install --setopt=install_weak_deps=False kmscon kmscon-pango dejavu-s
          "https://raw.githubusercontent.com/google/fonts/${DM_MONO_REV}/ofl/dmmono/OFL.txt" \
     && fc-cache -f
 
+# Manrope (OFL), the Bento interface font: one variable file, weights 200-800. Same pinned
+# google/fonts revision as DM Mono.
+ARG MANROPE_SHA256=9abd9f850d8d5fdf38c5dd6164a7750bd2d05138917bf162ff43ba2b2888a7da
+ARG MANROPE_OFL_SHA256=538144f4fe6c0271ebd9fe895ccddd4ce52b838f7ad288b0366590a1bb22940d
+RUN mkdir -p /usr/share/fonts/manrope /usr/share/licenses/manrope \
+    && curl -fsSL -o /usr/share/fonts/manrope/Manrope.ttf \
+         "https://raw.githubusercontent.com/google/fonts/${DM_MONO_REV}/ofl/manrope/Manrope%5Bwght%5D.ttf" \
+    && echo "${MANROPE_SHA256}  /usr/share/fonts/manrope/Manrope.ttf" | sha256sum -c - \
+    && curl -fsSL -o /usr/share/licenses/manrope/OFL.txt \
+         "https://raw.githubusercontent.com/google/fonts/${DM_MONO_REV}/ofl/manrope/OFL.txt" \
+    && echo "${MANROPE_OFL_SHA256}  /usr/share/licenses/manrope/OFL.txt" | sha256sum -c - \
+    && fc-cache -f
+
 # Icons for the bar, quick settings and our screens: Lucide (ISC), as a font, so GTK 3
 # and GTK 4 draw the same line icons at any size and in any colour.
 ARG LUCIDE_VERSION=1.66.0

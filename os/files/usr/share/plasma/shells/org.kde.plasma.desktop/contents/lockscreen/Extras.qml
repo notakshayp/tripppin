@@ -1,24 +1,29 @@
 import QtQuick
-import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as P5Support
 
-// The two optional lines of stage 1 (mock section 01): the next event (bold title, muted time
-// line) and the unread count per app (the app's icon and a number). Both come from small
-// files other parts of the system write, and both are left out when there is nothing real:
+// The optional tiles of the lock board (Bento mock 01) as data: the next event, what is
+// playing, and the unread count per app. All of it comes from small files or programs other
+// parts of the system provide, and a tile is left out when there is nothing real:
 //
 //   next event   $XDG_DATA_HOME/tripppin/next-event.json (default ~/.local/share/tripppin/),
-//                one line: {"title":"Design review","when":"Tomorrow 10:00 – 11:00","until":1795700000}
+//                one line: {"title":"Design review","when":"Tomorrow 10:00 - 11:00","until":1795700000}
 //                `until` is when it stops mattering (seconds since the epoch); written by the
-//                calendar app.
+//                calendar app. The tile's big number is the first time in `when`.
+//   now playing  MPRIS, through `playerctl metadata` (title, artist, state, cover when it is a
+//                local file).
 //   unread       $XDG_RUNTIME_DIR/tripppin-unread.json, one line:
-//                [{"icon":"firefox","count":3}]; written by the taskbar's status plasmoid
-//                from the notification server (the locker cannot see plasmashell's history).
-Column {
+//                [{"icon":"firefox","count":3}]; written by the rail's status plasmoid from the
+//                notification server (the locker cannot see plasmashell's history).
+Item {
     id: extras
-    property real s: 1
     property string eventTitle: ""
     property string eventWhen: ""
+    property string eventTime: ""
     property var unread: []
+    property string playTitle: ""
+    property string playArtist: ""
+    property bool playing: false
+    property string playArt: ""
 
     function parse(text) {
         var lines = (text || "").split("\n");
@@ -44,58 +49,41 @@ Column {
         } catch (err2) {}
         eventTitle = title;
         eventWhen = when;
+        var t = /\d{1,2}:\d{2}/.exec(when);
+        eventTime = t ? t[0] : "";
         unread = list;
+    }
+
+    function parsePlayer(text) {
+        var parts = (text || "").split("\n")[0].split("<|>");
+        if (parts.length < 4 || parts[1] === "" || (parts[0] !== "Playing" && parts[0] !== "Paused")) {
+            playTitle = ""; playArtist = ""; playing = false; playArt = "";
+            return;
+        }
+        playing = parts[0] === "Playing";
+        playTitle = parts[1];
+        playArtist = parts[2];
+        playArt = parts[3].indexOf("file://") === 0 ? parts[3] : "";
     }
 
     P5Support.DataSource {
         engine: "executable"
-        connectedSources: ["sh -c 'cat \"${XDG_DATA_HOME:-$HOME/.local/share}/tripppin/next-event.json\" 2>/dev/null | head -n 1 | sed \"s,^,E:,\"; cat \"${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/tripppin-unread.json\" 2>/dev/null | head -n 1 | sed \"s,^,U:,\"'"]
-        interval: 5000
-        onNewData: (source, data) => extras.parse(data["stdout"])
+        connectedSources: [
+            "sh -c 'cat \"${XDG_DATA_HOME:-$HOME/.local/share}/tripppin/next-event.json\" 2>/dev/null | head -n 1 | sed \"s,^,E:,\"; cat \"${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/tripppin-unread.json\" 2>/dev/null | head -n 1 | sed \"s,^,U:,\"'",
+            "playerctl metadata --format '{{status}}<|>{{title}}<|>{{artist}}<|>{{mpris:artUrl}}'"
+        ]
+        interval: 3000
+        onNewData: (source, data) => {
+            if (source.indexOf("playerctl") === 0) extras.parsePlayer(data["stdout"]);
+            else extras.parse(data["stdout"]);
+        }
     }
 
-    Item { width: 1; height: extras.eventTitle !== "" ? 18 * extras.s : 0 }
-    Text {
-        visible: extras.eventTitle !== ""
-        text: extras.eventTitle
-        color: "#ffffff"
-        font.family: "Inter"
-        font.weight: Font.DemiBold
-        font.pixelSize: 16 * extras.s
-    }
-    Text {
-        visible: extras.eventTitle !== "" && extras.eventWhen !== ""
-        text: extras.eventWhen
-        color: "#9aa4ab"
-        font.family: "Inter"
-        font.pixelSize: 15 * extras.s
-    }
-    Item { width: 1; height: extras.unread.length > 0 ? 22 * extras.s : 0 }
-    Row {
-        visible: extras.unread.length > 0
-        spacing: 22 * extras.s
-        Repeater {
-            model: extras.unread
-            delegate: Row {
-                id: badge
-                required property var modelData
-                spacing: 8 * extras.s
-                Kirigami.Icon {
-                    source: badge.modelData.icon
-                    fallback: "application-x-executable"
-                    width: 22 * extras.s
-                    height: 22 * extras.s
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: badge.modelData.count
-                    color: "#ffffff"
-                    font.family: "Inter"
-                    font.weight: Font.Light
-                    font.pixelSize: 18 * extras.s
-                }
-            }
-        }
+    // Play and pause from the tile.
+    function togglePlay() { control.connectSource("playerctl play-pause") }
+    P5Support.DataSource {
+        id: control
+        engine: "executable"
+        onNewData: (source, data) => disconnectSource(source)
     }
 }
